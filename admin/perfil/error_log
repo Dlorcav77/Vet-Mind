@@ -1,0 +1,4 @@
+[12-Feb-2025 13:50:21 UTC] PHP Fatal error:  Uncaught Error: Call to a member function bind_param() on bool in /home/netcomputersite/public_html/rac.netcomputer.cl/admin/perfiles/lisPerfiles.php:20
+Stack trace:
+#0 {main}
+  thrown in /home/netcomputersite/public_html/rac.netcomputer.cl/admin/perfiles/lisPerfiles.php on line 20

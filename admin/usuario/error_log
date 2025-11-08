@@ -1,0 +1,54 @@
+[09-Dec-2024 14:02:39 UTC] PHP Warning:  Undefined array key "usuario_id" in /home/netcomputersite/public_html/rac.netcomputer.cl/funciones/session/ini_session.php on line 8
+[09-Dec-2024 14:02:39 UTC] PHP Warning:  Undefined array key "codsede" in /home/netcomputersite/public_html/rac.netcomputer.cl/funciones/session/ini_session.php on line 9
+[09-Dec-2024 14:02:39 UTC] PHP Warning:  Undefined array key "categorias" in /home/netcomputersite/public_html/rac.netcomputer.cl/funciones/session/ini_session.php on line 10
+[09-Dec-2024 14:02:39 UTC] PHP Warning:  Undefined array key "perfiles" in /home/netcomputersite/public_html/rac.netcomputer.cl/funciones/session/ini_session.php on line 11
+[09-Dec-2024 14:02:39 UTC] PHP Warning:  Undefined array key "root" in /home/netcomputersite/public_html/rac.netcomputer.cl/funciones/session/ini_session.php on line 12
+[09-Dec-2024 14:02:39 UTC] PHP Warning:  Cannot modify header information - headers already sent by (output started at /home/netcomputersite/public_html/rac.netcomputer.cl/funciones/session/ini_session.php:8) in /home/netcomputersite/public_html/rac.netcomputer.cl/funciones/session/funcionesSesion.php on line 75
+[09-Dec-2024 14:02:52 UTC] PHP Warning:  Undefined array key "usuario_id" in /home/netcomputersite/public_html/rac.netcomputer.cl/funciones/session/ini_session.php on line 8
+[09-Dec-2024 14:02:52 UTC] PHP Warning:  Undefined array key "codsede" in /home/netcomputersite/public_html/rac.netcomputer.cl/funciones/session/ini_session.php on line 9
+[09-Dec-2024 14:02:52 UTC] PHP Warning:  Undefined array key "categorias" in /home/netcomputersite/public_html/rac.netcomputer.cl/funciones/session/ini_session.php on line 10
+[09-Dec-2024 14:02:52 UTC] PHP Warning:  Undefined array key "perfiles" in /home/netcomputersite/public_html/rac.netcomputer.cl/funciones/session/ini_session.php on line 11
+[09-Dec-2024 14:02:52 UTC] PHP Warning:  Undefined array key "root" in /home/netcomputersite/public_html/rac.netcomputer.cl/funciones/session/ini_session.php on line 12
+[09-Dec-2024 14:02:52 UTC] PHP Warning:  Cannot modify header information - headers already sent by (output started at /home/netcomputersite/public_html/rac.netcomputer.cl/funciones/session/ini_session.php:8) in /home/netcomputersite/public_html/rac.netcomputer.cl/funciones/session/funcionesSesion.php on line 75
+[09-Dec-2024 14:03:56 UTC] PHP Warning:  Undefined array key "usuario_id" in /home/netcomputersite/public_html/rac.netcomputer.cl/funciones/session/ini_session.php on line 8
+[09-Dec-2024 14:03:56 UTC] PHP Warning:  Undefined array key "codsede" in /home/netcomputersite/public_html/rac.netcomputer.cl/funciones/session/ini_session.php on line 9
+[09-Dec-2024 14:03:56 UTC] PHP Warning:  Undefined array key "categorias" in /home/netcomputersite/public_html/rac.netcomputer.cl/funciones/session/ini_session.php on line 10
+[09-Dec-2024 14:03:56 UTC] PHP Warning:  Undefined array key "perfiles" in /home/netcomputersite/public_html/rac.netcomputer.cl/funciones/session/ini_session.php on line 11
+[09-Dec-2024 14:03:56 UTC] PHP Warning:  Undefined array key "root" in /home/netcomputersite/public_html/rac.netcomputer.cl/funciones/session/ini_session.php on line 12
+[09-Dec-2024 14:03:56 UTC] PHP Warning:  Cannot modify header information - headers already sent by (output started at /home/netcomputersite/public_html/rac.netcomputer.cl/funciones/session/ini_session.php:8) in /home/netcomputersite/public_html/rac.netcomputer.cl/funciones/session/funcionesSesion.php on line 75
+[09-Dec-2024 14:04:05 UTC] PHP Warning:  Undefined array key "usuario_id" in /home/netcomputersite/public_html/rac.netcomputer.cl/funciones/session/ini_session.php on line 8
+[09-Dec-2024 14:04:05 UTC] PHP Warning:  Undefined array key "codsede" in /home/netcomputersite/public_html/rac.netcomputer.cl/funciones/session/ini_session.php on line 9
+[09-Dec-2024 14:04:05 UTC] PHP Warning:  Undefined array key "categorias" in /home/netcomputersite/public_html/rac.netcomputer.cl/funciones/session/ini_session.php on line 10
+[09-Dec-2024 14:04:05 UTC] PHP Warning:  Undefined array key "perfiles" in /home/netcomputersite/public_html/rac.netcomputer.cl/funciones/session/ini_session.php on line 11
+[09-Dec-2024 14:04:05 UTC] PHP Warning:  Undefined array key "root" in /home/netcomputersite/public_html/rac.netcomputer.cl/funciones/session/ini_session.php on line 12
+[09-Dec-2024 14:04:05 UTC] PHP Warning:  Cannot modify header information - headers already sent by (output started at /home/netcomputersite/public_html/rac.netcomputer.cl/funciones/session/ini_session.php:8) in /home/netcomputersite/public_html/rac.netcomputer.cl/funciones/session/funcionesSesion.php on line 75
+[09-Dec-2024 14:04:08 UTC] PHP Warning:  Undefined array key "usuario_id" in /home/netcomputersite/public_html/rac.netcomputer.cl/funciones/session/ini_session.php on line 8
+[09-Dec-2024 14:04:08 UTC] PHP Warning:  Undefined array key "codsede" in /home/netcomputersite/public_html/rac.netcomputer.cl/funciones/session/ini_session.php on line 9
+[09-Dec-2024 14:04:08 UTC] PHP Warning:  Undefined array key "categorias" in /home/netcomputersite/public_html/rac.netcomputer.cl/funciones/session/ini_session.php on line 10
+[09-Dec-2024 14:04:08 UTC] PHP Warning:  Undefined array key "perfiles" in /home/netcomputersite/public_html/rac.netcomputer.cl/funciones/session/ini_session.php on line 11
+[09-Dec-2024 14:04:08 UTC] PHP Warning:  Undefined array key "root" in /home/netcomputersite/public_html/rac.netcomputer.cl/funciones/session/ini_session.php on line 12
+[09-Dec-2024 14:04:08 UTC] PHP Warning:  Cannot modify header information - headers already sent by (output started at /home/netcomputersite/public_html/rac.netcomputer.cl/funciones/session/ini_session.php:8) in /home/netcomputersite/public_html/rac.netcomputer.cl/funciones/session/funcionesSesion.php on line 75
+[09-Dec-2024 14:04:14 UTC] PHP Warning:  Undefined array key "usuario_id" in /home/netcomputersite/public_html/rac.netcomputer.cl/funciones/session/ini_session.php on line 8
+[09-Dec-2024 14:04:14 UTC] PHP Warning:  Undefined array key "codsede" in /home/netcomputersite/public_html/rac.netcomputer.cl/funciones/session/ini_session.php on line 9
+[09-Dec-2024 14:04:14 UTC] PHP Warning:  Undefined array key "categorias" in /home/netcomputersite/public_html/rac.netcomputer.cl/funciones/session/ini_session.php on line 10
+[09-Dec-2024 14:04:14 UTC] PHP Warning:  Undefined array key "perfiles" in /home/netcomputersite/public_html/rac.netcomputer.cl/funciones/session/ini_session.php on line 11
+[09-Dec-2024 14:04:14 UTC] PHP Warning:  Undefined array key "root" in /home/netcomputersite/public_html/rac.netcomputer.cl/funciones/session/ini_session.php on line 12
+[09-Dec-2024 14:04:14 UTC] PHP Warning:  Cannot modify header information - headers already sent by (output started at /home/netcomputersite/public_html/rac.netcomputer.cl/funciones/session/ini_session.php:8) in /home/netcomputersite/public_html/rac.netcomputer.cl/funciones/session/funcionesSesion.php on line 75
+[09-Dec-2024 14:04:17 UTC] PHP Warning:  Undefined array key "usuario_id" in /home/netcomputersite/public_html/rac.netcomputer.cl/funciones/session/ini_session.php on line 8
+[09-Dec-2024 14:04:17 UTC] PHP Warning:  Undefined array key "codsede" in /home/netcomputersite/public_html/rac.netcomputer.cl/funciones/session/ini_session.php on line 9
+[09-Dec-2024 14:04:17 UTC] PHP Warning:  Undefined array key "categorias" in /home/netcomputersite/public_html/rac.netcomputer.cl/funciones/session/ini_session.php on line 10
+[09-Dec-2024 14:04:17 UTC] PHP Warning:  Undefined array key "perfiles" in /home/netcomputersite/public_html/rac.netcomputer.cl/funciones/session/ini_session.php on line 11
+[09-Dec-2024 14:04:17 UTC] PHP Warning:  Undefined array key "root" in /home/netcomputersite/public_html/rac.netcomputer.cl/funciones/session/ini_session.php on line 12
+[09-Dec-2024 14:04:17 UTC] PHP Warning:  Cannot modify header information - headers already sent by (output started at /home/netcomputersite/public_html/rac.netcomputer.cl/funciones/session/ini_session.php:8) in /home/netcomputersite/public_html/rac.netcomputer.cl/funciones/session/funcionesSesion.php on line 75
+[09-Dec-2024 14:04:21 UTC] PHP Warning:  Undefined array key "usuario_id" in /home/netcomputersite/public_html/rac.netcomputer.cl/funciones/session/ini_session.php on line 8
+[09-Dec-2024 14:04:21 UTC] PHP Warning:  Undefined array key "codsede" in /home/netcomputersite/public_html/rac.netcomputer.cl/funciones/session/ini_session.php on line 9
+[09-Dec-2024 14:04:21 UTC] PHP Warning:  Undefined array key "categorias" in /home/netcomputersite/public_html/rac.netcomputer.cl/funciones/session/ini_session.php on line 10
+[09-Dec-2024 14:04:21 UTC] PHP Warning:  Undefined array key "perfiles" in /home/netcomputersite/public_html/rac.netcomputer.cl/funciones/session/ini_session.php on line 11
+[09-Dec-2024 14:04:21 UTC] PHP Warning:  Undefined array key "root" in /home/netcomputersite/public_html/rac.netcomputer.cl/funciones/session/ini_session.php on line 12
+[09-Dec-2024 14:04:21 UTC] PHP Warning:  Cannot modify header information - headers already sent by (output started at /home/netcomputersite/public_html/rac.netcomputer.cl/funciones/session/ini_session.php:8) in /home/netcomputersite/public_html/rac.netcomputer.cl/funciones/session/funcionesSesion.php on line 75
+[09-Dec-2024 14:04:24 UTC] PHP Warning:  Undefined array key "usuario_id" in /home/netcomputersite/public_html/rac.netcomputer.cl/funciones/session/ini_session.php on line 8
+[09-Dec-2024 14:04:24 UTC] PHP Warning:  Undefined array key "codsede" in /home/netcomputersite/public_html/rac.netcomputer.cl/funciones/session/ini_session.php on line 9
+[09-Dec-2024 14:04:24 UTC] PHP Warning:  Undefined array key "categorias" in /home/netcomputersite/public_html/rac.netcomputer.cl/funciones/session/ini_session.php on line 10
+[09-Dec-2024 14:04:24 UTC] PHP Warning:  Undefined array key "perfiles" in /home/netcomputersite/public_html/rac.netcomputer.cl/funciones/session/ini_session.php on line 11
+[09-Dec-2024 14:04:24 UTC] PHP Warning:  Undefined array key "root" in /home/netcomputersite/public_html/rac.netcomputer.cl/funciones/session/ini_session.php on line 12
+[09-Dec-2024 14:04:24 UTC] PHP Warning:  Cannot modify header information - headers already sent by (output started at /home/netcomputersite/public_html/rac.netcomputer.cl/funciones/session/ini_session.php:8) in /home/netcomputersite/public_html/rac.netcomputer.cl/funciones/session/funcionesSesion.php on line 75

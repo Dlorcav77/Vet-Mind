@@ -1,0 +1,78 @@
+{
+  "_meta": {
+    "version": 1,
+    "unit_policy": "canonical",
+    "units": {
+      "length": "cm",
+      "wall_thickness": "cm",
+      "cm_ratio": ""
+    }
+  },
+  "aliases": {
+    "organ": {
+      "riñon": "kidney",
+      "rinon": "kidney",
+      "renal": "kidney",
+      "higado": "liver",
+      "hepatico": "liver",
+      "vesicula biliar": "gallbladder",
+      "bazo": "spleen",
+      "esplenico": "spleen",
+      "gastrico": "stomach",
+      "duodenal": "duodenum",
+      "yeyunal": "jejunum",
+      "colonico": "colon"
+    },
+    "measure": {
+      "tamaño": "length",
+      "tamano": "length",
+      "longitud": "length",
+      "grosor": "wall_thickness",
+      "grosor pared": "wall_thickness",
+      "relacion cortico medular": "cm_ratio",
+      "relación cortico medular": "cm_ratio",
+      "relacion cortico-medular": "cm_ratio",
+      "relación cortico-medular": "cm_ratio"
+    }
+  },
+  "_fallback": {
+    "_global": {
+      "kidney": {
+        "cm_ratio": { "unit": "", "min": null, "max": null, "note": "", "source": "" }
+      }
+    }
+  },
+  "felino": {
+    "cat": {
+      "juvenile": {},
+      "adult": {
+        "kidney": {
+          "length":    { "unit": "cm", "min": null, "max": null, "note": "", "source": "" },
+          "cm_ratio":  { "unit": "",  "min": null, "max": null, "note": "", "source": "" }
+        },
+        "jejunum": {
+          "wall_thickness": { "unit": "cm", "min": null, "max": null, "note": "", "source": "" }
+        }
+      },
+      "senior": {}
+    }
+  },
+  "canino": {
+    "small": {
+      "juvenile": {},
+      "adult": {
+        "kidney": {
+          "length":   { "unit": "cm", "min": null, "max": null, "note": "", "source": "" },
+          "cm_ratio": { "unit": "",  "min": null, "max": null, "note": "", "source": "" }
+        },
+        "duodenum": {
+          "wall_thickness": { "unit": "cm", "min": null, "max": null, "note": "", "source": "" }
+        }
+      },
+      "senior": {}
+    },
+    "medium": { "juvenile": {}, "adult": {}, "senior": {} },
+    "large":  { "juvenile": {}, "adult": {}, "senior": {} },
+    "giant":  { "juvenile": {}, "adult": {}, "senior": {} }
+  }
+}

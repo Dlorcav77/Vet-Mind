@@ -1,0 +1,8 @@
+/vendor/
+/uploads/
+/.env
+configP.php
+*.sql
+.idea/
+/.vscode/
+/*.log
