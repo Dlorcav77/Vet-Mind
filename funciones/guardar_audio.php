@@ -5,7 +5,10 @@ header('Content-Type: application/json; charset=utf-8');
 
 session_start();
 
-$logDir = dirname(__DIR__) . '/funciones/logs';
+// 🟣 rutas base ya corregidas para estar en /funciones/GPT
+$ROOT_DIR = dirname(__DIR__, 2);        // ← sube de /funciones/GPT → /
+$FUNC_DIR = dirname(__DIR__);           // ← /funciones
+$logDir   = $FUNC_DIR . '/logs';
 if (!is_dir($logDir)) {
     @mkdir($logDir, 0775, true);
 }
@@ -19,7 +22,7 @@ if ($userId <= 0) {
     exit;
 }
 
-$baseDir = dirname(__DIR__) . '/uploads/grabaciones';
+$baseDir = $ROOT_DIR . '/uploads/grabaciones';
 
 // ✅ Crear carpeta base si no existe
 if (!is_dir($baseDir)) {

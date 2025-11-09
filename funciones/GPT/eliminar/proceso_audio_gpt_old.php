@@ -1,14 +1,21 @@
 <?php
 header('Content-Type: application/json');
 date_default_timezone_set('America/Santiago');
-require_once(dirname(__DIR__) . "/configP.php");
+
+// ahora estamos en /funciones/GPT
+$ROOT_DIR = dirname(__DIR__, 2);   // /
+$FUNC_DIR = dirname(__DIR__);      // /funciones
+
+require_once($ROOT_DIR . "/configP.php");
 
 session_start();
 
-$logDir = dirname(__DIR__) . '/funciones/logs';
+$logDir = $FUNC_DIR . '/logs';
 if (!is_dir($logDir)) {
     @mkdir($logDir, 0775, true);
 }
+
+$T0 = microtime(true); // ⏱ inicio total
 
 $userId = isset($_SESSION['usuario_id']) ? (int)$_SESSION['usuario_id'] : 0;
 if ($userId <= 0) {
@@ -18,7 +25,7 @@ if ($userId <= 0) {
 }
 
 // 📁 Base y fecha
-$baseDir = dirname(__DIR__) . '/uploads/grabaciones';
+$baseDir = $ROOT_DIR . '/uploads/grabaciones';
 if (!is_dir($baseDir)) {
     if (!mkdir($baseDir, 0775, true)) {
         echo json_encode(['status' => 'error', 'message' => 'No se pudo crear la carpeta grabaciones']);
@@ -40,7 +47,6 @@ if (!is_dir($uploadDir)) {
     }
 }
 
-
 // 🔒 API Key AssemblyAI
 $assemblyApiKey = $ASSEM_API_KEY ?? '';
 if (!$assemblyApiKey) {
@@ -51,14 +57,11 @@ if (!$assemblyApiKey) {
 $audioPath = '';
 
 function sanitizeRelativeAudioPath($path) {
-    // Permitir: YYYY/MM/filename.wav o uploads/grabaciones/YYYY/MM/filename.wav o filename.wav
     $path = str_replace('\\', '/', $path);
     $path = trim($path);
-    $path = ltrim($path, '/'); // fuera el slash inicial
-    // normalizar y evitar traversal
+    $path = ltrim($path, '/');
     $path = preg_replace('#\.\./#', '', $path);
     $path = preg_replace('#[^a-zA-Z0-9/_\.\-]#', '', $path);
-    // si viene con prefijo uploads/grabaciones/, lo quitamos
     if (strpos($path, 'uploads/grabaciones/') === 0) {
         $path = substr($path, strlen('uploads/grabaciones/'));
     }
@@ -66,11 +69,9 @@ function sanitizeRelativeAudioPath($path) {
 }
 
 function findAudioByFilename($baseDir, $filename) {
-    // Busca en AAAA/MM/filename (dos niveles) y devuelve el más reciente
     $pattern = rtrim($baseDir, '/') . '/*/*/' . $filename;
     $matches = glob($pattern, GLOB_NOSORT);
     if (!$matches) return '';
-    // elegir el más nuevo por mtime
     $latest = '';
     $latestMtime = -1;
     foreach ($matches as $m) {
@@ -83,16 +84,15 @@ function findAudioByFilename($baseDir, $filename) {
     return $latest ?: $matches[0];
 }
 
+// 🟣 recibir audio
 if (isset($_FILES['audio'])) {
     $tmpFile = $_FILES['audio']['tmp_name'];
     $originalExt = strtolower(pathinfo($_FILES['audio']['name'], PATHINFO_EXTENSION));
-    if ($originalExt === '') { $originalExt = 'webm'; } // fallback común
+    if ($originalExt === '') { $originalExt = 'webm'; }
 
-
-    // === Validaciones: tamaño y MIME ===
+    // === Validaciones ===
     define('MAX_AUDIO_BYTES', 25 * 1024 * 1024); // 25 MB
 
-    // Tamaño real
     $size = (int)($_FILES['audio']['size'] ?? 0);
     if ($size <= 0 && is_file($tmpFile)) {
         $size = filesize($tmpFile);
@@ -103,7 +103,6 @@ if (isset($_FILES['audio'])) {
         exit;
     }
 
-    // MIME real
     $finfo = new finfo(FILEINFO_MIME_TYPE);
     $mime  = $finfo->file($tmpFile) ?: '';
 
@@ -111,8 +110,8 @@ if (isset($_FILES['audio'])) {
         'audio/wav', 'audio/x-wav',
         'audio/webm', 'video/webm',
         'audio/ogg',
-        'audio/mpeg',     // mp3
-        'audio/mp4',      // m4a
+        'audio/mpeg',
+        'audio/mp4',
         'audio/3gpp', 'audio/3gpp2'
     ];
     $allowedExts = ['wav','webm','mp3','m4a','ogg','3gp','3g2'];
@@ -131,10 +130,7 @@ if (isset($_FILES['audio'])) {
         echo json_encode(['status' => 'error', 'message' => 'Formato de audio no permitido. Usa WAV, WEBM, MP3, OGG o M4A.']);
         exit;
     }
-    // === Fin validaciones ===
 
-
-    // Temp en carpeta final
     $tempName = preg_replace('/[^a-zA-Z0-9_\-]/', '', uniqid('upload_', true)) . '.' . $originalExt;
     $tempPath = $uploadDir . '/' . $tempName;
 
@@ -143,7 +139,6 @@ if (isset($_FILES['audio'])) {
         exit;
     }
 
-    // Nombre final estandarizado
     $convertedName = $userId . '_' . $day . '_' . $hmsms . '.wav';
     $convertedPath = $uploadDir . '/' . $convertedName;
 
@@ -153,10 +148,9 @@ if (isset($_FILES['audio'])) {
         exit;
     }
 
-    // Normalizar SIEMPRE a WAV 16kHz mono
     $cmd = escapeshellarg($ffmpegPath) . " -nostdin -hide_banner -loglevel error -y " .
         "-i " . escapeshellarg($tempPath) . " " .
-        "-vn -sn -dn -map a:0 " .            // solo audio, primer track
+        "-vn -sn -dn -map a:0 " .
         "-ar 16000 -ac 1 -c:a pcm_s16le " .
         escapeshellarg($convertedPath) . " 2>&1";
     exec($cmd, $output, $returnVar);
@@ -168,31 +162,23 @@ if (isset($_FILES['audio'])) {
     }
 
     unlink($tempPath);
-
-    // 👉 Para Assembly usaremos el archivo ya normalizado:
     $audioPath = $convertedPath;
 
 } elseif (isset($_POST['audio_filename']) || isset($_POST['audio_url'])) {
-    // Acepta:
-    //  - 'YYYY/MM/archivo.wav'
-    //  - 'uploads/grabaciones/YYYY/MM/archivo.wav'
-    //  - 'archivo.wav' (solo nombre) -> se busca recursivamente
     $input = $_POST['audio_filename'] ?? $_POST['audio_url'];
     $rel   = sanitizeRelativeAudioPath($input);
 
-    if ($rel === '' || $rel === '.' ) {
+    if ($rel === '' || $rel === '.') {
         echo json_encode(['status' => 'error', 'message' => 'Ruta de audio inválida']);
         exit;
     }
 
     if (strpos($rel, '/') === false) {
-        // Solo nombre: buscar en AAAA/MM
         $found = findAudioByFilename($baseDir, $rel);
         if ($found !== '' && file_exists($found)) {
             $audioPath = $found;
         }
     } else {
-        // Trae carpeta: armar ruta relativa a uploads/grabaciones
         $candidate = $baseDir . '/' . $rel;
         if (file_exists($candidate)) {
             $audioPath = $candidate;
@@ -205,7 +191,11 @@ if (!file_exists($audioPath)) {
     exit;
 }
 
-// 📤 Subir audio a AssemblyAI (con timeouts y log en caso de fallo)
+/**
+ * ⏱ SUBIDA A ASSEMBLY
+ */
+$T_upload_start = microtime(true);
+
 $curlCmd = "curl -s --request POST " .
            "--url https://api.assemblyai.com/v2/upload " .
            "--header " . escapeshellarg("authorization: $assemblyApiKey") . " " .
@@ -214,6 +204,9 @@ $curlCmd = "curl -s --request POST " .
            "--connect-timeout 10 --max-time 60";
 
 $uploadResponse = shell_exec($curlCmd);
+
+$T_upload_end = microtime(true);
+
 $uploadData = json_decode($uploadResponse, true);
 
 if (!is_array($uploadData) || !isset($uploadData['upload_url'])) {
@@ -228,7 +221,11 @@ if (!is_array($uploadData) || !isset($uploadData['upload_url'])) {
 }
 $uploadUrl = $uploadData['upload_url'];
 
-// 🔥 Iniciar transcripción
+/**
+ * ⏱ POLLING DE TRANSCRIPCIÓN
+ */
+$T_poll_start = microtime(true);
+
 $transcriptionRequest = [
     'audio_url' => $uploadUrl,
     'language_code' => 'es',
@@ -244,7 +241,6 @@ curl_setopt($ch, CURLOPT_HTTPHEADER, [
 curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
 curl_setopt($ch, CURLOPT_POST, true);
 curl_setopt($ch, CURLOPT_POSTFIELDS, json_encode($transcriptionRequest));
-// ⏱️ Timeouts
 curl_setopt($ch, CURLOPT_CONNECTTIMEOUT, 10);
 curl_setopt($ch, CURLOPT_TIMEOUT, 30);
 
@@ -275,7 +271,6 @@ for ($i = 0; $i < count($delays); $i++) {
         'authorization: ' . $assemblyApiKey
     ]);
     curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
-    // ⏱️ Timeouts por request
     curl_setopt($ch, CURLOPT_CONNECTTIMEOUT, 10);
     curl_setopt($ch, CURLOPT_TIMEOUT, 15);
 
@@ -285,7 +280,6 @@ for ($i = 0; $i < count($delays); $i++) {
 
     $statusData = json_decode($statusResponse, true);
     if ($httpCode >= 400 || !is_array($statusData) || !isset($statusData['status'])) {
-        // glitch de red o respuesta mala → reintentar tras delay
         sleep($delays[$i]);
         continue;
     }
@@ -302,17 +296,22 @@ for ($i = 0; $i < count($delays); $i++) {
         exit;
     }
 
-    // queued / processing → backoff
     sleep($delays[$i]);
 }
+
+$T_poll_end = microtime(true);
 
 if (!$text || strlen($text) < 5) {
     echo json_encode(['status' => 'error', 'message' => 'Texto transcrito vacío o inválido (timeout o contenido muy corto).']);
     exit;
 }
 
-// 🤖 Pasar texto a proceso_gpt.php (con timeouts y logs de error)
-$ch = curl_init('http://localhost/funciones/proceso_gpt.php');
+/**
+ * ⏱ LLAMADA A GPT LOCAL
+ */
+$T_gpt_start = microtime(true);
+
+$ch = curl_init('http://localhost/funciones/GPT/proceso_gpt.php');
 curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
 curl_setopt($ch, CURLOPT_POST, true);
 curl_setopt($ch, CURLOPT_POSTFIELDS, http_build_query([
@@ -327,7 +326,6 @@ curl_setopt($ch, CURLOPT_POSTFIELDS, http_build_query([
     'tipo_estudio'  => $_POST['tipo_estudio'] ?? '',
     'motivo'        => $_POST['motivo_examen'] ?? ''
 ]));
-// ⏱️ Timeouts razonables
 curl_setopt($ch, CURLOPT_CONNECTTIMEOUT, 10);
 curl_setopt($ch, CURLOPT_TIMEOUT, 60);
 
@@ -336,6 +334,21 @@ $httpCode = (int) curl_getinfo($ch, CURLINFO_HTTP_CODE);
 $errNo    = curl_errno($ch);
 $errMsg   = curl_error($ch);
 curl_close($ch);
+
+$T_gpt_end = microtime(true);
+
+$T_end = microtime(true);
+
+// guardar tiempos en log
+file_put_contents(
+    $logDir . '/tiempos_proceso_audio.log',
+    date('c')
+    . ' | upload=' . round($T_upload_end - $T_upload_start, 3) . 's'
+    . ' | poll='   . round($T_poll_end - $T_poll_start, 3) . 's'
+    . ' | gpt='    . round($T_gpt_end - $T_gpt_start, 3) . 's'
+    . ' | total='  . round($T_end - $T0, 3) . "s\n",
+    FILE_APPEND
+);
 
 if ($errNo) {
     file_put_contents(
@@ -361,11 +374,9 @@ if ($httpCode < 200 || $httpCode >= 300 || !$responseGPT) {
 echo $responseGPT;
 
 
-
-
-
-
-
+/**
+ * util
+ */
 function quitarTildes($string) {
     $originales = ['á','é','í','ó','ú','Á','É','Í','Ó','Ú'];
     $sinTildes  = ['a','e','i','o','u','A','E','I','O','U'];

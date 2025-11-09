@@ -571,14 +571,34 @@ function audio_manual_setMode(mode) {
 
   function ensureCKE() {
     const id = 'contenido_html';
+    const plantilla = $('#plantillaBase').val() || '';
+
     if ($('#' + id).length && !CKEDITOR.instances[id]) {
       CKEDITOR.replace(id, {
         height: 300,
         allowedContent: true,
         extraAllowedContent: 'span{*}(*)'
       });
+
+      // 💥 cuando recién creo el editor y NO estoy modificando,
+      // si hay plantilla y el editor está vacío, la pongo
+      setTimeout(() => {
+        if (!ES_MODIFICAR && plantilla) {
+          const actual = CKEDITOR.instances[id].getData().trim();
+          if (!actual) {
+              CKEDITOR.instances[id].setData(plantilla);
+          }
+        }
+      }, 80);
+    } else if (!ES_MODIFICAR && plantilla && CKEDITOR.instances[id]) {
+      // por si ya estaba creado pero vacío
+      const actual = CKEDITOR.instances[id].getData().trim();
+      if (!actual) {
+          CKEDITOR.instances[id].setData(plantilla);
+      }
     }
   }
+
   function destroyCKE() {
     if (CKEDITOR.instances['contenido_html']) {
       CKEDITOR.instances['contenido_html'].destroy(true);

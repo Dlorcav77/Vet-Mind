@@ -204,9 +204,26 @@ $('select[name="plantilla_informe_id"]').on('change', function () {
             if (res.status === 'success') {
                 $('#plantillaBase').val(res.contenido);
                 $('#plantillaContenido').html(res.contenido);
-                $('#plantillaPlaceholder').hide();   // 👈 Oculta el placeholder
-                $('#plantillaPreview').show();      // 👈 Muestra la plantilla
+                $('#plantillaPlaceholder').hide();
+                $('#plantillaPreview').show();
                 $('#procesarIA').prop('disabled', false);
+
+                // 💥 NUEVO: si estoy en modo manual, no estoy editando y el editor está vacío, relleno
+                if (!ES_MODIFICAR && audio_manual_isManual()) {
+                    // si ya existe CKEditor
+                    if (CKEDITOR.instances['contenido_html']) {
+                        const actual = CKEDITOR.instances['contenido_html'].getData().trim();
+                        if (!actual) {
+                            CKEDITOR.instances['contenido_html'].setData(res.contenido);
+                        }
+                    } else {
+                        // por si todavía no se creó
+                        const $txt = $('#contenido_html');
+                        if ($txt.length && !$txt.val().trim()) {
+                            $txt.val(res.contenido);
+                        }
+                    }
+                }
             } else {
                 $('#plantillaBase').val('');
                 $('#plantillaContenido').html('<div class="text-danger">' + res.message + '</div>');

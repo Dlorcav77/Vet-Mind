@@ -1,14 +1,17 @@
 <?php
 declare(strict_types=1);
 
-require_once("../funciones/conn/conn.php");
-require_once("../configP.php");
-require_once(__DIR__ . "/logs/logger.php");
-require_once("../funciones/data/ref_ranges.php");
+// ahora en /funciones/GPT
+$ROOT_DIR = dirname(__DIR__, 2);   // /
+$FUNC_DIR = dirname(__DIR__);      // /funciones
+
+require_once($FUNC_DIR . "/conn/conn.php");
+require_once($ROOT_DIR . "/configP.php");
+require_once($FUNC_DIR . "/logs/logger.php");
+require_once($FUNC_DIR . "/data/ref_ranges.php");
 date_default_timezone_set('America/Santiago');
 
 $mysqli = conn();
-
 header('Content-Type: application/json; charset=utf-8');
 
 // === Límites (ajústalos si quieres) ========================================
@@ -483,7 +486,7 @@ if (!function_exists('build_observaciones_asistente')) {
 
         foreach ($m[0] as $match) {
             $supTag = $match[0];
-            $pos    = $match[1];
+            $pos    = (int)$match[1]; 
 
             // Número y tipo
             $n = null; $tipo = 'valor_sospechoso';

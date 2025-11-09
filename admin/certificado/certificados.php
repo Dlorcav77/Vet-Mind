@@ -132,20 +132,34 @@ if ($action === "modificar") {
 
 <!-- <script src="../assets/ckeditor/ckeditor.js"></script> -->
 <script>
+    (function () {
+        // solo la defino si no existe
+        if (typeof window.ES_MODIFICAR === 'undefined') {
+        window.ES_MODIFICAR = <?= $action === 'modificar' ? 'true' : 'false' ?>;
+        } else {
+        // si ya existe, la actualizamos igual por si cambiaste de ingresar a modificar
+        window.ES_MODIFICAR = <?= $action === 'modificar' ? 'true' : 'false' ?>;
+        }
+    })();
+</script>
+
+<script>
+
+
+
 
 $('#procesarIA').on('click', function () {
-    let $btnProcesar = $(this); // 💥 Aquí arriba
+    let $btnProcesar = $(this);
 
-    // 🚨 Validar que los datos del paciente están completos
+    // validar datos paciente
     let pacienteData = obtenerDatosPaciente();
     if (!pacienteData) {
         Swal.fire('Tipo de Examen requerido', 'Debes seleccionar un tipo de examen antes de procesar.', 'warning');
-        $btnProcesar.prop('disabled', false);
         return;
     }
+
     $btnProcesar.prop('disabled', true);
 
-    // 📌 Validar tipo de examen
     let tipoExamen = $('select[name="plantilla_informe_id"]').val();
     if (!tipoExamen) {
         Swal.fire('Tipo de Examen requerido', 'Debes seleccionar un tipo de examen antes de procesar.', 'warning');
@@ -153,41 +167,39 @@ $('#procesarIA').on('click', function () {
         return;
     }
 
-    // 🎤 Verificar si hay una grabación en progreso
     if (window.recorder && window.recorder.state === 'recording') {
         Swal.fire('Espera', 'Termina la grabación antes de procesar.', 'info');
         $btnProcesar.prop('disabled', false);
         return;
     }
 
-    // 📝 Obtener texto (si modo manual)
-    let texto = '';
-    if (CKEDITOR.instances['contenido_html']) {
-        texto = (CKEDITOR.instances['contenido_html'].getData() || '').trim();
-    } else {
-        texto = $('#contenido_html').val().trim();
-    }
-
-    // 🎛 Verificar si el método es manual o audio
     let esManual = $('#toggle_audio_manual').prop('checked');
 
+    // ---------- MODO MANUAL ----------
     if (esManual) {
-        // ✍️ Procesar texto escrito
+        let texto = '';
+        if (CKEDITOR.instances['contenido_html']) {
+            texto = (CKEDITOR.instances['contenido_html'].getData() || '').trim();
+        } else {
+            texto = $('#contenido_html').val().trim();
+        }
+
         if (texto.length < 5) {
             Swal.fire('Error', 'Debes ingresar un texto antes de procesar.', 'warning');
             $btnProcesar.prop('disabled', false);
             return;
         }
 
+        // aquí no mostramos swal largo, porque es rápido
         procesarTextoConGPT(texto).finally(() => {
             $btnProcesar.prop('disabled', false);
         });
         return;
     }
 
-    // 🎧 Si es modo audio, verificar archivo o grabación
+    // ---------- MODO AUDIO (2 pasos) ----------
     let audioFile = $('input[name="archivo_audio"]')[0].files[0];
-    let audioFilename = $('#bloque-audio').data('audioFilename'); // si es grabación
+    let audioFilename = $('#bloque-audio').data('audioFilename');
 
     if (!audioFile && !audioFilename) {
         Swal.fire('Error', 'Debes subir o grabar un audio antes de procesar.', 'warning');
@@ -195,57 +207,88 @@ $('#procesarIA').on('click', function () {
         return;
     }
 
+    // 🟣 UN SOLO MODAL PARA TODO
     Swal.fire({
-        title: 'Procesando audio...',
-        text: 'Transcribiendo audio y generando informe con IA.',
+        title: 'Procesando con Vet-Mind...',
+        html: 'Transcribiendo tu audio, espera un momento.',
         allowOutsideClick: false,
+        showConfirmButton: false,
         didOpen: () => Swal.showLoading()
     });
 
     let formData = new FormData();
     if (audioFile) {
         formData.append('audio', audioFile);
-    } else if (audioFilename) {
+    } else {
         formData.append('audio_filename', audioFilename);
     }
-    
-    // let pacienteData = obtenerDatosPaciente();
     for (const key in pacienteData) {
         formData.append(key, pacienteData[key]);
     }
 
-    // 🆕 Agregar plantilla base
-    let plantillaBase = $('#plantillaBase').val();
-    formData.append('plantilla_base', plantillaBase);
-
-    let plantillaId = $('select[name="plantilla_informe_id"]').val();
-    formData.append('plantilla_id', plantillaId);
-
-
-    $.ajax({
-        url: '/funciones/proceso_audio_gpt.php',
-        type: 'POST',
-        data: formData,
-        contentType: false,
-        processData: false,
-        success: function (response) {
-            Swal.close();
-            if (response.status === 'success') {
-                mostrarModalIA(response.content);
-            } else {
-                Swal.fire('Error', response.message, 'error');
-            }
-        },
-        error: function (jqXHR, textStatus, errorThrown) {
-            // console.log('AJAX Error:', { jqXHR, textStatus, errorThrown });
-            Swal.close();
-            Swal.fire('Error', 'No se pudo conectar al servicio de transcripción.', 'error');
-        },
-        complete: function () {
-            $btnProcesar.prop('disabled', false);
+    // 1) transcribir
+    fetch('/funciones/GPT/transcribir_audio.php', {
+        method: 'POST',
+        body: formData
+    })
+    .then(r => r.json())
+    .then(resp => {
+        if (resp.status !== 'success') {
+            throw new Error(resp.message || 'Error al transcribir.');
         }
+
+        const textoTranscrito = (resp.texto || '').trim();
+        if (!textoTranscrito) {
+            throw new Error('La transcripción volvió vacía.');
+        }
+
+        // 🔁 actualizamos el MISMO modal y volvemos a poner el loader
+        Swal.update({
+            title: 'Procesando con Vet-Mind...',
+            html: 'Generando el informe con la plantilla seleccionada...',
+            showConfirmButton: false,
+            allowOutsideClick: false
+        });
+        Swal.showLoading();   // 👈 este era el que faltaba
+
+        let plantillaBase = $('#plantillaBase').val();
+        let plantillaId = $('select[name="plantilla_informe_id"]').val();
+
+        return $.post('/funciones/GPT/proceso_gpt.php', {
+            texto: textoTranscrito,
+            plantilla_base: plantillaBase,
+            plantilla_id: plantillaId,
+            ...pacienteData
+        }, null, 'json');
+    })
+    .then(respGPT => {
+        Swal.close();
+        if (respGPT.status === 'success') {
+            mostrarModalIA(respGPT.content);
+        } else if (respGPT.status === 'dry_run') {
+            const html = respGPT.debug_html || respGPT.content_demo || '<p><strong>DEBUG:</strong> Dry-run activo.</p>';
+            mostrarModalDebug(html);
+        } else {
+            Swal.fire('Error', respGPT.message || 'Fallo al procesar con GPT.', 'error');
+        }
+    })
+    .catch(err => {
+        Swal.close();
+        Swal.fire('Error', err.message || 'No se pudo procesar el audio.', 'error');
+    })
+    .finally(() => {
+        $btnProcesar.prop('disabled', false);
     });
+
+
 });
+
+
+
+
+
+
+
 function procesarTextoConGPT(texto) {
     let pacienteData = obtenerDatosPaciente();
     if (!pacienteData) {
@@ -265,7 +308,7 @@ function procesarTextoConGPT(texto) {
         let plantillaId = $('select[name="plantilla_informe_id"]').val();
         let pacienteData = obtenerDatosPaciente();
 
-        $.post('/funciones/proceso_gpt.php', { 
+        $.post('/funciones/GPT/proceso_gpt.php', { 
             texto: texto,
             plantilla_base: plantillaBase,
             plantilla_id: plantillaId,
