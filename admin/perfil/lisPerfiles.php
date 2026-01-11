@@ -85,7 +85,7 @@ $res = $stmt->get_result();
                     <?php if (array_intersect(['modificar', 'eliminar'], $acceso_aplicaciones['perfil'] ?? [])): ?>
                     <td align='center'>
                       <div class="dropdown position-relative">
-                        <button class="btn btn-outline-info" type="button" id="dropdownMenuButton" data-bs-toggle="dropdown" aria-expanded="false">
+                        <button  class="btn btn-outline-info dropdown-toggle" type="button" data-bs-toggle="dropdown" aria-expanded="false">
                           <i class="align-middle" data-feather="more-vertical"></i>
                         </button>
                         <div class="dropdown-menu dropdown-menu-end">

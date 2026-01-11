@@ -1,5 +1,6 @@
 <?php
 declare(strict_types=1);
+const GPT_SNAPSHOT = 1;
 
 // rutas base
 $ROOT_DIR = dirname(__DIR__, 2);   // /
@@ -9,8 +10,6 @@ $GPT_DIR  = __DIR__;               // /funciones/GPT
 require_once($FUNC_DIR . "/conn/conn.php");
 require_once($ROOT_DIR . "/configP.php");
 require_once($FUNC_DIR . "/logs/logger.php");
-// require_once($FUNC_DIR . "/data/ref_ranges.php");
-
 
 // nuestros nuevos helpers
 require_once($GPT_DIR . "/lib/gpt_prompt.php");
@@ -96,6 +95,10 @@ app_log_body('prompt', [
 // 7. llamada a OpenAI
 $payload = [
     'model'     => 'gpt-4o',
+    // 'model'  => 'gpt-4o-mini',
+    // 'model'  => 'gpt-5-nano',
+    // 'model'  => 'gpt-5-mini',
+    // 'model'  => 'gpt-5',
     'messages'  => [
         ['role' => 'system', 'content' => $system],
         ['role' => 'user',   'content' => $prompt],
@@ -197,6 +200,34 @@ app_log('response', [
     'total_tokens'      => $total_tokens,
     'cost_usd'          => $cost_usd
 ], 'INFO');
+
+
+// ───── NUEVO: SNAPSHOT sencillo ─────
+if (GPT_SNAPSHOT === 1) {
+    $snapDir = $GPT_DIR . '/snapshots';
+    if (!is_dir($snapDir)) {
+        @mkdir($snapDir, 0775, true);
+    }
+    $snapFile = $snapDir . '/' . date('Ymd_His') . '_' . $rid . '.json';
+
+    $snapshot = [
+        'rid'           => $rid,
+        'datetime'      => date('c'),
+        'input'         => $input,
+        'system'        => $system,
+        'prompt'        => $prompt,
+        'content_final' => $content,
+        'usage'         => [
+            'prompt_tokens'     => $prompt_tokens,
+            'completion_tokens' => $completion_tokens,
+            'total_tokens'      => $total_tokens,
+            'cost_usd'          => $cost_usd,
+        ],
+    ];
+
+    @file_put_contents($snapFile, json_encode($snapshot, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE));
+}
+
 
 if ($mysqli instanceof mysqli) {
     @$mysqli->close();

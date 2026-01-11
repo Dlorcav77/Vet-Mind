@@ -1,0 +1,2 @@
+{"ts_utc":"2025-11-15T11:26:37+00:00","ts_local":"2025-11-15 08:26:37-03:00","hostname":"b421e0c99990","event":"request","level":"INFO","rid":"aaea93451aebe81a","model":"gpt-4o","plantilla_id":0,"prompt_bytes":6114,"client_ip":"172.18.0.2","user_agent":""}
+{"ts_utc":"2025-11-15T11:26:44+00:00","ts_local":"2025-11-15 08:26:44-03:00","hostname":"b421e0c99990","event":"response","level":"INFO","rid":"aaea93451aebe81a","http":200,"ms":7318,"prompt_tokens":2615,"completion_tokens":657,"total_tokens":3272,"cost_usd":0.013108}
