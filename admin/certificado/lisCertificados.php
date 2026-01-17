@@ -127,9 +127,14 @@ $res = $stmt->get_result();
                               <i class="fas fa-trash-alt me-2 text-danger"></i> Eliminar
                             </a>
 
-                            <a class="dropdown-item" href="../<?= htmlspecialchars($fila['archivo_pdf']) ?>" target="_blank">
+                            <a class="dropdown-item" href="certificado/descargar.php?id=<?= (int)$fila['id'] ?>" target="_blank">
                               <i class="fas fa-file-pdf me-2 text-danger"></i>Ver PDF
                             </a>
+
+                            <a class="dropdown-item" href="certificado/descargar.php?id=<?= (int)$fila['id'] ?>&dl=1">
+                              <i class="fas fa-download me-2 text-primary"></i>Descargar PDF
+                            </a>
+
                             <div class="dropdown-divider"></div>
                             <a class="dropdown-item" href="#"
                               onclick="abrirModalCorreo(this, <?= (int)$fila['id'] ?>)"

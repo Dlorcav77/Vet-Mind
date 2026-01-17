@@ -5,6 +5,46 @@ header('Content-Type: application/json; charset=utf-8');
 // primero cargamos config, que en tu caso ya arma la sesión
 require_once __DIR__ . '/../../config.php';
 
+function _vm_slug_filename($text) {
+    $text = (string)$text;
+    $text = trim($text);
+
+    // quita tildes/acentos
+    $t = @iconv('UTF-8', 'ASCII//TRANSLIT//IGNORE', $text);
+    if ($t !== false) $text = $t;
+
+    $text = strtolower($text);
+    $text = preg_replace('/\s+/', '_', $text);          // espacios -> _
+    $text = preg_replace('/[^a-z0-9\-_]/', '', $text);  // solo seguro
+    $text = preg_replace('/_+/', '_', $text);           // ___ -> _
+    $text = trim($text, '_');
+
+    return $text !== '' ? $text : 'informe';
+}
+
+function _vm_slug_codigo($text) {
+    $text = (string)$text;
+    $text = trim($text);
+
+    $t = @iconv('UTF-8', 'ASCII//TRANSLIT//IGNORE', $text);
+    if ($t !== false) $text = $t;
+
+    $text = strtolower($text);
+    $text = preg_replace('/\s+/', '', $text);           // sin espacios
+    $text = preg_replace('/[^a-z0-9\-_]/', '', $text);  // permite - _
+    return $text;
+}
+
+function _vm_nombre_adjunto_pdf($paciente, $codigoPaciente = '') {
+    $base = _vm_slug_filename($paciente);
+    $codigo = _vm_slug_codigo($codigoPaciente);
+
+    if ($codigo !== '') {
+        return $base . '(' . $codigo . ').pdf';
+    }
+    return $base . '.pdf';
+}
+
 // por si algún día lo llamas desde otro contexto sin sesión
 if (session_status() === PHP_SESSION_NONE) {
     session_start();
@@ -46,7 +86,9 @@ try {
             c.fecha_examen,
             c.archivo_pdf,
             c.tipo_ingreso,
+            c.manual_data,
             p.nombre AS paciente,
+            p.codigo_paciente AS codigo_paciente,
             t.nombre_completo AS propietario,
             pi.nombre AS tipo_examen
         FROM certificados c
@@ -66,15 +108,37 @@ try {
         throw new Exception('Certificado no encontrado o sin permisos.');
     }
 
-    $paciente    = $cert['paciente']    ?: '-';
-    $propietario = $cert['propietario'] ?: '-';
-    $tipoExamen  = $cert['tipo_examen'] ?: '-';
-    $fechaExamen = $cert['fecha_examen'] ? date('d-m-Y', strtotime($cert['fecha_examen'])) : '-';
+    // ========= Datos base (DB) =========
+    $paciente        = trim((string)($cert['paciente'] ?? ''));
+    $propietario     = trim((string)($cert['propietario'] ?? ''));
+    $tipoExamen      = trim((string)($cert['tipo_examen'] ?? ''));
+    $fechaExamen     = !empty($cert['fecha_examen']) ? date('d-m-Y', strtotime($cert['fecha_examen'])) : '-';
+    $codigoPaciente  = trim((string)($cert['codigo_paciente'] ?? ''));
+
+    // ========= Fallback a manual_data (cuando no hay paciente_id) =========
+    if (!empty($cert['manual_data'])) {
+        $m = json_decode($cert['manual_data'], true);
+
+        if (is_array($m)) {
+            if ($paciente === '') {
+                $paciente = trim((string)($m['paciente'] ?? ''));
+            }
+            if ($propietario === '') {
+                $propietario = trim((string)($m['propietario'] ?? ($m['tutor_nombre'] ?? '')));
+            }
+            if ($codigoPaciente === '') {
+                // soporta ambos keys por compatibilidad
+                $codigoPaciente = trim((string)($m['codigo_paciente'] ?? ($m['cod_paciente'] ?? '')));
+            }
+        }
+    }
+
+    // Defaults visuales
+    if ($paciente === '')    { $paciente = '-'; }
+    if ($propietario === '') { $propietario = '-'; }
+    if ($tipoExamen === '')  { $tipoExamen = '-'; }
 
     $subject = "Informe de {$tipoExamen} - Paciente: {$paciente}";
-
-
-
 
     $body = '
     <div style="background:#f5f5f5;padding:20px 0;">
@@ -92,7 +156,14 @@ try {
             <tr>
                 <td style="padding:4px 0;width:140px;color:#555;">Paciente:</td>
                 <td style="padding:4px 0;"><strong>' . htmlspecialchars($paciente, ENT_QUOTES, "UTF-8") . '</strong></td>
-            </tr>
+            </tr>'
+            . ($codigoPaciente !== '' && $codigoPaciente !== '-'
+                ? '<tr>
+                    <td style="padding:4px 0;color:#555;">Cod. Paciente:</td>
+                    <td style="padding:4px 0;">' . htmlspecialchars($codigoPaciente, ENT_QUOTES, "UTF-8") . '</td>
+                </tr>'
+                : ''
+            ) . '
             <tr>
                 <td style="padding:4px 0;color:#555;">Propietario:</td>
                 <td style="padding:4px 0;">' . htmlspecialchars($propietario, ENT_QUOTES, "UTF-8") . '</td>
@@ -124,19 +195,44 @@ try {
     </div>
     ';
 
-
-
-
-
     // ====== adjunto ======
     $attachments = [];
+    $tmpDir = null;
+    $tmpFile = null;
+
+    // codigo paciente: primero desde pacientes.codigo_paciente, si no, desde manual_data
+    $codigoPaciente = $cert['codigo_paciente'] ?? '';
+
+    if (($codigoPaciente === '' || $codigoPaciente === null) && !empty($cert['manual_data'])) {
+        $m = json_decode($cert['manual_data'], true);
+        if (is_array($m)) {
+            // soporta ambas llaves por si cambiaste el name del input
+            $codigoPaciente = $m['codigo_paciente'] ?? ($m['cod_paciente'] ?? '');
+        }
+    }
+
+    $nombreAdjunto = _vm_nombre_adjunto_pdf($paciente, (string)$codigoPaciente);
+
     if (!empty($cert['archivo_pdf'])) {
-        $baseDir = realpath(__DIR__ . '/../../..'); // ajusta si tu raíz está en otro lado
+        $baseDir = realpath(__DIR__ . '/../../..'); // raíz del proyecto (ajustado a tu estructura actual)
         $rel     = ltrim($cert['archivo_pdf'], '/');
         $pdfPath = $baseDir ? $baseDir . '/' . $rel : null;
 
-        if ($pdfPath && file_exists($pdfPath)) {
-            $attachments[] = $pdfPath;
+        if ($pdfPath && is_file($pdfPath)) {
+            // creamos una copia temporal con el nombre que verá el destinatario
+            $tmpDir = rtrim(sys_get_temp_dir(), DIRECTORY_SEPARATOR) . DIRECTORY_SEPARATOR
+                    . 'vetmind_mail_' . (int)$usuario_id . '_' . (int)$certificado_id . '_' . uniqid();
+            @mkdir($tmpDir, 0700, true);
+
+            $tmpFile = $tmpDir . DIRECTORY_SEPARATOR . $nombreAdjunto;
+
+            if (@copy($pdfPath, $tmpFile)) {
+                $attachments[] = $tmpFile; // EmailService recibirá un path; el nombre visible será el basename()
+            } else {
+                // fallback: si no pudo copiar, adjunta el original (nombre "feo")
+                $attachments[] = $pdfPath;
+                $tmpFile = null;
+            }
         }
     }
 
@@ -170,6 +266,14 @@ try {
     }
 
     $resp = $mailer->send($destinatarios, $subject, $body, $attachments);
+ 
+    // limpieza del adjunto temporal (si se creó)
+    if ($tmpFile && is_file($tmpFile)) {
+        @unlink($tmpFile);
+    }
+    if ($tmpDir && is_dir($tmpDir)) {
+        @rmdir($tmpDir);
+    }
 
     echo json_encode($resp['status'] === 'success'
         ? ['status' => 'success', 'message' => 'Correo enviado correctamente.']

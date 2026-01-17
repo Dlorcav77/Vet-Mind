@@ -93,44 +93,75 @@ if ($action === 'modificar' && $id > 0) {
 
 $manual_data = null;
 if ($modo_manual && $guardarMascota && !empty($manual)) {
-    $tutorNombre = $manual['propietario'] ?? '';
 
-    $stmt = $mysqli->prepare("SELECT id FROM tutores WHERE nombre_completo = ?  AND veterinario_id = ?");
-    $stmt->bind_param("ss", $tutorNombre, $veterinario);
+    // ---------- Tutor ----------
+    $tutorNombre = trim($manual['propietario'] ?? '');
+
+    $stmt = $mysqli->prepare("SELECT id FROM tutores WHERE nombre_completo = ? AND veterinario_id = ?");
+    $stmt->bind_param("si", $tutorNombre, $veterinario);
     $stmt->execute();
     $res = $stmt->get_result();
-    $tutorId = null;
 
+    $tutorId = null;
     if ($row = $res->fetch_assoc()) {
-        $tutorId = $row['id'];
+        $tutorId = (int)$row['id'];
     } else {
         $stmt = $mysqli->prepare("INSERT INTO tutores (nombre_completo, veterinario_id) VALUES (?, ?)");
-        $stmt->bind_param("ss", $tutorNombre, $veterinario);
+        $stmt->bind_param("si", $tutorNombre, $veterinario);
         if ($stmt->execute()) {
-            $tutorId = $stmt->insert_id;
+            $tutorId = (int)$stmt->insert_id;
         }
     }
 
-    $nombreMascota = $manual['paciente'] ?? '';
-    $especie       = $manual['especie'] ?? '';
-    $raza          = $manual['raza'] ?? '';
-    $sexo          = $manual['sexo'] ?? '';
-    $n_chip        = $manual['n_chip'] ?? '';
-    $fecha_nacimiento = $manual['fecha_nacimiento'] ?? '';
+    // ---------- Paciente ----------
+    $nombreMascota   = trim($manual['paciente'] ?? '');
+    $codigoPaciente  = trim($manual['codigo_paciente'] ?? ''); // 🆕 si viene desde el formulario manual
+    $especie         = trim($manual['especie'] ?? '');
+    $raza            = trim($manual['raza'] ?? '');
+    $sexo            = trim($manual['sexo'] ?? '');
+    $n_chip          = trim($manual['n_chip'] ?? '');
 
+    // ✅ Fecha nacimiento opcional: si viene vacío o inválido => NULL
+    $fecha_nacimiento_raw = trim($manual['fecha_nacimiento'] ?? '');
+    $fecha_nacimiento = null;
+    if ($fecha_nacimiento_raw !== '') {
+        $dt = DateTime::createFromFormat('Y-m-d', $fecha_nacimiento_raw);
+        if ($dt && $dt->format('Y-m-d') === $fecha_nacimiento_raw) {
+            $fecha_nacimiento = $fecha_nacimiento_raw;
+        }
+    }
+
+    // Buscar si ya existe ese paciente para ese tutor
     $stmt = $mysqli->prepare("SELECT id FROM pacientes WHERE nombre = ? AND tutor_id = ? AND veterinario_id = ?");
-    $stmt->bind_param("sis", $nombreMascota, $tutorId, $veterinario);
+    $stmt->bind_param("sii", $nombreMascota, $tutorId, $veterinario);
     $stmt->execute();
     $res = $stmt->get_result();
 
     if ($row = $res->fetch_assoc()) {
-        $paciente_id = $row['id'];
+        $paciente_id = (int)$row['id'];
     } else {
-        $stmt = $mysqli->prepare("INSERT INTO pacientes (nombre, especie, raza, sexo, fecha_nacimiento, tutor_id, veterinario_id, n_chip) 
-                                    VALUES (?, ?, ?, ?, ?, ?, ?, ?)");
-        $stmt->bind_param("sssssiis", $nombreMascota, $especie, $raza, $sexo, $fecha_nacimiento, $tutorId, $veterinario, $n_chip);
+        // 🆕 Incluye codigo_paciente si existe en tu tabla
+        $stmt = $mysqli->prepare("
+            INSERT INTO pacientes
+                (nombre, codigo_paciente, especie, raza, sexo, fecha_nacimiento, tutor_id, veterinario_id, n_chip)
+            VALUES
+                (?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ");
+        $stmt->bind_param(
+            "ssssssiis",
+            $nombreMascota,
+            $codigoPaciente,
+            $especie,
+            $raza,
+            $sexo,
+            $fecha_nacimiento,   // 👈 NULL si viene vacío
+            $tutorId,
+            $veterinario,
+            $n_chip
+        );
+
         if ($stmt->execute()) {
-            $paciente_id = $stmt->insert_id;
+            $paciente_id = (int)$stmt->insert_id;
         }
     }
 } elseif ($modo_manual && !empty($manual)) {
@@ -220,17 +251,28 @@ if ($action === 'ingresar') {
 }
 
 if ($stmt->execute()) {
+
+    // id del certificado (ingresar: insert_id, modificar: ya viene)
+    $certId = 0;
+    if ($action === 'ingresar') {
+        $certId = (int)$stmt->insert_id;
+    } elseif ($action === 'modificar' && $id > 0) {
+        $certId = (int)$id;
+    }
+
     echo json_encode([
         "status" => "success",
         "message" => "Certificado guardado correctamente.",
-        "rutaPdf" => $rutaPdf  
+        "rutaPdf" => $rutaPdf,
+        "id"      => $certId
     ]);
 } else {
     echo json_encode([
         'status' => 'info',
         'message' => 'Error al guardar el certificado.',
-        'mysql_error' => $stmt->error 
+        'mysql_error' => $stmt->error
     ]);
 }
+
 
 exit;

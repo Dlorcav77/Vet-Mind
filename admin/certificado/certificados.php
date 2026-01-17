@@ -626,10 +626,17 @@ $('#btnGuardarCertificado').on('click', function(e) {
             // console.log(response);
             Swal.close();
             if (response.status === 'success') {
-                let rutaPdf = response.rutaPdf || null;
-                if (rutaPdf) {
-                    let urlPdf = rutaPdf.startsWith('/') ? rutaPdf : '/' + rutaPdf;
-                    window.open(urlPdf, '_blank');
+               let certId = response.id || 0;
+                if (certId) {
+                    // inline en pestaña nueva (nombre bonito)
+                    window.open('certificado/descargar.php?id=' + encodeURIComponent(certId), '_blank');
+                } else {
+                    // fallback por si algo vino sin id
+                    let rutaPdf = response.rutaPdf || null;
+                    if (rutaPdf) {
+                        let urlPdf = rutaPdf.startsWith('/') ? rutaPdf : '/' + rutaPdf;
+                        window.open(urlPdf, '_blank');
+                    }
                 }
                 if (CKEDITOR.instances['contenido_html']) {
                     CKEDITOR.instances['contenido_html'].destroy(true);

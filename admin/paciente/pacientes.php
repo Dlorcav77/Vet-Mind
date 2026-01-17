@@ -25,9 +25,13 @@ if ($action == "modificar") {
   $tutor_id = intval($_GET['tutor_id']); // importante: recibe tutor_id
   $fila = [
     'nombre' => '',
+    'codigo_paciente' => '',
     'especie' => '',
     'raza' => '',
-    'edad' => ''
+    'edad' => '',
+    'n_chip' => '',
+    'sexo' => '',
+    'fecha_nacimiento' => ''
   ];
 }
 
@@ -56,14 +60,20 @@ global $usuario_id;
       <div class="row mb-3">
         <div class="col-md-6 mb-2">
           <label for="nombre" class="form-label">Nombre</label>
-          <input type="text" class="form-control" id="nombre" name="nombre" maxlength="100" value="<?php echo htmlspecialchars($fila['nombre']); ?>" required>
+          <input type="text" class="form-control" id="nombre" name="nombre" maxlength="100"
+                 value="<?php echo htmlspecialchars($fila['nombre']); ?>" required>
         </div>
+
         <div class="col-md-6 mb-2">
+          <label for="codigo_paciente" class="form-label">Código de Paciente</label>
+          <input type="text" class="form-control" id="codigo_paciente" name="codigo_paciente" maxlength="30"
+                 value="<?php echo htmlspecialchars($fila['codigo_paciente'] ?? ''); ?>">
         </div>
+
         <div class="col-md-6 mb-2">
           <label for="raza" class="form-label">Raza</label>
           <select name="raza" id="raza" class="select2 form-select" placeholder="Elija una opción">
-            <?php 
+            <?php
               if ($action == 'modificar') {
                   lisRazas($fila['especie'], $fila['raza'] ?? null);
               } else {
@@ -72,6 +82,7 @@ global $usuario_id;
             ?>
           </select>
         </div>
+
         <div class="col-md-6 mb-2">
           <label for="sexo" class="form-label">Sexo</label>
           <select class="form-control" id="sexo" name="sexo">
@@ -83,27 +94,33 @@ global $usuario_id;
             <?php endforeach; ?>
           </select>
         </div>
+
         <div class="col-md-6 mb-2">
           <label for="fecha_nacimiento" class="form-label">Fecha de Nacimiento</label>
-          <input type="date" class="form-control" id="fecha_nacimiento" name="fecha_nacimiento" 
+          <input type="date" class="form-control" id="fecha_nacimiento" name="fecha_nacimiento"
                 value="<?= htmlspecialchars($fila['fecha_nacimiento'] ?? '') ?>">
         </div>
+
         <div class="col-md-6 mb-2">
           <label for="n_chip" class="form-label">Número de Chip</label>
           <input type="text" class="form-control" id="n_chip" name="n_chip" maxlength="15"
                 value="<?php echo htmlspecialchars($fila['n_chip'] ?? ''); ?>">
         </div>
       </div>
+
       <?php if ($action == 'modificar'): ?>
         <input type="hidden" name="id" value="<?php echo $id; ?>">
       <?php endif; ?>
-      <input type="hidden" name="tutor_id" value="<?php echo $tutor_id; ?>">
+
+      <input type="hidden" name="tutor_id" value="<?php echo ($action == 'modificar') ? (int)$fila['tutor_id'] : (int)$tutor_id; ?>">
       <input type="hidden" name="veterinario_id" value="<?php echo $usuario_id; ?>">
       <input type="hidden" name="action" value="<?php echo $action; ?>">
+
       <button type="submit" class="btn btn-primary"><?php echo $accion; ?> Mascota</button>
     </form>
   </div>
 </div>
+
 <script>
 $(document).ready(function() {
   $('#formPaciente').on('submit', function(e) {
@@ -115,7 +132,6 @@ $(document).ready(function() {
       type: 'POST',
       data: formData,
       success: function(response) {
-        // console.log(response);
           let jsonResponse = JSON.parse(response);
           if (jsonResponse.status === 'success') {
               Swal.fire({
@@ -124,7 +140,6 @@ $(document).ready(function() {
                   text: jsonResponse.message,
                   confirmButtonText: 'OK'
               }).then(() => {
-                  // 👉 Al presionar OK, cargar lista de pacientes
                   $('#modalPacientes .modal-body').load(
                       'paciente/lisPacientes.php?tutor_id=<?= $action == 'modificar' ? $fila['tutor_id'] : $tutor_id; ?>'
                   );
@@ -188,14 +203,14 @@ function matcherConGrupos(params, data) {
 function initSelect2Raza() {
   var $sel = $('#raza');
 
-  if (!$sel.length) return;          // por si esta vista se carga vía AJAX
+  if (!$sel.length) return;
   if ($sel.hasClass('select2-hidden-accessible')) $sel.select2('destroy');
 
   $sel.attr('style','width:21rem;').select2({
     placeholder: 'Seleccione raza...',
     allowClear: true,
-    minimumResultsForSearch: 0,      // siempre con buscador
-    width: 'style',                  // respeta 21rem
+    minimumResultsForSearch: 0,
+    width: 'style',
     dropdownParent: $('#modalPacientes'),
     matcher: matcherConGrupos
   });
@@ -215,5 +230,3 @@ $(function(){
   if ($('#modalPacientes').is(':visible')) initSelect2Raza();
 });
 </script>
-
-

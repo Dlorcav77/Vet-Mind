@@ -16,7 +16,7 @@ if ($tutor_id <= 0) {
 }
 
 // Consultar pacientes asociados a este tutor
-$query = "SELECT id, nombre, n_chip, especie, sexo, raza, fecha_nacimiento, created_at
+$query = "SELECT id, nombre, codigo_paciente, n_chip, especie, sexo, raza, fecha_nacimiento, created_at
           FROM pacientes
           WHERE tutor_id = ?
           ORDER BY id DESC";
@@ -40,6 +40,7 @@ $result = $stmt->get_result();
       <tr>
         <th>#</th>
         <th>Nombre</th>
+        <th>Código</th>
         <th>Especie</th>
         <th>Sexo</th>
         <th>Raza</th>
@@ -52,19 +53,22 @@ $result = $stmt->get_result();
       </tr>
     </thead>
     <tbody>
-      <?php
+     <?php
       $i = 1;
       while ($row = $result->fetch_assoc()):
+        $especie_txt = trim((string)($row['especie'] ?? ''));
+        $sexo_txt    = trim((string)($row['sexo'] ?? ''));
       ?>
         <tr>
           <td><?= $i++ ?></td>
           <td><?= htmlspecialchars($row['nombre']) ?></td>
-          <td><?= htmlspecialchars(ucfirst($row['especie'])) ?></td>
-          <td><?= htmlspecialchars(ucfirst($row['sexo'] ?: '-')) ?></td>
+          <td><?= htmlspecialchars($row['codigo_paciente'] ?: '-') ?></td>
+          <td><?= htmlspecialchars($especie_txt !== '' ? ucfirst($especie_txt) : '-') ?></td>
+          <td><?= htmlspecialchars($sexo_txt !== '' ? ucfirst($sexo_txt) : '-') ?></td>
           <td><?= htmlspecialchars($row['raza'] ?: '-') ?></td>
           <td><?= $row['fecha_nacimiento'] ? calcular_edad($row['fecha_nacimiento']) : '-' ?></td>
           <td><?= htmlspecialchars($row['n_chip'] ?: '-') ?></td>
-          <!-- <td><?= date('d-m-Y H:i', strtotime($row['created_at'])) ?></td> -->
+
           <?php if (array_intersect(['modificar', 'eliminar'], $acceso_aplicaciones['tutor'] ?? [])): ?>
             <td>
               <div class="dropdown">
@@ -143,7 +147,6 @@ function eliminarPaciente(pacienteId, tutorId) {
         success: function(response) {
           let json = JSON.parse(response);
           if (json.status === 'success') {
-            // 🔥 Aquí recargamos la tabla de mascotas en el modal
             $('#modalPacientes .modal-body').load(
               'paciente/lisPacientes.php?tutor_id=' + tutorId
             );
@@ -159,7 +162,4 @@ function eliminarPaciente(pacienteId, tutorId) {
     }
   });
 }
-
-
-
 </script>

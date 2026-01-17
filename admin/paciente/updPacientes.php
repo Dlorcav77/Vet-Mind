@@ -27,12 +27,28 @@ function resolver_especie_y_raza_por_id(mysqli $db, $raza_id) {
 if ($action !== 'eliminar') {
     $veterinario_id   = intval($_POST['veterinario_id']);
     $tutor_id         = intval($_POST['tutor_id']);
-    $nombre           = trim($_POST['nombre']);
-    // ❌ ya no viene especie por POST
-    // $especie        = trim($_POST['especie']);
+    $nombre           = trim($_POST['nombre'] ?? '');
 
-    // ✅ ahora 'raza' es el ID seleccionado en el <select>
-    $raza_id_post     = isset($_POST['raza']) && $_POST['raza'] !== '' ? intval($_POST['raza']) : null;
+    // ✅ obligatorios: tutor + nombre
+    if ($tutor_id <= 0) {
+        echo json_encode(['status' => 'error', 'message' => 'Tutor inválido.']);
+        exit;
+    }
+    if ($nombre === '') {
+        echo json_encode(['status' => 'error', 'message' => 'El nombre es obligatorio.']);
+        exit;
+    }
+    validar_length("Nombre", $nombre, 100);
+
+    // ✅ código interno opcional
+    $codigo_paciente  = trim($_POST['codigo_paciente'] ?? '');
+    if ($codigo_paciente === '') $codigo_paciente = null;
+    if ($codigo_paciente !== null) {
+        validar_length("Código de paciente", $codigo_paciente, 30, true);
+    }
+
+    // ✅ raza opcional (ID en el <select>)
+    $raza_id_post = (isset($_POST['raza']) && $_POST['raza'] !== '') ? intval($_POST['raza']) : null;
 
     // ✅ resolvemos especie/raza (texto) desde BD (o null si no se seleccionó)
     list($especie, $raza) = resolver_especie_y_raza_por_id($mysqli, $raza_id_post);
@@ -41,22 +57,18 @@ if ($action !== 'eliminar') {
     $n_chip           = trim($_POST['n_chip'] ?? '');
     $sexo             = trim($_POST['sexo'] ?? '');
 
-    // Validaciones básicas
-    validar_length("Nombre", $nombre, 100);
-    // ❌ quitamos validar_length de especie por POST
-    // validar_length("Especie", $especie, 20);
-
-    // ✅ valida sexo contra catálogo permitido (evita typos)
+    // ✅ sexo opcional (solo validamos si viene)
     $sexos_validos = ['Macho','Macho Castrado','Hembra','Hembra Esterilizada','Otro'];
     if ($sexo !== '' && !in_array($sexo, $sexos_validos, true)) {
         echo json_encode(['status' => 'error', 'message' => 'Sexo inválido.']);
         exit;
     }
 
-    // ✅ raza es opcional; si viene, ya está normalizada a texto por resolver_especie_y_raza_por_id()
+    // ✅ raza/especie opcional
     if ($raza !== null) validar_length("Raza", $raza, 100, true);
     if ($especie !== null) validar_length("Especie", $especie, 20, true);
 
+    // ✅ fecha opcional (validamos si viene)
     if ($fecha_nacimiento !== '') {
         if (!preg_match('/^\d{4}-\d{2}-\d{2}$/', $fecha_nacimiento)) {
             echo json_encode(['status' => 'error', 'message' => 'Fecha de nacimiento inválida (formato esperado: YYYY-MM-DD).']);
@@ -70,6 +82,7 @@ if ($action !== 'eliminar') {
         $fecha_nacimiento = NULL;
     }
 
+    // ✅ chip opcional (validamos si viene)
     if ($n_chip !== '') {
         if (!preg_match('/^[0-9]{10,15}$/', $n_chip)) {
             echo json_encode(['status' => 'error', 'message' => 'El número de chip debe tener entre 10 y 15 dígitos numéricos.']);
@@ -78,7 +91,8 @@ if ($action !== 'eliminar') {
     }
 }
 
-// Soft delete
+
+// Eliminar
 if ($action === 'eliminar' && !empty($id)) {
     $delete_query = "DELETE FROM pacientes WHERE id = ?";
     $stmt = $mysqli->prepare($delete_query);
@@ -114,13 +128,19 @@ if ($action === 'modificar') {
         exit;
     }
 
-    // ✅ guardamos especie/raza como TEXTO (compat con tu esquema actual)
-    $update_query = "UPDATE pacientes 
-                        SET nombre = ?, n_chip = ?, especie = ?, raza = ?, fecha_nacimiento = ?, sexo = ?, updated_at = NOW() 
+    // ✅ guardamos especie/raza como TEXTO + código opcional
+    $update_query = "UPDATE pacientes
+                        SET nombre = ?,
+                            codigo_paciente = ?,
+                            n_chip = ?,
+                            especie = ?,
+                            raza = ?,
+                            fecha_nacimiento = ?,
+                            sexo = ?,
+                            updated_at = NOW()
                       WHERE id = ?";
     $stmt = $mysqli->prepare($update_query);
-    // si especie/raza pueden ser null, usa 's' y pasa null (mysqli lo acepta si tienes MYSQLI_REPORT_STRICT desactivado)
-    $stmt->bind_param('ssssssi', $nombre, $n_chip, $especie, $raza, $fecha_nacimiento, $sexo, $id);
+    $stmt->bind_param('sssssssi', $nombre, $codigo_paciente, $n_chip, $especie, $raza, $fecha_nacimiento, $sexo, $id);
 
     if ($stmt->execute()) {
         logg("Modificación de paciente ID: $id, Nombre: $nombre");
@@ -152,11 +172,11 @@ if ($action === 'ingresar') {
         exit;
     }
 
-    // ✅ guardamos especie/raza texto
-    $ins = "INSERT INTO pacientes (veterinario_id, tutor_id, nombre, n_chip, especie, raza, fecha_nacimiento, sexo, created_at) 
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, NOW())";
+    // ✅ guardamos especie/raza texto + código opcional
+    $ins = "INSERT INTO pacientes (veterinario_id, tutor_id, nombre, codigo_paciente, n_chip, especie, raza, fecha_nacimiento, sexo, created_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, NOW())";
     $stmt = $mysqli->prepare($ins);
-    $stmt->bind_param('iissssss', $veterinario_id, $tutor_id, $nombre, $n_chip, $especie, $raza, $fecha_nacimiento, $sexo);
+    $stmt->bind_param('iisssssss', $veterinario_id, $tutor_id, $nombre, $codigo_paciente, $n_chip, $especie, $raza, $fecha_nacimiento, $sexo);
 
     if ($stmt->execute()) {
         logg("Inserción de paciente: $nombre, Tutor ID: $tutor_id");
