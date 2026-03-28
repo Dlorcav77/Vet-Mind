@@ -1,4 +1,5 @@
 <?php
+//admin/plantilla_informe/plantillaInforme.php
 ###########################################
 require_once("../config.php");
 ###########################################

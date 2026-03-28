@@ -1,4 +1,5 @@
 <?php
+//admin/certificado/pacientes/paciente.php
 require_once(__DIR__ . '../../../config.php');
 $mysqli = conn();
 

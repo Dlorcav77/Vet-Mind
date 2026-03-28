@@ -57,15 +57,14 @@ $res = $stmt->get_result();
         <div class="w-100">
           <div class="row mb-4">
             <div class="col-12 d-flex justify-content-between align-items-center">
+              <a href="certificado/subir_informe/subir_informe.php" class="btn btn-outline-primary ajax-link">
+                <i style="width:20px;height:20px;" data-feather="upload"></i> Subir Informe
+              </a>
               <?php if (in_array('ingresar', $acceso_aplicaciones['certificado'] ?? [])): ?>
                 <a href="certificado/certificados.php" class="btn btn-primary ajax-link">
                   <i style="width:20px;height:20px;" data-feather="plus"></i> Nuevo Informe
                 </a>
               <?php endif; ?>
-
-              <a href="certificado/subir_informe/subir_informe.php" class="btn btn-outline-primary ajax-link">
-                <i style="width:20px;height:20px;" data-feather="upload"></i> Subir Informe
-              </a>
             </div>
           </div>
 

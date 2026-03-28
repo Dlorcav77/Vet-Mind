@@ -5,9 +5,9 @@ function conn()
     ##################### CONEXION #######################################
 
     $host = 'db';
-    $user =  'vetmind_user';
-    $pass = '*t8@%6Q3TG4rMhW87moo';
-    $name = 'vetmind_db';
+    $user =  'vetmind_dev_user';
+    $pass = '*t8@%6Q3TG4--Dalv89--rMhW87moo';
+    $name = 'vetmind_dev_db';
 
     $mysqli = new mysqli($host, $user, $pass, $name);
 

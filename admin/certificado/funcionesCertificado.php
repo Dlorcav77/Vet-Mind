@@ -1,17 +1,25 @@
 <?php
-function buildInformeHtml($veterinarioId, $pacienteId, $fecha, $motivo, $descripcion, $imagenes, $recinto, $medico_solicitante, $manual_data = null)
+function buildInformeHtml($veterinarioId, $configuracionInformeId, $pacienteId, $fecha, $motivo, $descripcion, $imagenes, $recinto, $medico_solicitante, $manual_data = null)
 {
     global $mysqli;
 
-    // Configuración del veterinario
-    $stmt = $mysqli->prepare("SELECT * FROM configuracion_informes WHERE veterinario_id = ?");
-    $stmt->bind_param("i", $veterinarioId);
+    // Configuración de la plantilla seleccionada
+    $stmt = $mysqli->prepare("
+        SELECT *
+        FROM configuracion_informes
+        WHERE id = ? AND veterinario_id = ?
+        LIMIT 1
+    ");
+    $stmt->bind_param("ii", $configuracionInformeId, $veterinarioId);
     $stmt->execute();
     $config = $stmt->get_result()->fetch_assoc();
 
+    if (!$config) {
+        throw new Exception("No se encontró la plantilla de diseño seleccionada.");
+    }
+
     // ---- DATOS PACIENTE ----
     if ($pacienteId) {
-        // Buscado en base de datos
         $stmt = $mysqli->prepare("
             SELECT 
                 p.nombre AS paciente, 
@@ -58,21 +66,21 @@ function buildInformeHtml($veterinarioId, $pacienteId, $fecha, $motivo, $descrip
     $paciente['recinto']       = $recinto;
     $paciente['m_solicitante'] = $medico_solicitante;
 
-    // ---- CAMPOS VISIBLES ----
-    $stmt = $mysqli->prepare(
-        "SELECT cp.campo, cp.etiqueta 
-         FROM configuracion_informe_campos cic
-         JOIN campos_permitidos cp ON cic.campo_id = cp.id
-         WHERE cic.veterinario_id = ?
-           AND cic.visible = 1
-         ORDER BY cic.orden ASC"
-    );
-    $stmt->bind_param("i", $veterinarioId);
+    // ---- CAMPOS VISIBLES DE LA PLANTILLA ----
+    $stmt = $mysqli->prepare("
+        SELECT cp.campo, cp.etiqueta
+        FROM configuracion_informe_campos cic
+        JOIN campos_permitidos cp ON cic.campo_id = cp.id
+        WHERE cic.configuracion_informe_id = ?
+            AND cic.visible = 1
+        ORDER BY cic.orden ASC, cic.id ASC
+    ");
+    $stmt->bind_param("i", $configuracionInformeId);
     $stmt->execute();
     $campos = $stmt->get_result()->fetch_all(MYSQLI_ASSOC);
 
     // ---- ARMADO DEL HTML ----
     ob_start();
-    include(__DIR__ . '/planilla_pdf.php'); // Aquí se usan $paciente, $config, $campos, etc.
+    include(__DIR__ . '/planilla_pdf.php');
     return ob_get_clean();
 }

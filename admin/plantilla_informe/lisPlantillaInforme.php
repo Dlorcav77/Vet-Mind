@@ -1,4 +1,5 @@
 <?php
+//admin/plantilla_informe/lisPlantillaInforme.php
 ###########################################
 require_once("../config.php");
 credenciales('plantilla_informe', 'listar');

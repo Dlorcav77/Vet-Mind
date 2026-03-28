@@ -59,10 +59,57 @@ if ($action === "modificar") {
         'estado'          => 'pendiente'
     ];
 }
+
+$configuracion_informe_id_actual = 0;
+
+$stmtPlantillas = $mysqli->prepare("
+    SELECT id, nombre_plantilla, es_predeterminada
+    FROM configuracion_informes
+    WHERE veterinario_id = ?
+    ORDER BY es_predeterminada DESC, nombre_plantilla ASC, id ASC
+");
+$stmtPlantillas->bind_param("i", $usuario_id);
+$stmtPlantillas->execute();
+$resPlantillas = $stmtPlantillas->get_result();
+
+$plantillas_diseno = [];
+while ($rowPlantilla = $resPlantillas->fetch_assoc()) {
+    $plantillas_diseno[] = $rowPlantilla;
+}
+
+if ($action === 'modificar' && !empty($fila['configuracion_informe_id'])) {
+    $configuracion_informe_id_actual = (int)$fila['configuracion_informe_id'];
+} else {
+    foreach ($plantillas_diseno as $pl) {
+        if ((int)$pl['es_predeterminada'] === 1) {
+            $configuracion_informe_id_actual = (int)$pl['id'];
+            break;
+        }
+    }
+
+    if ($configuracion_informe_id_actual === 0 && !empty($plantillas_diseno)) {
+        $configuracion_informe_id_actual = (int)$plantillas_diseno[0]['id'];
+    }
+}
 ?>
 <div class="card" id="certificado" data-page-id="certificado">
     <div class="card-header pb-1">
-        <h1 class="h3 fw-bold mb-1"><?= $accion; ?> Informe</h1>
+        <div class="d-flex flex-column flex-md-row justify-content-between align-items-md-center gap-2">
+            <h1 class="h3 fw-bold mb-0"><?= $accion; ?> Informe</h1>
+
+            <div class="w-100 w-md-auto" style="max-width: 320px;">
+                <select name="configuracion_informe_id" id="configuracion_informe_id" class="form-select">
+                    <option value="">Seleccione una plantilla de diseño</option>
+                    <?php foreach ($plantillas_diseno as $plantillaDiseno): ?>
+                        <option value="<?= (int)$plantillaDiseno['id'] ?>"
+                            <?= $configuracion_informe_id_actual === (int)$plantillaDiseno['id'] ? 'selected' : '' ?>>
+                            <?= htmlspecialchars($plantillaDiseno['nombre_plantilla']) ?>
+                            <?= (int)$plantillaDiseno['es_predeterminada'] === 1 ? ' (Predeterminada)' : '' ?>
+                        </option>
+                    <?php endforeach; ?>
+                </select>
+            </div>
+        </div>
     </div>
     <div class="card-body">
         <form method="post" action="certificado/updCertificados.php" enctype="multipart/form-data">
@@ -495,6 +542,12 @@ function obtenerDatosPaciente() {
 $('#btnVistaPrevia').on('click', function() {
     let esManual = $('#toggle_manual').is(':checked');
 
+    let configuracionInformeId = $('#configuracion_informe_id').val() || '';
+    if (!configuracionInformeId) {
+        Swal.fire('Falta Plantilla', 'Debes seleccionar una plantilla de diseño.', 'warning');
+        return;
+    }
+
     if (!esManual) {
         let pacienteId = $('input[name="paciente_id"]').val() || 0;
         if (!pacienteId) {
@@ -554,6 +607,12 @@ $('#btnGuardarCertificado').on('click', function(e) {
 
     // Validaciones igual que en vista previa...
     let esManual = $('#toggle_manual').is(':checked');
+
+    let configuracionInformeId = $('#configuracion_informe_id').val() || '';
+    if (!configuracionInformeId) {
+        Swal.fire('Falta Plantilla', 'Debes seleccionar una plantilla de diseño.', 'warning');
+        return;
+    }
 
     if (!esManual) {
         // Validación normal (modo buscar paciente)

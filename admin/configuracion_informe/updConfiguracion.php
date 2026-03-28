@@ -1,4 +1,5 @@
 <?php
+//admin/configuracion_informe/updConfiguracion.php
 require_once("../config.php");
 $mysqli = conn();
 
@@ -6,28 +7,31 @@ $action     = $_POST['action'] ?? '';
 $id         = $_POST['id'] ?? null;
 $usuario_id = $_SESSION['usuario_id'] ?? 0;
 
-// ✅ Campos con valores por defecto
-$logo_position      = $_POST['logo_position']      ?? 'center';
-$mostrar_marca_agua = isset($_POST['mostrar_marca_agua']) ? 1 : 0;
-$color_primario     = $_POST['color_primario']     ?? '#3498db';
-$color_secundario   = $_POST['color_secundario']   ?? '#2ecc71';
-$firma_nombre       = trim($_POST['firma_nombre']  ?? '');
-$firma_titulo       = trim($_POST['firma_titulo']  ?? '');
-$firma_subtitulo    = trim($_POST['firma_subtitulo'] ?? '');
-$firma_align        = $_POST['firma_align']        ?? 'center';
-$footer_texto       = trim($_POST['footer_texto']  ?? '');
-$footer_align       = $_POST['footer_align']       ?? 'center';
-$mostrar_fecha      = isset($_POST['mostrar_fecha']) ? 1 : 0;
-$formato_fecha      = $_POST['formato_fecha']      ?? 'd-m-Y';
-$lugar_fecha        = trim($_POST['lugar_fecha']   ?? '');
-$fecha_align        = $_POST['fecha_align']        ?? 'right'; // 🆕 Nuevo campo
-$logo_size          = $_POST['logo_size'] ?? 'medium';
-$marca_agua_size    = $_POST['marca_agua_size'] ?? 'medium';
-$imagenes_por_fila  = $_POST['imagenes_por_fila'] ?? 2;
-$titulo_informe     = $mysqli->real_escape_string($_POST['titulo_informe'] ?? 'INFORME ECOGRÁFICO');
+$nombre_plantilla     = trim($_POST['nombre_plantilla'] ?? 'Plantilla principal');
+$es_predeterminada    = isset($_POST['es_predeterminada']) ? 1 : 0;
+$logo_position        = $_POST['logo_position'] ?? 'center';
+$mostrar_marca_agua   = isset($_POST['mostrar_marca_agua']) ? 1 : 0;
+$color_primario       = $_POST['color_primario'] ?? '#3498db';
+$color_secundario     = $_POST['color_secundario'] ?? '#2ecc71';
+$firma_nombre         = trim($_POST['firma_nombre'] ?? '');
+$firma_titulo         = trim($_POST['firma_titulo'] ?? '');
+$firma_subtitulos     = $_POST['firma_subtitulos'] ?? [];
+$firma_subtitulos     = array_filter(array_map('trim', $firma_subtitulos));
+$firma_subtitulo      = !empty($firma_subtitulos) ? json_encode(array_values($firma_subtitulos)) : null;
+$firma_align          = $_POST['firma_align'] ?? 'center';
+$footer_texto         = trim($_POST['footer_texto'] ?? '');
+$footer_align         = $_POST['footer_align'] ?? 'center';
+$mostrar_fecha        = isset($_POST['mostrar_fecha']) ? 1 : 0;
+$formato_fecha        = $_POST['formato_fecha'] ?? 'd-m-Y';
+$lugar_fecha          = trim($_POST['lugar_fecha'] ?? '');
+$fecha_align          = $_POST['fecha_align'] ?? 'right';
+$logo_size            = $_POST['logo_size'] ?? 'medium';
+$marca_agua_size      = $_POST['marca_agua_size'] ?? 'medium';
+$imagenes_por_fila    = (int)($_POST['imagenes_por_fila'] ?? 2);
+$titulo_informe       = trim($_POST['titulo_informe'] ?? 'INFORME ECOGRÁFICO');
 $mostrar_firma_imagen = isset($_POST['mostrar_firma_imagen']) ? 1 : 0;
-$subtitulo          = $mysqli->real_escape_string(trim($_POST['subtitulo'] ?? ''));
-$subtitulo_align    = $_POST['subtitulo_align'] ?? 'center';
+$subtitulo            = trim($_POST['subtitulo'] ?? '');
+$subtitulo_align      = $_POST['subtitulo_align'] ?? 'center';
 
 $firma_imagen_subida = null;
 if (isset($_FILES['firma_imagen']) && !empty($_FILES['firma_imagen']['name'])) {
@@ -57,6 +61,8 @@ if ($action === 'modificar' && !empty($id)) {
     }
 
     $sql = "UPDATE configuracion_informes SET
+        nombre_plantilla = ?,
+        es_predeterminada = ?,
         logo_url = ?, logo_position = ?, logo_size = ?, 
         marca_agua_url = ?, marca_agua_size = ?, mostrar_marca_agua = ?,
         color_primario = ?, color_secundario = ?,
@@ -66,9 +72,12 @@ if ($action === 'modificar' && !empty($id)) {
         firma_imagen_url = ?, mostrar_firma_imagen = ?, subtitulo = ?, subtitulo_align = ?,
         updated_at = NOW()
         WHERE id = ? AND veterinario_id = ?";
+
     $stmt = $mysqli->prepare($sql);
     $stmt->bind_param(
-        "sssssissssssssisssississii",
+        "sisssssissssssssisssississii",
+        $nombre_plantilla,
+        $es_predeterminada,
         $logo_subido, $logo_position, $logo_size,
         $marca_agua_subida, $marca_agua_size, $mostrar_marca_agua,
         $color_primario, $color_secundario,
@@ -82,16 +91,26 @@ if ($action === 'modificar' && !empty($id)) {
 
 
     if ($stmt->execute()) {
+        if ($es_predeterminada === 1) {
+            $stmtDefault = $mysqli->prepare("
+                UPDATE configuracion_informes
+                SET es_predeterminada = 0
+                WHERE veterinario_id = ? AND id <> ?
+            ");
+            $stmtDefault->bind_param("ii", $usuario_id, $id);
+            $stmtDefault->execute();
+        }
+
         logg("Modificación de configuración para veterinario ID $usuario_id");
         guardarCamposInforme(
             $mysqli,
             $usuario_id,
+            (int)$id,
             'modificar',
             $_POST['campos_nuevos'] ?? [],
             $_POST['campos'] ?? [],
             explode(',', $_POST['campos_ids_actuales'] ?? '')
         );
-
 
         echo json_encode(['status' => 'success', 'message' => 'Configuración actualizada correctamente.']);
     } else {
@@ -105,27 +124,44 @@ if ($action === 'modificar' && !empty($id)) {
 //
 if ($action === 'ingresar') {
     $sql = "INSERT INTO configuracion_informes 
-        (veterinario_id, logo_url, logo_position, logo_size, marca_agua_url, marca_agua_size, mostrar_marca_agua,
+        (veterinario_id, nombre_plantilla, es_predeterminada, logo_url, logo_position, logo_size, marca_agua_url, marca_agua_size, mostrar_marca_agua,
         color_primario, color_secundario, firma_nombre, firma_titulo, firma_subtitulo, firma_align,
         footer_texto, footer_align, mostrar_fecha, formato_fecha, lugar_fecha, fecha_align, 
         imagenes_por_fila, titulo_informe, firma_imagen_url, mostrar_firma_imagen, subtitulo, subtitulo_align,
         created_at, updated_at)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), NOW())";
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), NOW())";
+
     $stmt = $mysqli->prepare($sql);
     $stmt->bind_param(
-        "isssssissssssssisssiisiss",
-        $usuario_id, $logo_subido, $logo_position, $logo_size, $marca_agua_subida, $marca_agua_size, $mostrar_marca_agua,
+        "isisssssissssssssisssississ",
+        $usuario_id, $nombre_plantilla, $es_predeterminada,
+        $logo_subido, $logo_position, $logo_size, $marca_agua_subida, $marca_agua_size, $mostrar_marca_agua,
         $color_primario, $color_secundario, $firma_nombre, $firma_titulo, $firma_subtitulo, $firma_align,
-        $footer_texto, $footer_align, $mostrar_fecha, $formato_fecha, $lugar_fecha, $fecha_align, $imagenes_por_fila, $titulo_informe,
-        $firma_imagen_subida, $mostrar_firma_imagen, $subtitulo, $subtitulo_align
+        $footer_texto, $footer_align, $mostrar_fecha, $formato_fecha, $lugar_fecha, $fecha_align,
+        $imagenes_por_fila, $titulo_informe, $firma_imagen_subida, $mostrar_firma_imagen,
+        $subtitulo, $subtitulo_align
     );
 
-
     if ($stmt->execute()) {
+        $nueva_configuracion_id = (int)$mysqli->insert_id;
+
+        if ($es_predeterminada === 1) {
+            $stmtDefault = $mysqli->prepare("
+                UPDATE configuracion_informes
+                SET es_predeterminada = 0
+                WHERE veterinario_id = ? AND id <> ?
+            ");
+            $stmtDefault->bind_param("ii", $usuario_id, $nueva_configuracion_id);
+            $stmtDefault->execute();
+        }
+
         logg("Creación de configuración para veterinario ID $usuario_id");
+        $nueva_configuracion_id = (int)$mysqli->insert_id;
+
         guardarCamposInforme(
             $mysqli,
             $usuario_id,
+            $nueva_configuracion_id,
             'ingresar',
             $_POST['campos_nuevos'] ?? []
         );
@@ -182,65 +218,83 @@ function subir_imagen($campo, $directorio, $veterinario_id, $tipo) {
 }
 
 
-function guardarCamposInforme($mysqli, $usuario_id, $modo = 'ingresar', $campos_nuevos = [], $campos_existentes = [], $campos_ids_actuales = []) {
-    if ($modo === 'modificar' && !empty($campos_existentes)) {
-        $ordenes_actualizados = json_decode($_POST['campos_orden'], true);
-
-        foreach ($campos_existentes as $campo_id => $data) {
-            $visible = isset($data['visible']) ? 1 : 0;
-            $nuevo_orden = $ordenes_actualizados[$campo_id] ?? 0;
-
-            $stmt = $mysqli->prepare(
-                "UPDATE configuracion_informe_campos
-                SET visible = ?, orden = ?
-                WHERE id = ? AND veterinario_id = ?"
-            );
-            $stmt->bind_param("iiii", $visible, $nuevo_orden, $campo_id, $usuario_id);
-            $stmt->execute();
+function guardarCamposInforme($mysqli, $usuario_id, $configuracion_informe_id, $modo = 'ingresar', $campos_nuevos = [], $campos_existentes = [], $campos_ids_actuales = []) {
+    if ($modo === 'modificar') {
+        $ordenes_actualizados = json_decode($_POST['campos_orden'] ?? '{}', true);
+        if (!is_array($ordenes_actualizados)) {
+            $ordenes_actualizados = [];
         }
 
-        // ✅ Eliminar campos que ya no están
-        if (!empty($campos_ids_actuales)) {
-            $ids_actuales = array_map('intval', $campos_ids_actuales);
-            $ids_actuales_str = implode(',', $ids_actuales);
+        if (!empty($campos_existentes)) {
+            foreach ($campos_existentes as $registro_id => $data) {
+                $visible = isset($data['visible']) ? 1 : 0;
+                $nuevo_orden = (int)($ordenes_actualizados[$registro_id] ?? 0);
+
+                $stmt = $mysqli->prepare(
+                    "UPDATE configuracion_informe_campos
+                     SET visible = ?, orden = ?
+                     WHERE id = ? AND veterinario_id = ? AND configuracion_informe_id = ?"
+                );
+                $stmt->bind_param("iiiii", $visible, $nuevo_orden, $registro_id, $usuario_id, $configuracion_informe_id);
+                $stmt->execute();
+            }
+        }
+
+        $ids_actuales_limpios = [];
+        foreach ($campos_ids_actuales as $valor) {
+            $valor = (int)$valor;
+            if ($valor > 0) {
+                $ids_actuales_limpios[] = $valor;
+            }
+        }
+
+        if (!empty($ids_actuales_limpios)) {
+            $ids_actuales_str = implode(',', $ids_actuales_limpios);
             $mysqli->query(
                 "DELETE FROM configuracion_informe_campos
-                 WHERE veterinario_id = $usuario_id
-                 AND id NOT IN ($ids_actuales_str)"
+                 WHERE veterinario_id = " . (int)$usuario_id . "
+                   AND configuracion_informe_id = " . (int)$configuracion_informe_id . "
+                   AND id NOT IN ($ids_actuales_str)"
             );
         } else {
-            // 🛑 Si no hay campos, eliminar todos
             $mysqli->query(
                 "DELETE FROM configuracion_informe_campos
-                 WHERE veterinario_id = $usuario_id"
+                 WHERE veterinario_id = " . (int)$usuario_id . "
+                   AND configuracion_informe_id = " . (int)$configuracion_informe_id
             );
         }
     }
 
-    // ✅ Insertar nuevos campos
     if (!empty($campos_nuevos)) {
-        $ordenResult = $mysqli->query(
+        $stmtMax = $mysqli->prepare(
             "SELECT IFNULL(MAX(orden), 0) AS max_orden
              FROM configuracion_informe_campos
-             WHERE veterinario_id = $usuario_id"
+             WHERE veterinario_id = ? AND configuracion_informe_id = ?"
         );
-        $ordenBase = $ordenResult->fetch_assoc()['max_orden'] ?? 0;
+        $stmtMax->bind_param("ii", $usuario_id, $configuracion_informe_id);
+        $stmtMax->execute();
+        $resMax = $stmtMax->get_result();
+        $ordenBase = (int)($resMax->fetch_assoc()['max_orden'] ?? 0);
 
         foreach ($campos_nuevos as $campo_id => $data) {
+            $campo_id = (int)$campo_id;
+            if ($campo_id <= 0) {
+                continue;
+            }
+
             $visible = isset($data['visible']) ? 1 : 0;
-            $ordenBase++; // Siguiente orden
+            $ordenBase++;
 
             $stmt = $mysqli->prepare(
                 "INSERT INTO configuracion_informe_campos
-                 (veterinario_id, campo_id, visible, orden)
-                 VALUES (?, ?, ?, ?)"
+                 (configuracion_informe_id, veterinario_id, campo_id, visible, orden)
+                 VALUES (?, ?, ?, ?, ?)"
             );
-            $stmt->bind_param("iiii", $usuario_id, $campo_id, $visible, $ordenBase);
+            $stmt->bind_param("iiiii", $configuracion_informe_id, $usuario_id, $campo_id, $visible, $ordenBase);
             $stmt->execute();
         }
     }
 }
-
 
 
 function generarNombreCampo($etiqueta) {

@@ -8,40 +8,47 @@ $mysqli = conn();
 header('Content-Type: text/plain; charset=utf-8');
 
 // 1. Recibir datos del formulario
-$veterinario  = intval($_POST['veterinario_id'] ?? 0);
-$paciente_id  = intval($_POST['paciente_id'] ?? 0);
-$fecha_examen = $_POST['fecha_examen'] ?? date('Y-m-d');
-$motivo       = trim($_POST['motivo_examen'] ?? '');
-$descripcion  = trim($_POST['contenido_html'] ?? '');
-$medico_solicitante   = trim($_POST['medico_solicitante'] ?? '');
-$recinto              = trim($_POST['recinto'] ?? '');
-$plantilla_informe_id = intval($_POST['plantilla_informe_id'] ?? 0);
-
+$veterinario              = intval($_POST['veterinario_id'] ?? 0);
+$paciente_id              = intval($_POST['paciente_id'] ?? 0);
+$fecha_examen             = $_POST['fecha_examen'] ?? date('Y-m-d');
+$motivo                   = trim($_POST['motivo_examen'] ?? '');
+$descripcion              = trim($_POST['contenido_html'] ?? '');
+$medico_solicitante       = trim($_POST['medico_solicitante'] ?? '');
+$recinto                  = trim($_POST['recinto'] ?? '');
+$plantilla_informe_id     = intval($_POST['plantilla_informe_id'] ?? 0);
+$configuracion_informe_id = intval($_POST['configuracion_informe_id'] ?? 0);
 
 $modo_manual = isset($_POST['toggle_manual']) && $_POST['toggle_manual'] == '1';
 
+$paciente = null;
 if ($modo_manual) {
-    // Recolectar datos manuales si existen
     $manual = function($campo) {
         return trim($_POST["manual_$campo"] ?? '');
     };
+
     $paciente = [
-        'paciente'     => $manual('paciente'),
-        'especie'    => $manual('especie'),
-        'raza'       => $manual('raza'),
-        'propietario'=> $manual('propietario'),
-        'edad'       => $manual('edad'),
-        'sexo'       => $manual('sexo'),
+        'paciente'         => $manual('paciente'),
+        'especie'          => $manual('especie'),
+        'raza'             => $manual('raza'),
+        'propietario'      => $manual('propietario'),
+        'edad'             => $manual('edad'),
+        'sexo'             => $manual('sexo'),
         'fecha_nacimiento' => $manual('fecha_nacimiento'),
-        'n_chip'     => $manual('n_chip'),
+        'n_chip'           => $manual('n_chip'),
+        'codigo_paciente'  => $manual('codigo_paciente'),
     ];
-    // Puedes pasar esto a buildInformeHtml() como parámetro extra o usarlo como desees
 }
 
-// 2. Validar campos mínimos (lo mismo que en JS, pero del lado backend por si acaso)
+// 2. Validar campos mínimos
 if (empty($veterinario) || empty($descripcion)) {
     http_response_code(400);
     echo "Faltan datos obligatorios para la vista previa.";
+    exit;
+}
+
+if ($configuracion_informe_id <= 0) {
+    http_response_code(400);
+    echo "Debes seleccionar una plantilla de diseño.";
     exit;
 }
 
@@ -51,8 +58,7 @@ if (!$modo_manual && empty($paciente_id)) {
     exit;
 }
 
-
-// 3. Procesar imágenes SOLO para vista previa (en base64, no guardar nada)
+// 3. Procesar imágenes SOLO para vista previa
 $imagenes = [];
 if (!empty($_FILES['imagenes']['name'][0])) {
     foreach ($_FILES['imagenes']['tmp_name'] as $key => $tmpName) {
@@ -64,10 +70,21 @@ if (!empty($_FILES['imagenes']['name'][0])) {
     }
 }
 
-// 4. Generar el HTML del informe con los datos
-$html = buildInformeHtml($veterinario, $paciente_id, $fecha_examen, $motivo, $descripcion, $imagenes, $recinto, $medico_solicitante, $modo_manual ? $paciente : null);
+// 4. Generar HTML usando la plantilla seleccionada
+$html = buildInformeHtml(
+    $veterinario,
+    $configuracion_informe_id,
+    $paciente_id,
+    $fecha_examen,
+    $motivo,
+    $descripcion,
+    $imagenes,
+    $recinto,
+    $medico_solicitante,
+    $modo_manual ? $paciente : null
+);
 
-// 5. Crear el PDF en una carpeta temporal
+// 5. Crear PDF temporal
 use Dompdf\Dompdf;
 
 $pdf = new Dompdf();
@@ -83,17 +100,16 @@ if (!is_dir($previewDir)) {
     mkdir($previewDir, 0777, true);
 }
 
-// Limpia archivos temporales viejos (opcional, puedes omitir si quieres)
+// Limpieza opcional de previews viejos
 foreach (glob($previewDir . 'preview_*.pdf') as $oldFile) {
-    if (filemtime($oldFile) < (time() - 60 * 60)) { // Más de 1 hora
+    if (filemtime($oldFile) < (time() - 60 * 60)) {
         unlink($oldFile);
     }
 }
 
 $tmpFile = $previewDir . uniqid('preview_', true) . '.pdf';
-
 file_put_contents($tmpFile, $pdf->output());
 
-$pdfUrl = '/uploads/tmp_previews/' . basename($tmpFile); // Ruta accesible desde el navegador
+$pdfUrl = '/uploads/tmp_previews/' . basename($tmpFile);
 echo $pdfUrl;
 exit;

@@ -1,4 +1,5 @@
 <?php
+//admin/certificado/metodo_ingreso/metodo_ingreso.php
   $isModificar = isset($action) && $action === 'modificar';
   $initialMode = $isModificar ? 'manual' : 'audio';
   $isManualInitial = $initialMode === 'manual';

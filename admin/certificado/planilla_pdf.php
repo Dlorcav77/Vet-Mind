@@ -1,4 +1,5 @@
 <?php
+//admin/certificado/plantilla_pdf.php
 // Mapas para alineaciones
 $align_map = ['left' => 'left', 'center' => 'center', 'right' => 'right'];
 $logo_align = $align_map[$config['logo_position']] ?? 'center';
@@ -30,6 +31,22 @@ $mes_es = ucfirst($meses[$mes_en] ?? strtolower($mes_en));
 
 $formato_fecha = $config['formato_fecha'] ?? '{{day}}/{{month}}/{{year}}';
 $fecha_str = str_replace(['{{day}}', '{{month}}', '{{year}}'], [$dia, $mes_es, $anio], $formato_fecha);
+
+// Subtítulos de firma: compatibilidad con formato antiguo (string) y nuevo (JSON)
+$firma_subtitulos = [];
+
+if (!empty($config['firma_subtitulo'])) {
+    $decoded_subtitulos = json_decode($config['firma_subtitulo'], true);
+
+    if (is_array($decoded_subtitulos)) {
+        $firma_subtitulos = array_filter(array_map('trim', $decoded_subtitulos));
+    } else {
+        $texto_subtitulo = trim((string)$config['firma_subtitulo']);
+        if ($texto_subtitulo !== '') {
+            $firma_subtitulos[] = $texto_subtitulo;
+        }
+    }
+}
 
 // Embebido base64 para logo, firma y marca de agua
 function base64Image($path) {
@@ -291,16 +308,20 @@ function base64Image($path) {
         </div>
     </div>
 
-
-
     <div class="firma">
         <div>
             <?php if (!empty($config['firma_imagen_url']) && $config['mostrar_firma_imagen']): ?>
                 <img src="<?= base64Image($config['firma_imagen_url']) ?>" alt="Firma">
             <?php endif; ?>
+
             <h4><?= htmlspecialchars($config['firma_nombre'] ?? 'Nombre de la Firma') ?></h4>
             <p><?= htmlspecialchars($config['firma_titulo'] ?? 'Título Profesional') ?></p>
-            <small><?= htmlspecialchars($config['firma_subtitulo'] ?? 'Subtítulo') ?></small>
+
+            <?php foreach ($firma_subtitulos as $linea_subtitulo): ?>
+                <small style="display:block;">
+                    <?= htmlspecialchars($linea_subtitulo) ?>
+                </small>
+            <?php endforeach; ?>
         </div>
     </div>
 

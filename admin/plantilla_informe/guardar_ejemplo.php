@@ -1,4 +1,5 @@
 <?php
+//admin/plantilla_informe/guardar_ejemplo.php
 require_once("../config.php");
 $mysqli = conn();
 

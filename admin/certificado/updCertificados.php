@@ -64,11 +64,17 @@ $medico_solicitante   = trim($_POST['medico_solicitante'] ?? '');
 $motivo               = trim($_POST['motivo_examen'] ?? '');
 $recinto              = trim($_POST['recinto'] ?? '');
 $plantilla_informe_id = intval($_POST['plantilla_informe_id']);
+$configuracion_informe_id = intval($_POST['configuracion_informe_id'] ?? 0);
 $modo_manual          = isset($_POST['toggle_manual']) && $_POST['toggle_manual'] == '1';
 
 
 if (empty($descripcion)) {
     echo json_encode(['status' => 'error', 'message' => 'Faltan datos obligatorios.']);
+    exit;
+}
+
+if ($configuracion_informe_id <= 0) {
+    echo json_encode(['status' => 'error', 'message' => 'Debes seleccionar una plantilla de diseño.']);
     exit;
 }
 
@@ -196,7 +202,18 @@ if (!empty($_FILES['imagenes']['name'][0])) {
 }
 
 $imagenesJson = json_encode($imagenes);
-$html = buildInformeHtml($veterinario, $paciente_id, $fecha_examen, $motivo, $descripcion, $imagenes, $recinto, $medico_solicitante, $manual_data);
+$html = buildInformeHtml(
+    $veterinario,
+    $configuracion_informe_id,
+    $paciente_id,
+    $fecha_examen,
+    $motivo,
+    $descripcion,
+    $imagenes,
+    $recinto,
+    $medico_solicitante,
+    $manual_data
+);
 
 // 📄 Generar PDF
 $pdf = new Dompdf();
@@ -213,9 +230,9 @@ $rutaPdf = "uploads/certificados/informes/" . $pdfFilename;
 // 🔥 Insertar o Actualizar en DB
 if ($action === 'ingresar') {
     $stmt = $mysqli->prepare("INSERT INTO certificados 
-        (veterinario_id, paciente_id, fecha_examen, contenido_html, archivo_pdf, imagenes_json, medico_solicitante, recinto, tipo_estudio, motivo, manual_data, created_at, updated_at)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), NOW())");
-    $stmt->bind_param("iisssssssss", $veterinario, $paciente_id, $fecha_examen, $descripcion, $rutaPdf, $imagenesJson, $medico_solicitante, $recinto, $plantilla_informe_id, $motivo, $manual_data);
+        (veterinario_id, paciente_id, fecha_examen, contenido_html, archivo_pdf, imagenes_json, medico_solicitante, recinto, tipo_estudio, configuracion_informe_id, motivo, manual_data, created_at, updated_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), NOW())");
+    $stmt->bind_param("iisssssssiss", $veterinario, $paciente_id, $fecha_examen, $descripcion, $rutaPdf, $imagenesJson, $medico_solicitante, $recinto, $plantilla_informe_id, $configuracion_informe_id, $motivo, $manual_data);
 } elseif ($action === 'modificar' && $id > 0) {
     // Obtener archivo anterior e imágenes
     $stmt = $mysqli->prepare("SELECT archivo_pdf, imagenes_json FROM certificados WHERE id = ? AND veterinario_id = ?");
@@ -242,9 +259,9 @@ if ($action === 'ingresar') {
 
     // Actualizar registro con nuevo PDF y nuevas imágenes
     $stmt = $mysqli->prepare("UPDATE certificados
-        SET fecha_examen = ?, contenido_html = ?, archivo_pdf = ?, imagenes_json = ?, medico_solicitante = ?, recinto = ?, tipo_estudio = ?, motivo = ?, manual_data = ?, updated_at = NOW()
+        SET fecha_examen = ?, contenido_html = ?, archivo_pdf = ?, imagenes_json = ?, medico_solicitante = ?, recinto = ?, tipo_estudio = ?, configuracion_informe_id = ?, motivo = ?, manual_data = ?, updated_at = NOW()
         WHERE id = ? AND veterinario_id = ?");
-    $stmt->bind_param("sssssssssii", $fecha_examen, $descripcion, $rutaPdf, $imagenesJson, $medico_solicitante, $recinto, $plantilla_informe_id, $motivo, $manual_data, $id, $veterinario);
+    $stmt->bind_param("sssssssissii", $fecha_examen, $descripcion, $rutaPdf, $imagenesJson, $medico_solicitante, $recinto, $plantilla_informe_id, $configuracion_informe_id, $motivo, $manual_data, $id, $veterinario);
 } else {
     echo json_encode(['status' => 'error', 'message' => 'Acción no válida.']);
     exit;
