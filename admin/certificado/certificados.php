@@ -241,6 +241,20 @@ if ($action === 'modificar' && !empty($fila['configuracion_informe_id'])) {
 
 
 
+function destroyAllCKEditorsSafe() {
+    if (typeof CKEDITOR === 'undefined' || !CKEDITOR.instances) {
+        return;
+    }
+
+    Object.keys(CKEDITOR.instances).forEach(function (instanceName) {
+        try {
+            CKEDITOR.instances[instanceName].destroy(true);
+        } catch (e) {
+            console.warn('No se pudo destruir CKEditor:', instanceName, e);
+        }
+    });
+}
+
 
 
 $('#procesarIA').on('click', function () {
@@ -609,6 +623,20 @@ $('#btnVistaPrevia').on('click', function() {
         }
     }
 
+    if (archivosSeleccionados.length > LIMITE_IMAGENES) {
+        Swal.fire({
+            icon: 'warning',
+            title: 'Demasiadas imágenes',
+            html: 'Se pueden subir como máximo <b>' + LIMITE_IMAGENES + '</b> imágenes para la vista previa.<br>Elimina <b>' + (archivosSeleccionados.length - LIMITE_IMAGENES) + '</b> para continuar.',
+            confirmButtonText: 'Entendido',
+            customClass: {
+                title: 'fw-bold',
+                popup: 'shadow rounded-4'
+            }
+        });
+        return;
+    }
+
     if (CKEDITOR.instances['contenido_html']) {
         if ($('#contenido_html').length > 0) {
             CKEDITOR.instances['contenido_html'].updateElement();
@@ -752,14 +780,11 @@ $('#btnGuardarCertificado').on('click', function(e) {
                         window.open(urlPdf, '_blank');
                     }
                 }
-                if (CKEDITOR.instances['contenido_html']) {
-                    CKEDITOR.instances['contenido_html'].destroy(true);
+                if (typeof destroyAllCKEditorsSafe === 'function') {
+                    destroyAllCKEditorsSafe();
                 }
 
-                // 👇 AQUI CARGAS LA NUEVA VISTA Y REINICIALIZAS CKEDITOR
-                $('#content').load('certificado/lisCertificados.php', function() {
-                    inicializarEditorContenido(); 
-                });
+                $('#content').load('certificado/lisCertificados.php');
 
             } else {
                 Swal.fire('Error', response.message || 'No se pudo guardar el certificado.', 'error');
@@ -783,24 +808,48 @@ $('#btnGuardarCertificado').on('click', function(e) {
     });
 });
 
-$('#modalVistaPrevia').on('hidden.bs.modal', function () {
-    if (window.nombreTempPDF) {
-        $.ajax({
-            url: 'certificado/tipo_examen/eliminar_temp_pdf.php', // 👈 Nuevo PHP
-            type: 'POST',
-            data: { pdf: window.nombreTempPDF },
-            success: function (res) {
-                // console.log('PDF temporal eliminado:', res);
-                window.nombreTempPDF = null; // 🧹 Limpia variable
-            },
-            error: function () {
-                console.error('Error al eliminar PDF temporal');
+window.ultimoTriggerVistaPrevia = window.ultimoTriggerVistaPrevia || null;
+
+$('#btnVistaPrevia')
+    .off('mousedown.storeTriggerVista focus.storeTriggerVista')
+    .on('mousedown.storeTriggerVista focus.storeTriggerVista', function () {
+        window.ultimoTriggerVistaPrevia = this;
+    });
+
+$('#modalVistaPrevia')
+    .off('hide.bs.modal.storeTriggerVista')
+    .on('hide.bs.modal.storeTriggerVista', function () {
+        const activo = document.activeElement;
+        if (activo && this.contains(activo)) {
+            activo.blur();
+        }
+
+        const destino = window.ultimoTriggerVistaPrevia || document.getElementById('btnVistaPrevia');
+        setTimeout(function () {
+            if (destino && typeof destino.focus === 'function') {
+                destino.focus();
+                destino.blur();
             }
-        });
-    }
-});
+        }, 0);
+    });
 
-
+$('#modalVistaPrevia')
+    .off('hidden.bs.modal.storeTriggerVista')
+    .on('hidden.bs.modal.storeTriggerVista', function () {
+        if (window.nombreTempPDF) {
+            $.ajax({
+                url: 'certificado/tipo_examen/eliminar_temp_pdf.php',
+                type: 'POST',
+                data: { pdf: window.nombreTempPDF },
+                success: function () {
+                    window.nombreTempPDF = null;
+                },
+                error: function () {
+                    console.error('Error al eliminar PDF temporal');
+                }
+            });
+        }
+    });
 
 function validarPacienteManualUI() {
   const okPaciente = !!($('input[name="manual_paciente"]').val() || '').trim();

@@ -39,7 +39,8 @@ $res = $stmt->get_result();
         float: none;
         text-align: center;
     }
-    table.dataTable thead th, table.dataTable tfoot th {
+    table.dataTable thead th,
+    table.dataTable tfoot th {
         font-family: Arial, sans-serif;
         font-size: 14px;
     }
@@ -51,6 +52,7 @@ $res = $stmt->get_result();
 
 <div id="certificado" data-page-id="certificado">
   <h1 class="h3 mb-3"><strong>Informes Generados</strong></h1>
+
   <div class="card">
     <div class="card-header">
       <div class="col-xl-12 col-xxl-12 d-flex">
@@ -60,6 +62,7 @@ $res = $stmt->get_result();
               <a href="certificado/subir_informe/subir_informe.php" class="btn btn-outline-primary ajax-link">
                 <i style="width:20px;height:20px;" data-feather="upload"></i> Subir Informe
               </a>
+
               <?php if (in_array('ingresar', $acceso_aplicaciones['certificado'] ?? [])): ?>
                 <a href="certificado/certificados.php" class="btn btn-primary ajax-link">
                   <i style="width:20px;height:20px;" data-feather="plus"></i> Nuevo Informe
@@ -83,16 +86,18 @@ $res = $stmt->get_result();
                 </tr>
               </thead>
               <tbody>
-                <?php $i = 1;
-                while ($fila = $res->fetch_assoc()):
-                    // Si no hay paciente, intenta sacar de manual_data
+                <?php $i = 1; ?>
+                <?php while ($fila = $res->fetch_assoc()): ?>
+                  <?php
                     $paciente = $fila['paciente'] ?? '';
                     $propietario = $fila['propietario'] ?? '';
                     $tipo_ingreso = $fila['tipo_ingreso'] ?? 'sistema';
+
                     if (empty($paciente) && !empty($fila['manual_data'])) {
                         $manual = json_decode($fila['manual_data'], true);
                         $paciente = $manual['paciente'] ?? 'Sin nombre';
                     }
+
                     if (empty($propietario) && !empty($fila['manual_data'])) {
                         $manual = $manual ?? json_decode($fila['manual_data'], true);
                         $propietario = $manual['propietario'] ?? '-';
@@ -108,42 +113,44 @@ $res = $stmt->get_result();
                     <td><?= date('d-m-Y', strtotime($fila['fecha_examen'])) ?></td>
                     <td>
                       <div class="dropdown">
-                        <button  class="btn btn-outline-info dropdown-toggle" type="button" data-bs-toggle="dropdown" aria-expanded="false">
+                        <button class="btn btn-outline-info dropdown-toggle" type="button" data-bs-toggle="dropdown" aria-expanded="false">
                           <i class="fas fa-ellipsis-v"></i>
                         </button>
+
                         <div class="dropdown-menu dropdown-menu-end">
-                            <?php if ($tipo_ingreso === 'manual'): ?>
-                              <a class="dropdown-item ajax-link" href="certificado/subir_informe/subir_informe.php?action=modificar&id=<?= $fila['id'] ?>">
-                                <i class="fas fa-edit me-2 text-primary"></i>Editar
-                              </a>
-                            <?php else: ?>
-                              <a class="dropdown-item ajax-link" href="certificado/certificados.php?action=modificar&id=<?= $fila['id'] ?>">
-                                <i class="fas fa-edit me-2 text-primary"></i>Editar
-                              </a>
-                            <?php endif; ?>
-
-                            <a class="dropdown-item" href="#" onclick="confirmDelete(<?= $fila['id'] ?>, '<?= $tipo_ingreso ?>')">
-                              <i class="fas fa-trash-alt me-2 text-danger"></i> Eliminar
+                          <?php if ($tipo_ingreso === 'manual'): ?>
+                            <a class="dropdown-item ajax-link" href="certificado/subir_informe/subir_informe.php?action=modificar&id=<?= (int)$fila['id'] ?>">
+                              <i class="fas fa-edit me-2 text-primary"></i>Editar
                             </a>
-
-                            <a class="dropdown-item" href="certificado/descargar.php?id=<?= (int)$fila['id'] ?>" target="_blank">
-                              <i class="fas fa-file-pdf me-2 text-danger"></i>Ver PDF
+                          <?php else: ?>
+                            <a class="dropdown-item ajax-link" href="certificado/certificados.php?action=modificar&id=<?= (int)$fila['id'] ?>">
+                              <i class="fas fa-edit me-2 text-primary"></i>Editar
                             </a>
+                          <?php endif; ?>
 
-                            <a class="dropdown-item" href="certificado/descargar.php?id=<?= (int)$fila['id'] ?>&dl=1">
-                              <i class="fas fa-download me-2 text-primary"></i>Descargar PDF
-                            </a>
+                          <a class="dropdown-item" href="#" onclick="confirmDelete(<?= (int)$fila['id'] ?>, '<?= htmlspecialchars($tipo_ingreso, ENT_QUOTES) ?>')">
+                            <i class="fas fa-trash-alt me-2 text-danger"></i> Eliminar
+                          </a>
 
-                            <div class="dropdown-divider"></div>
-                            <a class="dropdown-item" href="#"
-                              onclick="abrirModalCorreo(this, <?= (int)$fila['id'] ?>)"
-                              data-id="<?= (int)$fila['id'] ?>"
-                              data-paciente="<?= htmlspecialchars($paciente) ?>"
-                              data-propietario="<?= htmlspecialchars($propietario) ?>"
-                              data-tipo_examen="<?= htmlspecialchars($fila['tipo_examen'] ?? '-') ?>"
-                              data-email="<?= htmlspecialchars($fila['email'] ?? '') ?>">
-                              <i class="fas fa-envelope me-2 text-success"></i> Enviar por correo
-                            </a>
+                          <a class="dropdown-item" href="certificado/descargar.php?id=<?= (int)$fila['id'] ?>" target="_blank">
+                            <i class="fas fa-file-pdf me-2 text-danger"></i>Ver PDF
+                          </a>
+
+                          <a class="dropdown-item" href="certificado/descargar.php?id=<?= (int)$fila['id'] ?>&dl=1">
+                            <i class="fas fa-download me-2 text-primary"></i>Descargar PDF
+                          </a>
+
+                          <div class="dropdown-divider"></div>
+
+                          <a class="dropdown-item" href="#"
+                             onclick="abrirModalCorreo(this, <?= (int)$fila['id'] ?>)"
+                             data-id="<?= (int)$fila['id'] ?>"
+                             data-paciente="<?= htmlspecialchars($paciente) ?>"
+                             data-propietario="<?= htmlspecialchars($propietario) ?>"
+                             data-tipo_examen="<?= htmlspecialchars($fila['tipo_examen'] ?? '-') ?>"
+                             data-email="<?= htmlspecialchars($fila['email'] ?? '') ?>">
+                            <i class="fas fa-envelope me-2 text-success"></i> Enviar por correo
+                          </a>
                         </div>
                       </div>
                     </td>
@@ -158,55 +165,72 @@ $res = $stmt->get_result();
   </div>
 </div>
 
-<?php 
-include 'envio_email/envio_email.php'; 
-?>
+<?php include 'envio_email/envio_email.php'; ?>
 
 <script>
-  function confirmDelete(id, tipo) {
+function confirmDelete(id, tipo) {
     Swal.fire({
-      title: '¿Eliminar Informe?',
-      text: 'Esta acción no se puede deshacer',
-      icon: 'warning',
-      showCancelButton: true,
-      confirmButtonColor: '#d33',
-      cancelButtonColor: '#3085d6',
-      confirmButtonText: 'Sí, eliminar',
-      cancelButtonText: 'Cancelar'
+        title: '¿Eliminar Informe?',
+        text: 'Esta acción no se puede deshacer',
+        icon: 'warning',
+        showCancelButton: true,
+        confirmButtonColor: '#d33',
+        cancelButtonColor: '#3085d6',
+        confirmButtonText: 'Sí, eliminar',
+        cancelButtonText: 'Cancelar'
     }).then((result) => {
-      if (result.isConfirmed) {
+        if (!result.isConfirmed) {
+            return;
+        }
+
         const url = tipo === 'manual'
-          ? 'certificado/subir_informe/updSubirInforme.php'
-          : 'certificado/updCertificados.php';
+            ? 'certificado/subir_informe/updSubirInforme.php'
+            : 'certificado/updCertificados.php';
 
         $.ajax({
-          url: url,
-          type: 'POST',
-          data: { action: 'eliminar', id: id },
-          success: function(response) {
-            let jsonResponse = JSON.parse(response);
-            if (jsonResponse.status === 'success') {
-              $('#content').load('certificado/lisCertificados.php');
-              Swal.fire('Eliminado', jsonResponse.message, 'success');
-            } else {
-              Swal.fire('Error', jsonResponse.message, 'error');
+            url: url,
+            type: 'POST',
+            data: { action: 'eliminar', id: id },
+            success: function (response) {
+                let jsonResponse;
+
+                try {
+                    jsonResponse = JSON.parse(response);
+                } catch (e) {
+                    Swal.fire('Error', 'La respuesta del servidor no fue válida.', 'error');
+                    console.error('Respuesta inválida al eliminar:', response);
+                    return;
+                }
+
+                if (jsonResponse.status === 'success') {
+                    if (typeof destroyAllCKEditorsSafe === 'function') {
+                        destroyAllCKEditorsSafe();
+                    }
+
+                    $('#content').load('certificado/lisCertificados.php');
+                    Swal.fire('Eliminado', jsonResponse.message, 'success');
+                } else {
+                    Swal.fire('Error', jsonResponse.message || 'No se pudo eliminar el informe.', 'error');
+                }
+            },
+            error: function () {
+                Swal.fire('Error', 'No se pudo eliminar el Informe.', 'error');
             }
-          },
-          error: function() {
-            Swal.fire('Error', 'No se pudo eliminar el Informe.', 'error');
-          }
         });
-      }
     });
-  }
+}
 
 if (!window.ajaxLinkEventRegistered) {
     $(document).on('click', '.ajax-link', function (e) {
         e.preventDefault();
+
+        if (typeof destroyAllCKEditorsSafe === 'function') {
+            destroyAllCKEditorsSafe();
+        }
+
         cargarConEditor($(this).attr('href'));
     });
 
-    window.ajaxLinkEventRegistered = true; // ⚠️ clave
+    window.ajaxLinkEventRegistered = true;
 }
-
 </script>

@@ -80,14 +80,85 @@ try {
         }
     }
 
-    $imagenes = [];
+    $previewDir = __DIR__ . '/../../uploads/tmp_previews/';
+    $previewImgDir = $previewDir . 'img/';
 
+    $limiteImagenes = 24;
+    $cantidadImagenesAntiguas = 0;
+    if (!empty($_POST['imagenes_antiguas'])) {
+        $tmpAntiguas = json_decode($_POST['imagenes_antiguas'], true);
+        if (is_array($tmpAntiguas)) {
+            $cantidadImagenesAntiguas = count($tmpAntiguas);
+        }
+    }
+
+    $cantidadImagenesNuevas = 0;
+    if (!empty($_FILES['imagenes']['name']) && is_array($_FILES['imagenes']['name'])) {
+        foreach ($_FILES['imagenes']['name'] as $nombreTmp) {
+            if (!empty($nombreTmp)) {
+                $cantidadImagenesNuevas++;
+            }
+        }
+    }
+
+    $cantidadTotalImagenes = $cantidadImagenesAntiguas + $cantidadImagenesNuevas;
+
+    if ($cantidadTotalImagenes > $limiteImagenes) {
+        http_response_code(400);
+        echo "Se permiten como máximo {$limiteImagenes} imágenes para la vista previa.";
+        exit;
+    }
+
+    if (!is_dir($previewDir)) {
+        mkdir($previewDir, 0777, true);
+    }
+
+    if (!is_dir($previewImgDir)) {
+        mkdir($previewImgDir, 0777, true);
+    }
+
+    // Limpieza de previews viejos
+    foreach (glob($previewDir . 'preview_*.pdf') as $oldFile) {
+        if (filemtime($oldFile) < (time() - 60 * 60)) {
+            @unlink($oldFile);
+        }
+    }
+
+    // Limpieza de imágenes temporales viejas
+    foreach (glob($previewImgDir . 'previmg_*') as $oldImg) {
+        if (filemtime($oldImg) < (time() - 60 * 60)) {
+            @unlink($oldImg);
+        }
+    }
+
+    $imagenes = [];
+    
+    // Mantener imágenes antiguas si vienen al modificar
+    if (!empty($_POST['imagenes_antiguas'])) {
+        $imgsAntiguas = json_decode($_POST['imagenes_antiguas'], true);
+        if (is_array($imgsAntiguas)) {
+            foreach ($imgsAntiguas as $img) {
+                if (!empty($img)) {
+                    $imagenes[] = ltrim($img, '/');
+                }
+            }
+        }
+    }
+
+    // Nuevas imágenes para preview: copiar a temporales en disco, NO base64
     if (!empty($_FILES['imagenes']['name'][0])) {
         foreach ($_FILES['imagenes']['tmp_name'] as $key => $tmpName) {
             if (!empty($tmpName) && is_uploaded_file($tmpName)) {
-                $data = base64_encode(file_get_contents($tmpName));
-                $mime = mime_content_type($tmpName);
-                $imagenes[] = "data:$mime;base64,$data";
+                $originalName = $_FILES['imagenes']['name'][$key] ?? ('imagen_' . $key);
+                $ext = pathinfo($originalName, PATHINFO_EXTENSION);
+                $ext = $ext ? '.' . strtolower($ext) : '.jpg';
+
+                $tmpPreviewName = 'previmg_' . $veterinario . '_' . uniqid('', true) . $ext;
+                $destinoFisico = $previewImgDir . $tmpPreviewName;
+
+                if (move_uploaded_file($tmpName, $destinoFisico)) {
+                    $imagenes[] = 'uploads/tmp_previews/img/' . $tmpPreviewName;
+                }
             }
         }
     }
@@ -112,17 +183,6 @@ try {
     $pdf->loadHtml($html);
     $pdf->setPaper('A4', 'portrait');
     $pdf->render();
-
-    $previewDir = __DIR__ . '/../../uploads/tmp_previews/';
-    if (!is_dir($previewDir)) {
-        mkdir($previewDir, 0777, true);
-    }
-
-    foreach (glob($previewDir . 'preview_*.pdf') as $oldFile) {
-        if (filemtime($oldFile) < (time() - 60 * 60)) {
-            @unlink($oldFile);
-        }
-    }
 
     $tmpFile = $previewDir . uniqid('preview_', true) . '.pdf';
     file_put_contents($tmpFile, $pdf->output());

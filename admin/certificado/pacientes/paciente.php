@@ -319,13 +319,17 @@ $(function () {
   });
 });
 
-function abrirModalBuscarPaciente() {
-  $('#modalBuscarPaciente').modal('show');
+window.ultimoTriggerModalPaciente = window.ultimoTriggerModalPaciente || null;
+
+function abrirModalBuscarPaciente(triggerEl = null) {
+  window.ultimoTriggerModalPaciente = triggerEl || document.getElementById('paciente_seleccionado');
+
   $('#buscarPacienteInput').val('');
   $('#resultadosBuscarPaciente').html('<p class="text-muted">Comience a escribir para ver resultados.</p>');
+  $('#modalBuscarPaciente').modal('show');
 }
 
-$('#buscarPacienteInput').on('input', function () {
+$('#buscarPacienteInput').off('input.certBuscarPaciente').on('input.certBuscarPaciente', function () {
   let query = $(this).val().trim();
 
   if (query.length < 3) {
@@ -358,14 +362,47 @@ function seleccionarPaciente(id, mascota, tutor, especie, raza, edad, sexo) {
     .data('fecha_nacimiento', edad)
     .data('sexo', sexo);
 
+  const inputFueraModal = document.getElementById('paciente_seleccionado');
+  if (inputFueraModal) {
+    inputFueraModal.focus();
+    inputFueraModal.blur();
+  }
+
   $('#modalBuscarPaciente').modal('hide');
 }
 
-$('#pacienteSeleccion').on('click', function () {
+$('#pacienteSeleccion').off('click.certModalPaciente').on('click.certModalPaciente', function (e) {
   if (!$('#toggle_manual').is(':checked')) {
-    abrirModalBuscarPaciente();
+    const triggerReal = e.target.closest('button, input, #pacienteSeleccion') || this;
+    abrirModalBuscarPaciente(triggerReal);
   }
 });
+
+$('#modalBuscarPaciente')
+  .off('show.bs.modal.certModalPaciente')
+  .on('show.bs.modal.certModalPaciente', function () {
+    const inputBusqueda = document.getElementById('buscarPacienteInput');
+    setTimeout(function () {
+      if (inputBusqueda) inputBusqueda.focus();
+    }, 150);
+  });
+
+$('#modalBuscarPaciente')
+  .off('hide.bs.modal.certModalPaciente')
+  .on('hide.bs.modal.certModalPaciente', function () {
+    const activo = document.activeElement;
+    if (activo && this.contains(activo)) {
+      activo.blur();
+    }
+
+    const destino = window.ultimoTriggerModalPaciente || document.getElementById('paciente_seleccionado');
+    setTimeout(function () {
+      if (destino && typeof destino.focus === 'function') {
+        destino.focus();
+        destino.blur();
+      }
+    }, 0);
+  });
 
 window.MANUAL_DATA = <?php
   $md = $fila['manual_data'] ?? null;

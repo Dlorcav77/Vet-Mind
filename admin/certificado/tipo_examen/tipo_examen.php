@@ -214,7 +214,7 @@ var imagenesAntiguas = [];
 var imagenesArray = [];
 var imagenActual = 0;
 var archivosSeleccionados = [];
-var LIMITE_IMAGENES = 20;
+var LIMITE_IMAGENES = 24;
 var modoSoloGuardar = false;
 var nombreTempImagen = null;
 var imagenesAntiguasCargadas = [];
@@ -843,6 +843,18 @@ $('#medirModal').on('hidden.bs.modal', function () {
                 console.error('Error al eliminar imagen temporal');
             }
         });
+    }
+});
+
+$('#imagenModal').on('hidden.bs.modal', function () {
+    if (document.activeElement) {
+        document.activeElement.blur();
+    }
+});
+
+$('#medirModal').on('hidden.bs.modal', function () {
+    if (document.activeElement) {
+        document.activeElement.blur();
     }
 });
 

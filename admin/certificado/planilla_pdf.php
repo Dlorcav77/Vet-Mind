@@ -15,6 +15,12 @@ $logo_height = $logo_sizes[$config['logo_size']] ?? '80px';
 $agua_sizes = ['small' => '50%', 'medium' => '70%', 'large' => '90%'];
 $marca_width = $agua_sizes[$config['marca_agua_size']] ?? '30%';
 
+$imagenes_por_fila = intval($config['imagenes_por_fila'] ?? 2);
+if ($imagenes_por_fila <= 0) {
+    $imagenes_por_fila = 2;
+}
+$ancho_imagen_td = (100 / $imagenes_por_fila) . '%';
+
 // Fecha formateada
 $lugar = trim($config['lugar_fecha'] ?? '');
 $fecha_dt = new DateTime($fecha);
@@ -77,10 +83,9 @@ function base64Image($path) {
             font-family: 'Times New Roman', Arial, sans-serif;
             color: #333;
             background: #fff;
-            margin: 0px 10px 0px 10px;
-            padding-top: 0;
+            margin: 0;
+            padding: 0;
             position: relative;
-            padding-bottom: 60px; 
         }
         .header {
             text-align: <?= $logo_align ?>;
@@ -149,30 +154,47 @@ function base64Image($path) {
             /* line-height: 1.5; */
         }
 
-        .contenido-centrado {
-            max-width: 90%; /* Ajusta el ancho al 80% del área imprimible */
-            margin: 0 auto; /* Centra el contenido */
-        }
-        .imagenes {
+        .contenido-principal {
             width: 100%;
-            border-collapse: collapse;
-            margin-top: 20px;
         }
 
-        .imagenes td {
-            padding: 5px;
-            width: <? echo 100 / ($config['imagenes_por_fila'] ?: 2) ?>%;
+        .contenido-centrado {
+            max-width: 90%;
+            margin: 0 auto;
         }
-        
-        .imagenes img {
-            width: 100%;
-            height: auto;
-            border-radius: 6px;
-            border: 1px solid #ccc;
-            object-fit: contain;
-            page-break-inside: avoid;
-            break-inside: avoid;
-        }
+
+
+
+
+
+.imagenes {
+    width: 100%;
+    border-collapse: collapse;
+    margin-top: 8px;
+    table-layout: fixed;
+}
+
+.imagenes td {
+    padding: 3px;
+    width: <?= htmlspecialchars($ancho_imagen_td) ?>;
+    vertical-align: top;
+}
+
+.imagenes img {
+    display: block;
+    width: 100%;
+    max-height: 235px;
+    height: auto;
+    border-radius: 4px;
+    border: 1px solid #ccc;
+    object-fit: contain;
+    page-break-inside: avoid;
+    break-inside: avoid;
+}
+
+
+
+
         .firma {
             /* margin-top: 30px; */
             text-align: <?= $firma_align ?>; 
@@ -208,20 +230,21 @@ function base64Image($path) {
         }
 
         @page {
-            margin: 40px 20px 20px 20px; /* top, right, bottom, left */
+            margin: 40px 20px 90px 20px; /* top, right, bottom, left */
         }
 
         .footer-text {
             position: fixed;
-            bottom: 0px;
+            bottom: -70px;
             left: 0;
+            right: 0;
             width: 100%;
             text-align: <?= $footer_align ?>;
             color: #888;
             font-size: 15px;
-            padding: 5px;
+            padding: 0 10px;
             background-color: #fff;
-            /* z-index: 100; */
+            z-index: 999;
         }
 
         .marca-agua {
@@ -237,7 +260,13 @@ function base64Image($path) {
     </style>
 </head>
 <body>
-<!-- <div class="contenido> -->
+<?php if (!empty($config['footer_texto'])): ?>
+    <div class="footer-text">
+        <?= nl2br(htmlspecialchars($config['footer_texto'])) ?>
+    </div>
+<?php endif; ?>
+
+<div class="contenido-principal">
     <?php if (!empty($config['marca_agua_url']) && $config['mostrar_marca_agua']): ?>
         <img src="<?= base64Image($config['marca_agua_url']) ?>" class="marca-agua">
     <?php endif; ?>
@@ -347,14 +376,7 @@ function base64Image($path) {
             <?= ($lugar ? htmlspecialchars($lugar) . ", " : '') . $fecha_str ?>
         </div>
     <?php endif; ?>
-<!-- </div> -->
-
-
-    <?php if (!empty($config['footer_texto'])): ?>
-        <div class="footer-text">
-            <?= nl2br(htmlspecialchars($config['footer_texto'])) ?>
-        </div>
-    <?php endif; ?>
+</div>
 
     <?php if (!empty($imagenes)): ?>
         <table class="imagenes">
