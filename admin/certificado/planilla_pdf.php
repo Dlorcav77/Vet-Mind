@@ -50,12 +50,22 @@ if (!empty($config['firma_subtitulo'])) {
 
 // Embebido base64 para logo, firma y marca de agua
 function base64Image($path) {
-    $fullPath = realpath(__DIR__ . '/../../' . $path);
+    if (!$path) {
+        return null;
+    }
+
+    // Si ya viene embebida como data URI, devolver tal cual
+    if (strpos($path, 'data:image/') === 0) {
+        return $path;
+    }
+
+    $fullPath = realpath(__DIR__ . '/../../' . ltrim($path, '/'));
     if ($fullPath && file_exists($fullPath)) {
         $mime = mime_content_type($fullPath);
         $data = base64_encode(file_get_contents($fullPath));
         return "data:$mime;base64,$data";
     }
+
     return null;
 }
 ?>
@@ -255,9 +265,13 @@ function base64Image($path) {
 
                     // Manejo especial para edad y campos específicos
                     if ($campoNombre == 'edad') {
-                        $fechaNacimiento = new DateTime($paciente['fecha_nacimiento']);
-                        $hoy = new DateTime();
-                        $valorCampo = $hoy->diff($fechaNacimiento)->y . " años";
+                        if (!empty($paciente['fecha_nacimiento'])) {
+                            $fechaNacimiento = new DateTime($paciente['fecha_nacimiento']);
+                            $hoy = new DateTime();
+                            $valorCampo = $hoy->diff($fechaNacimiento)->y . " años";
+                        } else {
+                            $valorCampo = '';
+                        }
                     } elseif ($campoNombre == 'fecha_nacimiento' && !empty($paciente['fecha_nacimiento'])) {
                         $fechaNacimiento = new DateTime($paciente['fecha_nacimiento']);
                         $valorCampo = $fechaNacimiento->format('d-m-Y');
@@ -276,16 +290,19 @@ function base64Image($path) {
                         $campoNombre2 = $campos[$i + 1]['campo'];
 
                         if ($campoNombre2 == 'edad') {
-                            $fechaNacimiento = new DateTime($paciente['fecha_nacimiento']);
-                            $hoy = new DateTime();
-                            $valorCampo2 = $hoy->diff($fechaNacimiento)->y . " años";
+                            if (!empty($paciente['fecha_nacimiento'])) {
+                                $fechaNacimiento = new DateTime($paciente['fecha_nacimiento']);
+                                $hoy = new DateTime();
+                                $valorCampo2 = $hoy->diff($fechaNacimiento)->y . " años";
+                            } else {
+                                $valorCampo2 = '';
+                            }
                         } elseif ($campoNombre2 == 'fecha_nacimiento' && !empty($paciente['fecha_nacimiento'])) {
                             $fechaNacimiento = new DateTime($paciente['fecha_nacimiento']);
                             $valorCampo2 = $fechaNacimiento->format('d-m-Y');
                         } else {
                             $valorCampo2 = $paciente[$campoNombre2] ?? '';
                         }
-
 
                         echo "<td class='titulo-celda' style='white-space: nowrap;'>{$etiqueta2}:</td>";
                         echo "<td>" . htmlspecialchars($valorCampo2) . "</td>";

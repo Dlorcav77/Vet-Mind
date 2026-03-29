@@ -3,7 +3,6 @@ function buildInformeHtml($veterinarioId, $configuracionInformeId, $pacienteId, 
 {
     global $mysqli;
 
-    // Configuración de la plantilla seleccionada
     $stmt = $mysqli->prepare("
         SELECT *
         FROM configuracion_informes
@@ -18,20 +17,19 @@ function buildInformeHtml($veterinarioId, $configuracionInformeId, $pacienteId, 
         throw new Exception("No se encontró la plantilla de diseño seleccionada.");
     }
 
-    // ---- DATOS PACIENTE ----
     if ($pacienteId) {
         $stmt = $mysqli->prepare("
             SELECT 
-                p.nombre AS paciente, 
-                p.fecha_nacimiento, 
-                p.n_chip, 
-                p.especie, 
-                p.sexo, 
+                p.nombre AS paciente,
+                p.fecha_nacimiento,
+                p.n_chip,
+                p.especie,
+                p.sexo,
                 p.raza,
                 p.codigo_paciente,
                 t.nombre_completo AS propietario
-            FROM pacientes p 
-            LEFT JOIN tutores t ON p.tutor_id = t.id 
+            FROM pacientes p
+            LEFT JOIN tutores t ON p.tutor_id = t.id
             WHERE p.id = ?
         ");
         $stmt->bind_param("i", $pacienteId);
@@ -66,20 +64,27 @@ function buildInformeHtml($veterinarioId, $configuracionInformeId, $pacienteId, 
     $paciente['recinto']       = $recinto;
     $paciente['m_solicitante'] = $medico_solicitante;
 
-    // ---- CAMPOS VISIBLES DE LA PLANTILLA ----
     $stmt = $mysqli->prepare("
-        SELECT cp.campo, cp.etiqueta
-        FROM configuracion_informe_campos cic
-        JOIN campos_permitidos cp ON cic.campo_id = cp.id
-        WHERE cic.configuracion_informe_id = ?
-            AND cic.visible = 1
-        ORDER BY cic.orden ASC, cic.id ASC
+        SELECT x.campo, x.etiqueta
+        FROM (
+            SELECT 
+                cp.id AS campo_id,
+                cp.campo,
+                cp.etiqueta,
+                MIN(cic.orden) AS orden_min,
+                MIN(cic.id) AS id_min
+            FROM configuracion_informe_campos cic
+            INNER JOIN campos_permitidos cp ON cp.id = cic.campo_id
+            WHERE cic.configuracion_informe_id = ?
+              AND cic.visible = 1
+            GROUP BY cp.id, cp.campo, cp.etiqueta
+        ) x
+        ORDER BY x.orden_min ASC, x.id_min ASC
     ");
     $stmt->bind_param("i", $configuracionInformeId);
     $stmt->execute();
     $campos = $stmt->get_result()->fetch_all(MYSQLI_ASSOC);
 
-    // ---- ARMADO DEL HTML ----
     ob_start();
     include(__DIR__ . '/planilla_pdf.php');
     return ob_get_clean();

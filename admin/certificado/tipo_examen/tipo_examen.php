@@ -32,7 +32,6 @@ if (!isset($tipos_estudio)) {
             ];
         }
     }
-
 }
 ?>
 <style>
@@ -59,18 +58,55 @@ if (!isset($tipos_estudio)) {
         padding: 8px;
     }
 </style>
-<div class="col-md-4 mb-3">
+
+<div
+    class="col-md-4 mb-3"
+    id="wrap_motivo_examen"
+    data-campo-general="antecedentes"
+    style="<?= in_array('antecedentes', $campos_visibles_actuales ?? [], true) ? '' : 'display:none;' ?>"
+>
     <label for="motivo_examen" class="form-label fw-bold">Motivo</label>
-    <input type="text" class="form-control" name="motivo_examen" id="motivo_examen" value="<?= htmlspecialchars($fila['motivo'] ?? '') ?>">
+    <input
+        type="text"
+        class="form-control"
+        name="motivo_examen"
+        id="motivo_examen"
+        value="<?= htmlspecialchars($fila['motivo'] ?? '') ?>"
+    >
 </div>
-<div class="col-md-4 mb-3">
+
+<div
+    class="col-md-4 mb-3"
+    id="wrap_medico_solicitante"
+    data-campo-general="m_solicitante"
+    style="<?= in_array('m_solicitante', $campos_visibles_actuales ?? [], true) ? '' : 'display:none;' ?>"
+>
     <label for="medico_solicitante" class="form-label fw-bold">Médico Solicitante</label>
-    <input type="text" class="form-control" name="medico_solicitante" id="medico_solicitante" value="<?= htmlspecialchars($fila['medico_solicitante'] ?? '') ?>">
+    <input
+        type="text"
+        class="form-control"
+        name="medico_solicitante"
+        id="medico_solicitante"
+        value="<?= htmlspecialchars($fila['medico_solicitante'] ?? '') ?>"
+    >
 </div>
-<div class="col-md-4 mb-3">
+
+<div
+    class="col-md-4 mb-3"
+    id="wrap_recinto"
+    data-campo-general="recinto"
+    style="<?= in_array('recinto', $campos_visibles_actuales ?? [], true) ? '' : 'display:none;' ?>"
+>
     <label for="recinto" class="form-label fw-bold">Recinto</label>
-    <input type="text" class="form-control" name="recinto" id="recinto" value="<?= htmlspecialchars($fila['recinto'] ?? '') ?>">
+    <input
+        type="text"
+        class="form-control"
+        name="recinto"
+        id="recinto"
+        value="<?= htmlspecialchars($fila['recinto'] ?? '') ?>"
+    >
 </div>
+
 <div class="col-md-6 mb-3">
     <label for="plantilla_informe_id" class="form-label fw-bold">Tipo de Examen</label>
     <select name="plantilla_informe_id" id="plantilla_informe_id" class="form-select" required>
@@ -89,18 +125,21 @@ if (!isset($tipos_estudio)) {
         <?php endforeach; ?>
     </select>
 </div>
+
 <div class="col-md-6">
     <label for="imagenInput" class="form-label fw-bold">Imágenes Asociadas</label>
     <input type="file" id="imagenInput" class="form-control mb-2" name="imagenes[]" multiple accept="image/*">
 </div>
-<div class="col-md-6" id="plantillaPlaceholder" style=" display:block;">
-</div>
+
+<div class="col-md-6" id="plantillaPlaceholder" style="display:block;"></div>
+
 <div class="col-md-6 mb-2" id="plantillaPreview" style="display:none;">
     <span class="form-label fw-bold">Plantilla Asociada</span>
     <div class="border rounded p-3 mt-2 bg-light" id="plantillaContenido" style="min-height: 300px; overflow-y: auto;">
         <em class="text-muted">Selecciona un tipo de examen para ver su plantilla...</em>
     </div>
 </div>
+
 <div class="col-md-6 mb-2" id="imagenesColumna" style="display:none;">
     <div class="d-flex justify-content-between align-items-center">
         <label for="columnasImagenes" class="form-label fw-bold">Imágenes</label>
@@ -112,37 +151,35 @@ if (!isset($tipos_estudio)) {
         </select>
     </div>
 
-    <div id="imagenesPreview" class="border rounded bg-light"
-        style="min-height: 150px; overflow-y: auto;">
+    <div id="imagenesPreview" class="border rounded bg-light" style="min-height: 150px; overflow-y: auto;">
         <em class="text-muted">Sube imágenes para verlas aquí.</em>
     </div>
     <div id="maxImgsWarning" style="display:none;"></div>
 </div>
 
-
-
-<div class="modal fade" id="imagenModal" tabindex="-1" aria-labelledby="imagenModalLabel" >
+<div class="modal fade" id="imagenModal" tabindex="-1" aria-labelledby="imagenModalLabel">
     <div class="modal-dialog modal-dialog-centered modal-lg">
         <div class="modal-content">
-        <div class="modal-body p-0">
-            <img src="" id="imagenModalSrc" class="img-fluid w-100 rounded">
-        </div>
-        <button type="button" id="prevImg" class="btn btn-light position-absolute top-50 start-0 translate-middle-y" style="z-index:1051;">
-            &#8592;
-        </button>
-        <button type="button" id="nextImg" class="btn btn-light position-absolute top-50 end-0 translate-middle-y" style="z-index:1051;">
-            &#8594;
-        </button>
-        <button 
-            type="button" 
-            id="btnEditarMedirImg" 
-            class="btn btn-warning position-absolute bottom-0 end-0 m-3"
-            style="z-index:1052;">
-            ✏️ Medir / Editar
-        </button>
+            <div class="modal-body p-0">
+                <img src="" id="imagenModalSrc" class="img-fluid w-100 rounded">
+            </div>
+            <button type="button" id="prevImg" class="btn btn-light position-absolute top-50 start-0 translate-middle-y" style="z-index:1051;">
+                &#8592;
+            </button>
+            <button type="button" id="nextImg" class="btn btn-light position-absolute top-50 end-0 translate-middle-y" style="z-index:1051;">
+                &#8594;
+            </button>
+            <button
+                type="button"
+                id="btnEditarMedirImg"
+                class="btn btn-warning position-absolute bottom-0 end-0 m-3"
+                style="z-index:1052;">
+                ✏️ Medir / Editar
+            </button>
         </div>
     </div>
 </div>
+
 <div class="modal fade" id="medirModal" tabindex="-1" aria-labelledby="medirModalLabel">
     <div class="modal-dialog modal-dialog-centered modal-xl">
         <div class="modal-content">
@@ -162,6 +199,7 @@ if (!isset($tipos_estudio)) {
         </div>
     </div>
 </div>
+
 <?php if ($action === 'modificar' && $mostrarImagenesAntiguas && !empty($imagenesGuardadas)): ?>
 <script>
 var imagenesAntiguas = <?= json_encode($imagenesGuardadas) ?>;
@@ -171,6 +209,7 @@ var imagenesAntiguas = <?= json_encode($imagenesGuardadas) ?>;
 var imagenesAntiguas = [];
 </script>
 <?php endif; ?>
+
 <script>
 var imagenesArray = [];
 var imagenActual = 0;
@@ -180,27 +219,23 @@ var modoSoloGuardar = false;
 var nombreTempImagen = null;
 var imagenesAntiguasCargadas = [];
 
-
 $('select[name="plantilla_informe_id"]').on('change', function () {
     let tipo = $(this).val();
     $('#procesarIA').prop('disabled', true);
 
     if (!tipo) {
-        // 🟢 Si NO hay examen seleccionado
         $('#plantillaBase').val('');
-        $('#plantillaPreview').hide();          // Oculta la plantilla
-        $('#plantillaPlaceholder').show();      // Muestra el placeholder
+        $('#plantillaPreview').hide();
+        $('#plantillaPlaceholder').show();
         $('#plantillaContenido').html('<em class="text-muted">Selecciona un tipo de examen para ver su plantilla...</em>');
         return;
     }
 
-    // 🟢 Si SÍ hay examen seleccionado
     $.ajax({
         url: 'certificado/tipo_examen/getPlantillaPorTipo.php',
         type: 'POST',
         data: { plantilla_informe_id: tipo },
         success: function (res) {
-            // console.log(res);
             if (res.status === 'success') {
                 $('#plantillaBase').val(res.contenido);
                 $('#plantillaContenido').html(res.contenido);
@@ -208,16 +243,13 @@ $('select[name="plantilla_informe_id"]').on('change', function () {
                 $('#plantillaPreview').show();
                 $('#procesarIA').prop('disabled', false);
 
-                // 💥 NUEVO: si estoy en modo manual, no estoy editando y el editor está vacío, relleno
                 if (!ES_MODIFICAR && audio_manual_isManual()) {
-                    // si ya existe CKEditor
                     if (CKEDITOR.instances['contenido_html']) {
                         const actual = CKEDITOR.instances['contenido_html'].getData().trim();
                         if (!actual) {
                             CKEDITOR.instances['contenido_html'].setData(res.contenido);
                         }
                     } else {
-                        // por si todavía no se creó
                         const $txt = $('#contenido_html');
                         if ($txt.length && !$txt.val().trim()) {
                             $txt.val(res.contenido);
@@ -249,10 +281,9 @@ $('#imagenInput').on('change', function (e) {
 });
 
 function renderPreview() {
-    const scrollTop = $('#imagenesPreview').scrollTop(); // 📌 guarda scroll antes de limpiar
+    const scrollTop = $('#imagenesPreview').scrollTop();
     $('#imagenesPreview').html('');
 
-    // Primero renderiza las imágenes antiguas si existen
     if (imagenesAntiguasCargadas.length > 0) {
         imagenesAntiguasCargadas.forEach((src, idx) => {
             const imageContainer = $('<div>', {
@@ -260,7 +291,7 @@ function renderPreview() {
                 css: { margin: '5px' },
                 'data-antigua': 'true',
                 'data-idx': idx,
-                'data-file-idx': idx // importante para medir
+                'data-file-idx': idx
             });
 
             const img = $('<img>', {
@@ -286,7 +317,6 @@ function renderPreview() {
         });
     }
 
-    // Luego renderiza las imágenes nuevas cargadas con FileReader
     archivosSeleccionados.forEach((file, idx) => {
         if (!file.type.startsWith('image/')) return;
 
@@ -296,7 +326,7 @@ function renderPreview() {
                 class: 'position-relative d-inline-block',
                 css: { margin: '5px' },
                 'data-idx': idx,
-                'data-file-idx': idx // ✅ CLAVE para medir correctamente
+                'data-file-idx': idx
             });
 
             const img = $('<img>', {
@@ -322,15 +352,12 @@ function renderPreview() {
 
             imageContainer.append(img).append(deleteBtn);
             $('#imagenesPreview').append(imageContainer);
-
-            // 🔁 Restaurar scroll después de cargar
             $('#imagenesPreview').scrollTop(scrollTop);
         };
 
         reader.readAsDataURL(file);
     });
 
-    // ⚠️ Advertencia por límite
     if (archivosSeleccionados.length > LIMITE_IMAGENES) {
         let cantidadEliminar = archivosSeleccionados.length - LIMITE_IMAGENES;
         $('#maxImgsWarning')
@@ -343,7 +370,6 @@ function renderPreview() {
         $('#maxImgsWarning').hide();
     }
 
-    // 🧼 Mensajes por si no hay imágenes cargadas
     if (archivosSeleccionados.length === 0 && imagenesAntiguasCargadas.length === 0) {
         $('#imagenesPreview').html('<em class="text-muted">Sube imágenes para verlas aquí.</em>');
         $('#imagenesColumna').hide();
@@ -353,13 +379,12 @@ function renderPreview() {
     }
 }
 
-
 imagenesAntiguasCargadas = [];
 
 function renderImagenesAntiguas() {
     if (!imagenesAntiguas.length) return;
 
-    imagenesAntiguasCargadas = []; // 💡 limpia primero
+    imagenesAntiguasCargadas = [];
     $('#imagenesColumna').show();
     $('#imagenesPreview').empty();
 
@@ -369,7 +394,7 @@ function renderImagenesAntiguas() {
             css: { margin: '5px' },
             'data-antigua': 'true',
             'data-idx': idx
-        }).attr('data-file-idx', idx); 
+        }).attr('data-file-idx', idx);
 
         const img = $('<img>', {
             src: src,
@@ -391,8 +416,7 @@ function renderImagenesAntiguas() {
 
         imageContainer.append(img).append(deleteBtn);
         $('#imagenesPreview').append(imageContainer);
-
-        imagenesAntiguasCargadas.push(src); // Guarda copia para ampliar o medir
+        imagenesAntiguasCargadas.push(src);
     });
 }
 
@@ -440,6 +464,7 @@ $('#prevImg').on('click', function () {
         $('#imagenModalSrc').attr('src', imagenesArray[imagenActual]);
     }
 });
+
 $('#nextImg').on('click', function () {
     if (imagenActual < imagenesArray.length - 1) {
         imagenActual++;
@@ -458,7 +483,6 @@ function abrirModalMedir(imgUrl) {
     const esAntigua = $('#imagenesPreview img').eq(imagenActual).parent().data('antigua') === true;
 
     if (esAntigua) {
-        // 🔄 Si es una imagen antigua, cargarla con fetch
         fetch(imgUrl)
             .then(res => res.blob())
             .then(blob => {
@@ -470,7 +494,6 @@ function abrirModalMedir(imgUrl) {
                 Swal.fire('Error', 'No se pudo cargar la imagen antigua.', 'error');
             });
     } else {
-        // 🆕 Imagen nueva, buscar su índice real dentro del input
         const fileIdx = $('#imagenesPreview img').eq(imagenActual).parent().data('file-idx');
         const file = archivosSeleccionados[fileIdx];
 
@@ -519,8 +542,6 @@ function abrirModalMedir(imgUrl) {
     }
 }
 
-
-
 function llamarCalibrar(imgUrl) {
     const canvas = document.getElementById('canvasMedicion');
     const ctx = canvas.getContext('2d');
@@ -539,16 +560,15 @@ function llamarCalibrar(imgUrl) {
             data: { imagen: imgUrl },
             dataType: 'json',
             success: function (res) {
-                // console.log("Respuesta cruda:", res);
                 if (typeof res === 'string') {
-                try { res = JSON.parse(res); } catch (e) {
-                    console.error('No es JSON (calibrar):', res);
-                    Swal.fire('Error', 'Respuesta inválida del servidor (calibrar).', 'error');
-                    return;
+                    try {
+                        res = JSON.parse(res);
+                    } catch (e) {
+                        console.error('No es JSON (calibrar):', res);
+                        Swal.fire('Error', 'Respuesta inválida del servidor (calibrar).', 'error');
+                        return;
+                    }
                 }
-                }
-
-                // console.log("Respuesta parseada:", res);
 
                 if (res.status === 'success') {
                     pxPorCm = res.pxPorCm;
@@ -561,7 +581,6 @@ function llamarCalibrar(imgUrl) {
                 }
             },
             error: function () {
-                // console.log(error);
                 Swal.fire('Error4', 'Error al calibrar imagen.', 'error');
                 Swal.close();
             }
@@ -570,14 +589,12 @@ function llamarCalibrar(imgUrl) {
     img.src = imgUrl;
 }
 
-
 function inicializarMedicion(canvas, ctx, img, mediciones, getPxPorCm) {
     let drawing = false;
     let start = { x: 0, y: 0 };
     let end = { x: 0, y: 0 };
     let botonLimpiarRect = null;
 
-    // 🖱️ Eventos del canvas
     canvas.addEventListener('mousedown', function (e) {
         drawing = true;
         start = getMousePos(canvas, e);
@@ -692,54 +709,45 @@ function inicializarMedicion(canvas, ctx, img, mediciones, getPxPorCm) {
         }
     }
 
-$('#btnGuardarMediciones').off('click').on('click', function () {
-    const estabaActivo = modoSoloGuardar;
-    modoSoloGuardar = true;
-    redraw();
+    $('#btnGuardarMediciones').off('click').on('click', function () {
+        const estabaActivo = modoSoloGuardar;
+        modoSoloGuardar = true;
+        redraw();
 
-    const nuevaImagen = canvas.toDataURL('image/png');
-    modoSoloGuardar = estabaActivo;
-    redraw();
+        const nuevaImagen = canvas.toDataURL('image/png');
+        modoSoloGuardar = estabaActivo;
+        redraw();
 
-    // ✅ Reemplaza visualmente
-    imagenesArray[imagenActual] = nuevaImagen;
-    $('#imagenesPreview img').eq(imagenActual).attr('src', nuevaImagen);
-    $('#imagenModalSrc').attr('src', nuevaImagen);
+        imagenesArray[imagenActual] = nuevaImagen;
+        $('#imagenesPreview img').eq(imagenActual).attr('src', nuevaImagen);
+        $('#imagenModalSrc').attr('src', nuevaImagen);
 
-    const $imgContainer = $('#imagenesPreview img').eq(imagenActual).parent();
-    const esAntigua = $imgContainer.data('antigua') === true;
-    const idxAntigua = $imgContainer.data('idx');
-    const fileIdx = $imgContainer.data('file-idx');
+        const $imgContainer = $('#imagenesPreview img').eq(imagenActual).parent();
+        const esAntigua = $imgContainer.data('antigua') === true;
+        const idxAntigua = $imgContainer.data('idx');
+        const fileIdx = $imgContainer.data('file-idx');
 
-    let nombreOriginal = 'imagen_editada_' + Date.now() + '.png';
+        let nombreOriginal = 'imagen_editada_' + Date.now() + '.png';
 
-    if (esAntigua) {
-        // 🧠 Si era una imagen antigua: eliminarla y agregar la medida como nueva
-        if (typeof idxAntigua !== 'undefined') {
-            imagenesAntiguas.splice(idxAntigua, 1);
-            $('#imagenes_antiguas').val(JSON.stringify(imagenesAntiguas));
-        }
+        if (esAntigua) {
+            if (typeof idxAntigua !== 'undefined') {
+                imagenesAntiguas.splice(idxAntigua, 1);
+                $('#imagenes_antiguas').val(JSON.stringify(imagenesAntiguas));
+            }
 
-        // ✅ Convertir imagen medida a File y agregarla
-        const nuevoFile = dataURLToFile(nuevaImagen, nombreOriginal);
-        archivosSeleccionados.push(nuevoFile);
-        updateInputFiles();
-    } else {
-        // 🧠 Si es imagen nueva, reemplazar en archivosSeleccionados
-        if (typeof fileIdx !== 'undefined' && archivosSeleccionados[fileIdx]) {
-            nombreOriginal = archivosSeleccionados[fileIdx].name;
-            archivosSeleccionados[fileIdx] = dataURLToFile(nuevaImagen, nombreOriginal);
+            const nuevoFile = dataURLToFile(nuevaImagen, nombreOriginal);
+            archivosSeleccionados.push(nuevoFile);
             updateInputFiles();
+        } else {
+            if (typeof fileIdx !== 'undefined' && archivosSeleccionados[fileIdx]) {
+                nombreOriginal = archivosSeleccionados[fileIdx].name;
+                archivosSeleccionados[fileIdx] = dataURLToFile(nuevaImagen, nombreOriginal);
+                updateInputFiles();
+            }
         }
-    }
 
-    // Swal.fire('Guardado', 'La imagen con mediciones se actualizó correctamente.', 'success').then(() => {
-    // });
-    $('#medirModal').modal('hide');
-});
-
-
-
+        $('#medirModal').modal('hide');
+    });
 
     $('#btnDescargarImagen').off('click').on('click', function () {
         modoSoloGuardar = true;
@@ -817,20 +825,19 @@ $('#btnEditarMedirImg').on('click', function () {
         Swal.fire('Error', 'No hay imágenes cargadas para medir.', 'error');
         return;
     }
+
     const imgUrl = imagenesArray[imagenActual];
     abrirModalMedir(imgUrl);
 });
 
 $('#medirModal').on('hidden.bs.modal', function () {
     if (nombreTempImagen) {
-        // console.log(nombreTempImagen);
         $.ajax({
             url: 'certificado/tipo_examen/eliminar_temp_imagen.php',
             type: 'POST',
             data: { imagen: nombreTempImagen },
-            success: function (res) {
-                // console.log('Imagen temporal eliminada:', res);
-                nombreTempImagen = null; // 🧹 Limpia variable
+            success: function () {
+                nombreTempImagen = null;
             },
             error: function () {
                 console.error('Error al eliminar imagen temporal');
@@ -852,11 +859,11 @@ function dataURLToFile(dataurl, filename) {
     let n = bstr.length;
     let u8arr = new Uint8Array(n);
 
-    while(n--){
+    while (n--) {
         u8arr[n] = bstr.charCodeAt(n);
     }
 
-    return new File([u8arr], filename, {type:mime});
+    return new File([u8arr], filename, { type: mime });
 }
 
 $(function () {
@@ -864,6 +871,41 @@ $(function () {
         $('#plantilla_informe_id').trigger('change');
     <?php endif; ?>
 });
+</script>
 
+<script>
+function cargarCamposVisiblesPorConfiguracion(configuracionInformeId) {
+    if (!configuracionInformeId) {
+        if (typeof aplicarCamposVisiblesFormulario === 'function') {
+            aplicarCamposVisiblesFormulario([]);
+        }
+        return;
+    }
 
+    $.ajax({
+        url: 'certificado/configuracion/get_campos_visibles.php',
+        type: 'POST',
+        dataType: 'json',
+        data: { configuracion_informe_id: configuracionInformeId },
+        success: function (res) {
+            if (res && res.status === 'success') {
+                if (typeof aplicarCamposVisiblesFormulario === 'function') {
+                    aplicarCamposVisiblesFormulario(res.campos || []);
+                }
+            } else {
+                Swal.fire('Error', (res && res.message) ? res.message : 'No se pudieron cargar los campos de la plantilla.', 'error');
+            }
+        },
+        error: function () {
+            Swal.fire('Error', 'No se pudieron cargar los campos de la plantilla.', 'error');
+        }
+    });
+}
+
+$(function () {
+    $('#configuracion_informe_id').off('change.certCamposVisibles').on('change.certCamposVisibles', function () {
+        const configuracionInformeId = $(this).val() || '';
+        cargarCamposVisiblesPorConfiguracion(configuracionInformeId);
+    });
+});
 </script>

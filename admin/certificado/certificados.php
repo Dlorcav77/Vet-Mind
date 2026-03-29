@@ -90,6 +90,44 @@ if ($action === 'modificar' && !empty($fila['configuracion_informe_id'])) {
     if ($configuracion_informe_id_actual === 0 && !empty($plantillas_diseno)) {
         $configuracion_informe_id_actual = (int)$plantillas_diseno[0]['id'];
     }
+
+    $campos_permitidos_catalogo = [];
+    $resCamposPermitidos = $mysqli->query("
+        SELECT id, campo, etiqueta
+        FROM campos_permitidos
+        WHERE activo = 1
+        ORDER BY id ASC
+    ");
+    while ($rowCampoPermitido = $resCamposPermitidos->fetch_assoc()) {
+        $campos_permitidos_catalogo[] = $rowCampoPermitido;
+    }
+
+    $campos_visibles_actuales = [];
+    if ($configuracion_informe_id_actual > 0) {
+        $stmtCamposVisibles = $mysqli->prepare("
+            SELECT x.campo
+            FROM (
+                SELECT 
+                    cp.id AS campo_id,
+                    cp.campo,
+                    MIN(cic.orden) AS orden_min,
+                    MIN(cic.id) AS id_min
+                FROM configuracion_informe_campos cic
+                INNER JOIN campos_permitidos cp ON cp.id = cic.campo_id
+                WHERE cic.configuracion_informe_id = ?
+                AND cic.visible = 1
+                GROUP BY cp.id, cp.campo
+            ) x
+            ORDER BY x.orden_min ASC, x.id_min ASC
+        ");
+        $stmtCamposVisibles->bind_param("i", $configuracion_informe_id_actual);
+        $stmtCamposVisibles->execute();
+        $resCamposVisibles = $stmtCamposVisibles->get_result();
+
+        while ($rowCampoVisible = $resCamposVisibles->fetch_assoc()) {
+            $campos_visibles_actuales[] = $rowCampoVisible['campo'];
+        }
+    }
 }
 ?>
 <div class="card" id="certificado" data-page-id="certificado">
@@ -123,6 +161,7 @@ if ($action === 'modificar' && !empty($fila['configuracion_informe_id'])) {
                 </div>
             </div>
             <input type="hidden" id="plantillaBase" name="plantillaBase" value="">
+            <input type="hidden" id="configuracion_informe_id_hidden" name="configuracion_informe_id" value="<?= (int)$configuracion_informe_id_actual ?>">
             <input type="hidden" name="veterinario_id" value="<?= $usuario_id ?>">
             <input type="hidden" name="action" value="<?= $action ?>">
             <?php if ($action === 'modificar'): ?>
@@ -188,9 +227,18 @@ if ($action === 'modificar' && !empty($fila['configuracion_informe_id'])) {
         window.ES_MODIFICAR = <?= $action === 'modificar' ? 'true' : 'false' ?>;
         }
     })();
-</script>
+    $(function () {
+        function syncConfiguracionInformeId() {
+            $('#configuracion_informe_id_hidden').val($('#configuracion_informe_id').val() || '');
+        }
 
-<script>
+        syncConfiguracionInformeId();
+
+        $('#configuracion_informe_id').off('change.syncConfigHidden').on('change.syncConfigHidden', function () {
+            syncConfiguracionInformeId();
+        });
+    });
+
 
 
 
@@ -597,7 +645,14 @@ $('#btnVistaPrevia').on('click', function() {
         },
         error: function(xhr) {
             Swal.close();
-            Swal.fire('Error', 'No se pudo generar la vista previa del PDF.', 'error');
+
+            let msg = 'No se pudo generar la vista previa del PDF.';
+            if (xhr && xhr.responseText) {
+                msg += '\n' + xhr.responseText;
+            }
+
+            Swal.fire('Error', msg, 'error');
+            console.error('previewPDF error:', xhr);
         }
     });
 });
