@@ -90,43 +90,43 @@ if ($action === 'modificar' && !empty($fila['configuracion_informe_id'])) {
     if ($configuracion_informe_id_actual === 0 && !empty($plantillas_diseno)) {
         $configuracion_informe_id_actual = (int)$plantillas_diseno[0]['id'];
     }
+}
 
-    $campos_permitidos_catalogo = [];
-    $resCamposPermitidos = $mysqli->query("
-        SELECT id, campo, etiqueta
-        FROM campos_permitidos
-        WHERE activo = 1
-        ORDER BY id ASC
+$campos_permitidos_catalogo = [];
+$resCamposPermitidos = $mysqli->query("
+    SELECT id, campo, etiqueta
+    FROM campos_permitidos
+    WHERE activo = 1
+    ORDER BY id ASC
+");
+while ($rowCampoPermitido = $resCamposPermitidos->fetch_assoc()) {
+    $campos_permitidos_catalogo[] = $rowCampoPermitido;
+}
+
+$campos_visibles_actuales = [];
+if ($configuracion_informe_id_actual > 0) {
+    $stmtCamposVisibles = $mysqli->prepare("
+        SELECT x.campo
+        FROM (
+            SELECT 
+                cp.id AS campo_id,
+                cp.campo,
+                MIN(cic.orden) AS orden_min,
+                MIN(cic.id) AS id_min
+            FROM configuracion_informe_campos cic
+            INNER JOIN campos_permitidos cp ON cp.id = cic.campo_id
+            WHERE cic.configuracion_informe_id = ?
+              AND cic.visible = 1
+            GROUP BY cp.id, cp.campo
+        ) x
+        ORDER BY x.orden_min ASC, x.id_min ASC
     ");
-    while ($rowCampoPermitido = $resCamposPermitidos->fetch_assoc()) {
-        $campos_permitidos_catalogo[] = $rowCampoPermitido;
-    }
+    $stmtCamposVisibles->bind_param("i", $configuracion_informe_id_actual);
+    $stmtCamposVisibles->execute();
+    $resCamposVisibles = $stmtCamposVisibles->get_result();
 
-    $campos_visibles_actuales = [];
-    if ($configuracion_informe_id_actual > 0) {
-        $stmtCamposVisibles = $mysqli->prepare("
-            SELECT x.campo
-            FROM (
-                SELECT 
-                    cp.id AS campo_id,
-                    cp.campo,
-                    MIN(cic.orden) AS orden_min,
-                    MIN(cic.id) AS id_min
-                FROM configuracion_informe_campos cic
-                INNER JOIN campos_permitidos cp ON cp.id = cic.campo_id
-                WHERE cic.configuracion_informe_id = ?
-                AND cic.visible = 1
-                GROUP BY cp.id, cp.campo
-            ) x
-            ORDER BY x.orden_min ASC, x.id_min ASC
-        ");
-        $stmtCamposVisibles->bind_param("i", $configuracion_informe_id_actual);
-        $stmtCamposVisibles->execute();
-        $resCamposVisibles = $stmtCamposVisibles->get_result();
-
-        while ($rowCampoVisible = $resCamposVisibles->fetch_assoc()) {
-            $campos_visibles_actuales[] = $rowCampoVisible['campo'];
-        }
+    while ($rowCampoVisible = $resCamposVisibles->fetch_assoc()) {
+        $campos_visibles_actuales[] = $rowCampoVisible['campo'];
     }
 }
 ?>

@@ -915,9 +915,18 @@ function cargarCamposVisiblesPorConfiguracion(configuracionInformeId) {
 }
 
 $(function () {
-    $('#configuracion_informe_id').off('change.certCamposVisibles').on('change.certCamposVisibles', function () {
-        const configuracionInformeId = $(this).val() || '';
-        cargarCamposVisiblesPorConfiguracion(configuracionInformeId);
-    });
+    $('#configuracion_informe_id')
+        .off('change.certCamposVisibles')
+        .on('change.certCamposVisibles', function () {
+            const configuracionInformeId = $(this).val() || '';
+            cargarCamposVisiblesPorConfiguracion(configuracionInformeId);
+        });
+
+    const configuracionInformeIdInicial = $('#configuracion_informe_id').val() || '';
+    if (configuracionInformeIdInicial) {
+        cargarCamposVisiblesPorConfiguracion(configuracionInformeIdInicial);
+    } else if (typeof aplicarCamposVisiblesFormulario === 'function') {
+        aplicarCamposVisiblesFormulario([]);
+    }
 });
 </script>
