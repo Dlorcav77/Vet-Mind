@@ -1,4 +1,6 @@
 <?php
+// admin/certificado/plantilla_pdf.php
+
 $align_map = ['left' => 'left', 'center' => 'center', 'right' => 'right'];
 $logo_align = $align_map[$config['logo_position']] ?? 'center';
 $firma_align = $align_map[$config['firma_align']] ?? 'center';
@@ -100,7 +102,7 @@ function base64Image($path) {
             color: <?= htmlspecialchars($config['color_primario']) ?>;
             font-weight: 600;
             font-size: 1rem;
-            margin-bottom: 0px;
+            margin: 0 0 12px 0;
         }
         table.datos-paciente {
             width: 100%;
@@ -136,6 +138,11 @@ function base64Image($path) {
             border-right: none;
             border-left: none;
         }
+
+        .descripcion {
+            margin-top: 8px;
+        }
+
         .descripcion p {
             margin: 0 0 2px 0;
             line-height: 1.15;
@@ -157,6 +164,52 @@ function base64Image($path) {
         }
 
         .descripcion li {
+            margin: 0 0 2px 0;
+            line-height: 1.15;
+        }
+
+        .descripcion .tableWrapper {
+            width: 100%;
+            margin: 12px 0 14px 0;
+            overflow: visible;
+        }
+
+        .descripcion table,
+        .descripcion .vm-tiptap-table {
+            width: 100%;
+            border-collapse: collapse;
+            table-layout: fixed;
+            margin: 16px 0 18px 0;
+            font-size: 12px;
+        }
+
+        .descripcion th,
+        .descripcion td {
+            border: 1px solid #bfc9d6;
+            padding: 6px 8px;
+            vertical-align: top;
+            text-align: left;
+            color: #000;
+        }
+
+        .descripcion th {
+            background: #f3f6fa;
+            font-weight: bold;
+        }
+
+        .descripcion td p,
+        .descripcion th p {
+            margin: 0;
+            line-height: 1.15;
+        }
+
+        .descripcion table ul,
+        .descripcion table ol {
+            margin: 2px 0 2px 16px;
+            padding: 0;
+        }
+
+        .descripcion table li {
             margin: 0 0 2px 0;
             line-height: 1.15;
         }

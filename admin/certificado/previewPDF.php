@@ -1,4 +1,6 @@
 <?php
+// admin/certificado/previewPDF.php
+
 require_once("../config.php");
 require_once("../../vendor/autoload.php");
 require_once("funcionesCertificado.php");

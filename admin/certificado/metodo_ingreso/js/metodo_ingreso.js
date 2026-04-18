@@ -1,3 +1,4 @@
+//admin/certificado/metodo_ingreso/metodo_ingreso.js
 function audio_manual_isManual() {
   return $('#toggle_audio_manual').is(':checked');
 }

@@ -1,9 +1,14 @@
+//admin/certificado/common/tiptap-editor.js
 import { Editor, Extension } from 'https://esm.sh/@tiptap/core@2.22.3';
 import StarterKit from 'https://esm.sh/@tiptap/starter-kit@2.22.3';
 import Placeholder from 'https://esm.sh/@tiptap/extension-placeholder@2.22.3';
 import Underline from 'https://esm.sh/@tiptap/extension-underline@2.22.3';
 import TextAlign from 'https://esm.sh/@tiptap/extension-text-align@2.22.3';
 import { TextStyle } from 'https://esm.sh/@tiptap/extension-text-style@2.22.3';
+import Table from 'https://esm.sh/@tiptap/extension-table@2.22.3';
+import TableRow from 'https://esm.sh/@tiptap/extension-table-row@2.22.3';
+import TableHeader from 'https://esm.sh/@tiptap/extension-table-header@2.22.3';
+import TableCell from 'https://esm.sh/@tiptap/extension-table-cell@2.22.3';
 
 const FontSize = Extension.create({
   name: 'fontSize',
@@ -109,7 +114,8 @@ const LineHeight = Extension.create({
       wrapperElement: document.getElementById('contenido_html_editor_wrapper'),
       headingSelect: document.getElementById('contenido_html_heading'),
       fontSizeSelect: document.getElementById('contenido_html_font_size'),
-      lineHeightSelect: document.getElementById('contenido_html_line_height')
+      lineHeightSelect: document.getElementById('contenido_html_line_height'),
+      tableActionSelect: document.getElementById('contenido_html_table_actions')
     };
   }
 
@@ -121,7 +127,8 @@ const LineHeight = Extension.create({
       wrapperElement: document.getElementById('editorIA_wrapper'),
       headingSelect: document.getElementById('editorIA_heading'),
       fontSizeSelect: document.getElementById('editorIA_font_size'),
-      lineHeightSelect: document.getElementById('editorIA_line_height')
+      lineHeightSelect: document.getElementById('editorIA_line_height'),
+      tableActionSelect: document.getElementById('editorIA_table_actions')
     };
   }
 
@@ -212,6 +219,24 @@ const LineHeight = Extension.create({
     elements.lineHeightSelect.value = getCurrentLineHeight(editor);
   }
 
+  function updateTableActionVisibility(target) {
+    const editor = getEditorByTarget(target);
+    const elements = getElementsByTarget(target);
+
+    if (!editor || !elements.tableActionSelect) {
+      return;
+    }
+
+    const html = (editor.getHTML() || '').toLowerCase();
+    const hasTable = html.indexOf('<table') !== -1;
+
+    elements.tableActionSelect.style.display = hasTable ? '' : 'none';
+
+    if (!hasTable) {
+      elements.tableActionSelect.value = '';
+    }
+  }
+
   function updateToolbarState(target) {
     const editor = getEditorByTarget(target);
     const elements = getElementsByTarget(target);
@@ -242,6 +267,8 @@ const LineHeight = Extension.create({
         isActive = editor.isActive({ textAlign: 'right' });
       } else if (command === 'alignJustify') {
         isActive = editor.isActive({ textAlign: 'justify' });
+      } else if (command === 'insertTable') {
+        isActive = editor.isActive('table');
       }
 
       button.classList.toggle('active', isActive);
@@ -250,9 +277,10 @@ const LineHeight = Extension.create({
     updateHeadingSelect(target);
     updateFontSizeSelect(target);
     updateLineHeightSelect(target);
+    updateTableActionVisibility(target);
   }
 
-  function runCommand(editor, command) {
+  async function runCommand(editor, command) {
     if (!editor) {
       return;
     }
@@ -279,6 +307,8 @@ const LineHeight = Extension.create({
       editor.chain().focus().undo().run();
     } else if (command === 'redo') {
       editor.chain().focus().redo().run();
+    } else if (command === 'insertTable') {
+      await insertTable(editor);
     }
   }
 
@@ -324,6 +354,153 @@ const LineHeight = Extension.create({
     editor.chain().focus().setLineHeight(value).run();
   }
 
+  async function insertTable(editor) {
+    if (!editor) {
+      return;
+    }
+
+    if (window.Swal && typeof window.Swal.fire === 'function') {
+      const result = await window.Swal.fire({
+        title: 'Insertar tabla',
+        html: `
+          <div style="display:grid; grid-template-columns:1fr 1fr; gap:12px; text-align:left;">
+            <div>
+              <label for="vm_table_cols" style="display:block; font-weight:600; margin-bottom:6px;">Columnas</label>
+              <input
+                id="vm_table_cols"
+                type="number"
+                min="1"
+                max="12"
+                value="3"
+                class="swal2-input"
+                style="margin:0; width:100%;"
+              >
+            </div>
+            <div>
+              <label for="vm_table_rows" style="display:block; font-weight:600; margin-bottom:6px;">Filas</label>
+              <input
+                id="vm_table_rows"
+                type="number"
+                min="1"
+                max="50"
+                value="3"
+                class="swal2-input"
+                style="margin:0; width:100%;"
+              >
+            </div>
+          </div>
+        `,
+        focusConfirm: false,
+        showCancelButton: true,
+        confirmButtonText: 'Insertar',
+        cancelButtonText: 'Cancelar',
+        preConfirm: () => {
+          const cols = parseInt(document.getElementById('vm_table_cols')?.value || '', 10);
+          const rows = parseInt(document.getElementById('vm_table_rows')?.value || '', 10);
+
+          if (!Number.isInteger(cols) || cols < 1 || cols > 12) {
+            window.Swal.showValidationMessage('La cantidad de columnas debe ser entre 1 y 12.');
+            return false;
+          }
+
+          if (!Number.isInteger(rows) || rows < 1 || rows > 50) {
+            window.Swal.showValidationMessage('La cantidad de filas debe ser entre 1 y 50.');
+            return false;
+          }
+
+          return { cols, rows };
+        }
+      });
+
+      if (!result.isConfirmed || !result.value) {
+        return;
+      }
+
+      editor.chain().focus().insertTable({
+        rows: result.value.rows,
+        cols: result.value.cols,
+        withHeaderRow: true
+      }).run();
+
+      setTimeout(() => {
+        updateToolbarState('main');
+        updateToolbarState('editorIA');
+      }, 0);
+
+      return;
+    }
+
+    const colsInput = window.prompt('Cantidad de columnas', '3');
+    if (colsInput === null) {
+      return;
+    }
+
+    const rowsInput = window.prompt('Cantidad de filas', '3');
+    if (rowsInput === null) {
+      return;
+    }
+
+    const cols = parseInt(colsInput, 10);
+    const rows = parseInt(rowsInput, 10);
+
+    if (!Number.isInteger(cols) || cols < 1 || cols > 12) {
+      window.alert('La cantidad de columnas debe ser entre 1 y 12.');
+      return;
+    }
+
+    if (!Number.isInteger(rows) || rows < 1 || rows > 50) {
+      window.alert('La cantidad de filas debe ser entre 1 y 50.');
+      return;
+    }
+
+    editor.chain().focus().insertTable({
+      rows,
+      cols,
+      withHeaderRow: true
+    }).run();
+
+    setTimeout(() => {
+      updateToolbarState('main');
+      updateToolbarState('editorIA');
+    }, 0);
+  }
+
+  function applyTableAction(editor, value) {
+    if (!editor || !value) {
+      return;
+    }
+
+    const chain = editor.chain().focus();
+
+    if (value === 'addColumnBefore') {
+      chain.addColumnBefore().run();
+    } else if (value === 'addColumnAfter') {
+      chain.addColumnAfter().run();
+    } else if (value === 'deleteColumn') {
+      chain.deleteColumn().run();
+    } else if (value === 'addRowBefore') {
+      chain.addRowBefore().run();
+    } else if (value === 'addRowAfter') {
+      chain.addRowAfter().run();
+    } else if (value === 'deleteRow') {
+      chain.deleteRow().run();
+    } else if (value === 'toggleHeaderRow') {
+      chain.toggleHeaderRow().run();
+    } else if (value === 'toggleHeaderColumn') {
+      chain.toggleHeaderColumn().run();
+    } else if (value === 'toggleHeaderCell') {
+      chain.toggleHeaderCell().run();
+    } else if (value === 'mergeCells') {
+      chain.mergeCells().run();
+    } else if (value === 'splitCell') {
+      chain.splitCell().run();
+    } else if (value === 'deleteTable') {
+      chain.deleteTable().run();
+    } else if (value === 'fixTables') {
+      chain.fixTables().run();
+    }
+  }
+
   function bindToolbar(toolbarElement, target) {
     if (!toolbarElement) {
       return;
@@ -339,7 +516,7 @@ const LineHeight = Extension.create({
         e.preventDefault();
       });
 
-      button.addEventListener('click', function (e) {
+      button.addEventListener('click', async function (e) {
         e.preventDefault();
 
         const command = this.getAttribute('data-command');
@@ -350,7 +527,7 @@ const LineHeight = Extension.create({
           return;
         }
 
-        runCommand(editor, command);
+        await runCommand(editor, command);
         syncEditorToTextarea(buttonTarget);
         updateToolbarState(buttonTarget);
         editor.commands.focus();
@@ -421,6 +598,36 @@ const LineHeight = Extension.create({
         }
       });
     }
+
+    const tableActionSelect = getElementsByTarget(target).tableActionSelect;
+    if (tableActionSelect && tableActionSelect.dataset.bound !== '1') {
+      tableActionSelect.dataset.bound = '1';
+
+      tableActionSelect.addEventListener('mousedown', function (e) {
+        e.stopPropagation();
+      });
+
+      tableActionSelect.addEventListener('change', function () {
+        const selectTarget = this.getAttribute('data-editor-target') || target;
+        const editor = getEditorByTarget(selectTarget);
+        const action = this.value;
+
+        if (!editor || !action) {
+          this.value = '';
+          return;
+        }
+
+        applyTableAction(editor, action);
+        syncEditorToTextarea(selectTarget);
+        updateToolbarState(selectTarget);
+
+        this.value = '';
+
+        if (editor) {
+          editor.commands.focus();
+        }
+      });
+    }
   }
 
   function buildEditor(element, placeholderText, initialContent, onUpdateCallback) {
@@ -445,7 +652,16 @@ const LineHeight = Extension.create({
         }),
         TextAlign.configure({
           types: ['heading', 'paragraph']
-        })
+        }),
+        Table.configure({
+          resizable: true,
+          HTMLAttributes: {
+            class: 'vm-tiptap-table'
+          }
+        }),
+        TableRow,
+        TableHeader,
+        TableCell
       ],
       content: initialContent || '<p></p>',
       editorProps: {

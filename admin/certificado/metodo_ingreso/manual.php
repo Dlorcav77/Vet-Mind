@@ -80,10 +80,10 @@ $contenidoInforme = isset($fila['contenido_html']) ? (string)$fila['contenido_ht
         line-height: 1.45;
     }
 
-#contenido_html_editor p {
-    margin-top: 0;
-    margin-bottom: 0;
-}
+    #contenido_html_editor p {
+        margin-top: 0;
+        margin-bottom: 0;
+    }
 
     #contenido_html_editor h1,
     #contenido_html_editor h2,
@@ -96,6 +96,89 @@ $contenidoInforme = isset($fila['contenido_html']) ? (string)$fila['contenido_ht
     #contenido_html_editor ol {
         padding-left: 1.4rem;
         margin-bottom: .65rem;
+    }
+
+#contenido_html_toolbar .vm-toolbar-select {
+    min-width: auto;
+    width: auto;
+    padding-right: 2rem;
+}
+
+#contenido_html_heading {
+    width: 104px;
+    min-width: 104px;
+    max-width: 104px;
+}
+
+#contenido_html_font_size {
+    width: 68px;
+    min-width: 68px;
+    max-width: 68px;
+}
+
+#contenido_html_line_height {
+    width: 72px;
+    min-width: 72px;
+    max-width: 72px;
+}
+
+#contenido_html_table_actions {
+    width: 148px;
+    min-width: 148px;
+    max-width: 148px;
+}
+
+    #contenido_html_editor table,
+    #contenido_html_editor .vm-tiptap-table {
+        width: 100%;
+        border-collapse: collapse;
+        margin: .8rem 0;
+        table-layout: fixed;
+    }
+
+    #contenido_html_editor th,
+    #contenido_html_editor td {
+        border: 1px solid #cbd5e1;
+        padding: .55rem .65rem;
+        vertical-align: top;
+        min-width: 80px;
+    }
+
+    #contenido_html_editor th {
+        background: #f8fafc;
+        font-weight: 700;
+    }
+
+    #contenido_html_editor .selectedCell:after {
+        background: rgba(47, 111, 236, 0.12);
+        content: "";
+        left: 0;
+        right: 0;
+        top: 0;
+        bottom: 0;
+        pointer-events: none;
+        position: absolute;
+        z-index: 2;
+    }
+
+    #contenido_html_editor td,
+    #contenido_html_editor th {
+        position: relative;
+    }
+
+    #contenido_html_editor .column-resize-handle {
+        position: absolute;
+        top: 0;
+        right: -2px;
+        bottom: 0;
+        width: 4px;
+        background: #2f6fec;
+        pointer-events: none;
+    }
+
+    #contenido_html_editor .tableWrapper {
+        overflow-x: auto;
+        margin: .75rem 0;
     }
 </style>
 <div id="bloque-manual" class="col-12 mb-1" style="<?= $isManualInitial ? '' : 'display:none;' ?>">
@@ -229,6 +312,61 @@ $contenidoInforme = isset($fila['contenido_html']) ? (string)$fila['contenido_ht
                         <line x1="10" y1="17" x2="20" y2="17"></line>
                     </svg>
                 </button>
+            </div>
+
+            <div class="vm-toolbar-divider"></div>
+
+            <div class="vm-toolbar-group">
+                <button
+                    type="button"
+                    class="vm-toolbar-icon-btn"
+                    data-command="insertTable"
+                    title="Insertar tabla"
+                    aria-label="Insertar tabla"
+                >
+                    <svg viewBox="0 0 24 24" aria-hidden="true">
+                        <rect x="4" y="5" width="16" height="14" rx="1"></rect>
+                        <line x1="4" y1="10" x2="20" y2="10"></line>
+                        <line x1="4" y1="14.5" x2="20" y2="14.5"></line>
+                        <line x1="9.33" y1="5" x2="9.33" y2="19"></line>
+                        <line x1="14.66" y1="5" x2="14.66" y2="19"></line>
+                    </svg>
+                </button>
+
+                <select
+                    id="contenido_html_table_actions"
+                    class="form-select form-select-sm vm-toolbar-select vm-toolbar-select-table"
+                    data-table-action-select="1"
+                    data-editor-target="contenido_html"
+                    title="Acciones de tabla"
+                    style="display:none;"
+                >
+                    <option value="">Tabla</option>
+
+                    <optgroup label="Agregar">
+                        <option value="addRowBefore">Fila arriba</option>
+                        <option value="addRowAfter">Fila abajo</option>
+                        <option value="addColumnBefore">Columna izquierda</option>
+                        <option value="addColumnAfter">Columna derecha</option>
+                    </optgroup>
+
+                    <optgroup label="Eliminar">
+                        <option value="deleteRow">Fila</option>
+                        <option value="deleteColumn">Columna</option>
+                    </optgroup>
+
+                    <optgroup label="Títulos">
+                        <option value="toggleHeaderRow">Fila</option>
+                        <option value="toggleHeaderColumn">Columna</option>
+                        <option value="toggleHeaderCell">Celda</option>
+                    </optgroup>
+
+                    <optgroup label="Tabla">
+                        <option value="mergeCells">Combinar celdas</option>
+                        <option value="splitCell">Dividir celda</option>
+                        <option value="deleteTable">Eliminar tabla</option>
+                    </optgroup>
+                </select>
             </div>
 
             <div class="vm-toolbar-divider"></div>

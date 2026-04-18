@@ -158,6 +158,6 @@ $isManualInitial = $initialMode === 'manual';
 <?php include __DIR__ . '/audio.php'; ?>
 <?php include __DIR__ . '/manual.php'; ?>
 
-<script type="module" src="certificado/common/js/tiptap-editor.js?v=6"></script>
+<script type="module" src="certificado/common/js/tiptap-editor.js?v=10"></script>
 <script src="certificado/metodo_ingreso/js/audio.js?v=1"></script>
 <script src="certificado/metodo_ingreso/js/metodo_ingreso.js?v=6"></script>
