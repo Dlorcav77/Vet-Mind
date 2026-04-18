@@ -1,4 +1,5 @@
 <?php
+//admin/certificado/envio_email/get_email_certificado.php
 require_once("../../../funciones/conn/conn.php");
 $mysqli = conn();
 
@@ -30,4 +31,5 @@ if ($stmt) {
   $response['message'] = 'Error en la consulta';
 }
 
+header('Content-Type: application/json; charset=utf-8');
 echo json_encode($response);

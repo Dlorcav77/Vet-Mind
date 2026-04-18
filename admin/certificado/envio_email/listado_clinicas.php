@@ -1,6 +1,8 @@
 <?php
+//admin/certificado/envio_email/listado_clinicas.php
 require_once("../../../funciones/conn/conn.php");
 $mysqli = conn();
+
 session_start();
 $usuario_id = $_SESSION['usuario_id'] ?? 0;
 
@@ -15,7 +17,10 @@ $stmt = $mysqli->prepare("
 $stmt->bind_param('i', $usuario_id);
 $stmt->execute();
 $res = $stmt->get_result();
-while ($r = $res->fetch_assoc()) $out['clinicas'][] = $r;
+
+while ($r = $res->fetch_assoc()) {
+  $out['clinicas'][] = $r;
+}
 
 header('Content-Type: application/json; charset=utf-8');
 echo json_encode($out);

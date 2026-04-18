@@ -1,19 +1,20 @@
+<?php
+//admin/certificado/envio_email/envio_email.php
+?>
 <style>
   .section-title{
     font-size: .9rem;
     letter-spacing: .04em;
-    color: #6c757d;            /* text-muted */
+    color: #6c757d;
     text-transform: uppercase;
     border-bottom: 1px solid rgba(0,0,0,.06);
     padding-bottom: .4rem;
     margin-bottom: .6rem;
     font-weight: 600;
   }
-  .bg-light-subtle{ background-color: rgba(108,117,125,.06); } /* similar a text-muted suave */
+  .bg-light-subtle{ background-color: rgba(108,117,125,.06); }
 </style>
 
-
-<!-- Modal Enviar Correo -->
 <div class="modal fade" id="modalEnviarCorreo" tabindex="-1" aria-labelledby="modalCorreoLabel" aria-hidden="true">
   <div class="modal-dialog modal-lg modal-dialog-scrollable">
     <div class="modal-content">
@@ -33,20 +34,22 @@
               <div class="row g-2 text-center text-md-start">
                 <div class="col-md-4 col-12">
                   <div class="text-muted fw-semibold text-uppercase mb-1">Paciente</div>
-                  <div id="info_paciente" class=""></div>
+                  <div id="info_paciente"></div>
                 </div>
                 <div class="col-md-4 col-12">
                   <div class="text-muted fw-semibold text-uppercase mb-1">Propietario</div>
-                  <div id="info_propietario" class=""></div>
+                  <div id="info_propietario"></div>
                 </div>
                 <div class="col-md-4 col-12">
                   <div class="text-muted fw-semibold text-uppercase mb-1">Tipo de examen</div>
-                  <div id="info_tipo_examen" class=""></div>
+                  <div id="info_tipo_examen"></div>
                 </div>
               </div>
             </div>
           </div>
+
           <div class="section-title">Destinatarios</div>
+
           <label class="form-label fw-bold mt-2 mb-1">Propietario</label>
           <div class="input-group mb-3">
             <span class="input-group-text">
@@ -54,6 +57,7 @@
             </span>
             <input type="email" class="form-control" id="correo_propietario" name="correo_propietario" readonly>
           </div>
+
           <label class="form-label fw-bold mb-1">Clínica</label>
           <div class="input-group mb-3">
             <span class="input-group-text">
@@ -63,6 +67,7 @@
               <option value="">— Selecciona una clínica —</option>
             </select>
           </div>
+
           <label class="form-label fw-bold mb-1">Correo Adicional</label>
           <div class="input-group">
             <span class="input-group-text">
@@ -72,6 +77,7 @@
           </div>
         </form>
       </div>
+
       <div class="modal-footer border-0">
         <button type="button" class="btn btn-light" data-bs-dismiss="modal">Cancelar</button>
         <button type="button" class="btn btn-success" onclick="enviarCorreoCertificado()">
@@ -89,8 +95,10 @@ function isEmail(v) {
 
 async function ensureClinicasCache() {
   if (Array.isArray(window.CLINICAS)) return window.CLINICAS;
+
   const r = await fetch('certificado/envio_email/listado_clinicas.php');
   const j = await r.json();
+
   window.CLINICAS = j.clinicas || [];
   return window.CLINICAS;
 }
@@ -98,18 +106,27 @@ async function ensureClinicasCache() {
 function renderClinicasSelect(correoPropietario) {
   const sel = $('#selectClinica');
   const wasChecked = $('#chk_clinica').is(':checked');
+
   sel.empty();
-  sel.append(`<option value="">— Selecciona una clínica —</option>`);
+  sel.append('<option value="">— Selecciona una clínica —</option>');
 
   const prop = (correoPropietario || '').trim().toLowerCase();
+
   if (Array.isArray(window.CLINICAS)) {
     window.CLINICAS.forEach(c => {
       const correo = (c.correo || '').trim();
       if (!correo) return;
-      if (prop && correo.toLowerCase() === prop) return; // evitar duplicar propietario
-      sel.append(`<option value="${correo}">${c.nombre_clinica} (${correo})</option>`);
+      if (prop && correo.toLowerCase() === prop) return;
+
+      sel.append(
+        $('<option>', {
+          value: correo,
+          text: `${c.nombre_clinica} (${correo})`
+        })
+      );
     });
   }
+
   sel.prop('disabled', !wasChecked);
 }
 
@@ -122,13 +139,12 @@ async function abrirModalCorreo(el, certificadoId) {
   $('#info_tipo_examen').text(tipo_examen || '-');
 
   $('#correo_propietario').val('');
-  $('#selectClinica').empty().append(`<option value="">— Selecciona una clínica —</option>`);
+  $('#selectClinica').empty().append('<option value="">— Selecciona una clínica —</option>');
   $('#correo_adicional').val('').prop('disabled', true);
 
   $('#chk_propietario').prop('checked', true).prop('disabled', false);
   $('#chk_clinica').prop('checked', false);
   $('#chk_adicionales').prop('checked', false);
-
   $('#selectClinica').prop('disabled', true);
 
   const showModal = () => {
@@ -137,6 +153,7 @@ async function abrirModalCorreo(el, certificadoId) {
   };
 
   window.CLINICAS = null;
+
   const setPropietarioYClinicas = async (correo) => {
     const c = (correo || '').trim();
     $('#correo_propietario').val(c);
@@ -158,6 +175,7 @@ async function abrirModalCorreo(el, certificadoId) {
   $.post('certificado/envio_email/get_email_certificado.php', { id: certificadoId }, async function(res) {
     try {
       const data = JSON.parse(res);
+
       if (data.status === 'success') {
         await setPropietarioYClinicas(data.correo || '');
       } else {
@@ -207,6 +225,7 @@ async function enviarCorreoCertificado() {
     Swal.fire('Error', 'No se encontró el ID del certificado.', 'error');
     return;
   }
+
   if (!destinatarios.length) {
     Swal.fire('Atención', 'Selecciona al menos un destinatario válido.', 'warning');
     return;
@@ -228,12 +247,13 @@ async function enviarCorreoCertificado() {
     },
     success: function(resp) {
       Swal.close();
+
       if (resp && resp.status === 'success') {
         Swal.fire('Listo', resp.message || 'Correo enviado correctamente.', 'success');
-        // Cierra el modal
+
         const modalEl = document.getElementById('modalEnviarCorreo');
         const modal = bootstrap.Modal.getInstance(modalEl);
-        modal && modal.hide();
+        if (modal) modal.hide();
       } else {
         Swal.fire('Error', (resp && resp.message) || 'No se pudo enviar el correo.', 'error');
       }

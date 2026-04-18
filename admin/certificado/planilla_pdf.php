@@ -1,6 +1,4 @@
 <?php
-//admin/certificado/plantilla_pdf.php
-// Mapas para alineaciones
 $align_map = ['left' => 'left', 'center' => 'center', 'right' => 'right'];
 $logo_align = $align_map[$config['logo_position']] ?? 'center';
 $firma_align = $align_map[$config['firma_align']] ?? 'center';
@@ -8,7 +6,6 @@ $fecha_align = $align_map[$config['fecha_align']] ?? 'flex-end';
 $footer_align = $align_map[$config['footer_align']] ?? 'center';
 $subtitulo_align = $align_map[$config['subtitulo_align']] ?? 'center';
 
-// Tamaños logo y marca de agua
 $logo_sizes = ['small' => '50px', 'medium' => '80px', 'large' => '120px'];
 $logo_height = $logo_sizes[$config['logo_size']] ?? '80px';
 
@@ -21,7 +18,6 @@ if ($imagenes_por_fila <= 0) {
 }
 $ancho_imagen_td = (100 / $imagenes_por_fila) . '%';
 
-// Fecha formateada
 $lugar = trim($config['lugar_fecha'] ?? '');
 $fecha_dt = new DateTime($fecha);
 $dia = $fecha_dt->format('j');
@@ -38,7 +34,6 @@ $mes_es = ucfirst($meses[$mes_en] ?? strtolower($mes_en));
 $formato_fecha = $config['formato_fecha'] ?? '{{day}}/{{month}}/{{year}}';
 $fecha_str = str_replace(['{{day}}', '{{month}}', '{{year}}'], [$dia, $mes_es, $anio], $formato_fecha);
 
-// Subtítulos de firma: compatibilidad con formato antiguo (string) y nuevo (JSON)
 $firma_subtitulos = [];
 
 if (!empty($config['firma_subtitulo'])) {
@@ -54,13 +49,11 @@ if (!empty($config['firma_subtitulo'])) {
     }
 }
 
-// Embebido base64 para logo, firma y marca de agua
 function base64Image($path) {
     if (!$path) {
         return null;
     }
 
-    // Si ya viene embebida como data URI, devolver tal cual
     if (strpos($path, 'data:image/') === 0) {
         return $path;
     }
@@ -110,48 +103,62 @@ function base64Image($path) {
             margin-bottom: 0px;
         }
         table.datos-paciente {
-            width: 100%; /* Abarca todo el ancho */
-            border-collapse: collapse; /* Une los bordes */
-            font-size: 12px; /* Letras más pequeñas */
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 12px;
             margin-bottom: 15px;
-            border: 1px solid #ccc; /* Bordes visibles */
+            border: 1px solid #ccc;
         }
 
         table.datos-paciente td {
-            padding: 3px 6px; /* Reduce espacio interno */
-            border: 1px solid #ccc; /* Bordes entre celdas */
+            padding: 3px 6px;
+            border: 1px solid #ccc;
             vertical-align: top;
-            color: #000; /* Texto negro */
+            color: #000;
         }
 
         table.datos-paciente td.titulo {
             background-color: <?= htmlspecialchars($config['color_secundario']) ?>;
             font-weight: bold;
-            color: #000; /* Texto negro */
+            color: #000;
         }
 
         table.datos-paciente td.titulo-celda {
             background-color: <?= htmlspecialchars($config['color_secundario']) ?>;
             font-weight: bold;
-            color: #000; /* Letras negras */
+            color: #000;
             text-align: left;
             width: 15%;
             font-size: 14px;
         }
 
         table.datos-paciente td.no-borde {
-            border-right: none; /* Quita borde derecho */
-            border-left: none;  /* Quita borde izquierdo */
+            border-right: none;
+            border-left: none;
         }
-        .descripcion {
-            text-align: justify;
-            padding: 0rem 1rem 0rem 1rem;
-            border: none;
-            background-color: transparent;
-            color: #333;
-            font-size: 12px;
-            /* margin-bottom: 2px; */
-            /* line-height: 1.5; */
+        .descripcion p {
+            margin: 0 0 2px 0;
+            line-height: 1.15;
+        }
+
+        .descripcion div {
+            margin: 0;
+            line-height: 1.15;
+        }
+
+        .descripcion br {
+            line-height: 1.15;
+        }
+
+        .descripcion ul,
+        .descripcion ol {
+            margin: 2px 0 2px 18px;
+            padding: 0;
+        }
+
+        .descripcion li {
+            margin: 0 0 2px 0;
+            line-height: 1.15;
         }
 
         .contenido-principal {
@@ -163,40 +170,32 @@ function base64Image($path) {
             margin: 0 auto;
         }
 
+        .imagenes {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 8px;
+            table-layout: fixed;
+        }
 
+        .imagenes td {
+            padding: 3px;
+            width: <?= htmlspecialchars($ancho_imagen_td) ?>;
+            vertical-align: top;
+        }
 
-
-
-.imagenes {
-    width: 100%;
-    border-collapse: collapse;
-    margin-top: 8px;
-    table-layout: fixed;
-}
-
-.imagenes td {
-    padding: 3px;
-    width: <?= htmlspecialchars($ancho_imagen_td) ?>;
-    vertical-align: top;
-}
-
-.imagenes img {
-    display: block;
-    width: 100%;
-    max-height: 235px;
-    height: auto;
-    border-radius: 4px;
-    border: 1px solid #ccc;
-    object-fit: contain;
-    page-break-inside: avoid;
-    break-inside: avoid;
-}
-
-
-
+        .imagenes img {
+            display: block;
+            width: 100%;
+            max-height: 235px;
+            height: auto;
+            border-radius: 4px;
+            border: 1px solid #ccc;
+            object-fit: contain;
+            page-break-inside: avoid;
+            break-inside: avoid;
+        }
 
         .firma {
-            /* margin-top: 30px; */
             text-align: <?= $firma_align ?>; 
             page-break-inside: avoid;
             break-inside: avoid;
@@ -230,7 +229,7 @@ function base64Image($path) {
         }
 
         @page {
-            margin: 40px 20px 90px 20px; /* top, right, bottom, left */
+            margin: 40px 20px 90px 20px;
         }
 
         .footer-text {
@@ -279,7 +278,6 @@ function base64Image($path) {
 
     <div class="titulo"><?= htmlspecialchars($config['titulo_informe'] ?? 'INFORME ECOGRÁFICO') ?></div>
 
-
     <div class="contenido-centrado">
         <table class="datos-paciente">
             <tbody>
@@ -288,11 +286,9 @@ function base64Image($path) {
 
                     echo "<tr>";
                     
-                    // Primera celda
                     $etiqueta = htmlspecialchars($campos[$i]['etiqueta']);
                     $campoNombre = $campos[$i]['campo'];
 
-                    // Manejo especial para edad y campos específicos
                     if ($campoNombre == 'edad') {
                         if (!empty($paciente['fecha_nacimiento'])) {
                             $fechaNacimiento = new DateTime($paciente['fecha_nacimiento']);
@@ -308,12 +304,10 @@ function base64Image($path) {
                         $valorCampo = $paciente[$campoNombre] ?? '';
                     }
 
-
                     $colspan = (count($campos) % 2 !== 0 && $i + 1 == count($campos)) ? " colspan='3'" : '';
                     echo "<td class='titulo-celda' style='white-space: nowrap;'>{$etiqueta}:</td>";
                     echo "<td$colspan>" . htmlspecialchars($valorCampo) . "</td>";
 
-                    // Segunda celda (pareja) si existe
                     if (isset($campos[$i + 1])) {
                         $etiqueta2 = htmlspecialchars($campos[$i + 1]['etiqueta']);
                         $campoNombre2 = $campos[$i + 1]['campo'];
@@ -343,14 +337,12 @@ function base64Image($path) {
             </tbody>
         </table>
 
-        <?php 
-        if (!empty($config['subtitulo'])): ?>
+        <?php if (!empty($config['subtitulo'])): ?>
             <div class="subtitulo"><?= htmlspecialchars($config['subtitulo']) ?></div>
         <?php endif; ?>
         <div class="descripcion">
             <?= $descripcion ?>
-            <br>
-            Saluda atentamente a usted.
+            <div style="margin-top: 10px;">Saluda atentamente a usted.</div>
         </div>
     </div>
 
@@ -378,22 +370,21 @@ function base64Image($path) {
     <?php endif; ?>
 </div>
 
-    <?php if (!empty($imagenes)): ?>
-        <table class="imagenes">
-            <tr>
-            <?php foreach ($imagenes as $index => $img): ?>
-                <td>
-                    <img src="<?= base64Image($img) ?>" alt="Imagen">
-                </td>
-                <?php
-                // Si alcanzamos el número de imágenes por fila, cerramos y abrimos fila
-                if (($index + 1) % (intval($config['imagenes_por_fila']) ?: 2) == 0):
-                    echo '</tr><tr>';
-                endif;
-                ?>
-            <?php endforeach; ?>
-            </tr>
-        </table>
-    <?php endif; ?>
+<?php if (!empty($imagenes)): ?>
+    <table class="imagenes">
+        <tr>
+        <?php foreach ($imagenes as $index => $img): ?>
+            <td>
+                <img src="<?= base64Image($img) ?>" alt="Imagen">
+            </td>
+            <?php
+            if (($index + 1) % (intval($config['imagenes_por_fila']) ?: 2) == 0):
+                echo '</tr><tr>';
+            endif;
+            ?>
+        <?php endforeach; ?>
+        </tr>
+    </table>
+<?php endif; ?>
 </body>
 </html>
