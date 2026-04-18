@@ -85,6 +85,7 @@ try {
 
     $limiteImagenes = 24;
     $cantidadImagenesAntiguas = 0;
+
     if (!empty($_POST['imagenes_antiguas'])) {
         $tmpAntiguas = json_decode($_POST['imagenes_antiguas'], true);
         if (is_array($tmpAntiguas)) {
@@ -117,14 +118,12 @@ try {
         mkdir($previewImgDir, 0777, true);
     }
 
-    // Limpieza de previews viejos
     foreach (glob($previewDir . 'preview_*.pdf') as $oldFile) {
         if (filemtime($oldFile) < (time() - 60 * 60)) {
             @unlink($oldFile);
         }
     }
 
-    // Limpieza de imágenes temporales viejas
     foreach (glob($previewImgDir . 'previmg_*') as $oldImg) {
         if (filemtime($oldImg) < (time() - 60 * 60)) {
             @unlink($oldImg);
@@ -132,8 +131,7 @@ try {
     }
 
     $imagenes = [];
-    
-    // Mantener imágenes antiguas si vienen al modificar
+
     if (!empty($_POST['imagenes_antiguas'])) {
         $imgsAntiguas = json_decode($_POST['imagenes_antiguas'], true);
         if (is_array($imgsAntiguas)) {
@@ -145,7 +143,6 @@ try {
         }
     }
 
-    // Nuevas imágenes para preview: copiar a temporales en disco, NO base64
     if (!empty($_FILES['imagenes']['name'][0])) {
         foreach ($_FILES['imagenes']['tmp_name'] as $key => $tmpName) {
             if (!empty($tmpName) && is_uploaded_file($tmpName)) {

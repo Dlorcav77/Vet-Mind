@@ -219,6 +219,8 @@ function subir_imagen($campo, $directorio, $veterinario_id, $tipo) {
 
 
 function guardarCamposInforme($mysqli, $usuario_id, $configuracion_informe_id, $modo = 'ingresar', $campos_nuevos = [], $campos_existentes = [], $campos_ids_actuales = []) {
+    $campos_fijos_ids = [1, 5];
+
     if ($modo === 'modificar') {
         $ordenes_actualizados = json_decode($_POST['campos_orden'] ?? '{}', true);
         if (!is_array($ordenes_actualizados)) {
@@ -227,7 +229,26 @@ function guardarCamposInforme($mysqli, $usuario_id, $configuracion_informe_id, $
 
         if (!empty($campos_existentes)) {
             foreach ($campos_existentes as $registro_id => $data) {
-                $visible = isset($data['visible']) ? 1 : 0;
+                $registro_id = (int)$registro_id;
+                if ($registro_id <= 0) {
+                    continue;
+                }
+
+                $stmtCampo = $mysqli->prepare("
+                    SELECT campo_id
+                    FROM configuracion_informe_campos
+                    WHERE id = ? AND veterinario_id = ? AND configuracion_informe_id = ?
+                    LIMIT 1
+                ");
+                $stmtCampo->bind_param("iii", $registro_id, $usuario_id, $configuracion_informe_id);
+                $stmtCampo->execute();
+                $resCampo = $stmtCampo->get_result();
+                $rowCampo = $resCampo->fetch_assoc();
+
+                $campo_id_actual = (int)($rowCampo['campo_id'] ?? 0);
+                $es_fijo = in_array($campo_id_actual, $campos_fijos_ids, true);
+
+                $visible = $es_fijo ? 1 : (isset($data['visible']) ? 1 : 0);
                 $nuevo_orden = (int)($ordenes_actualizados[$registro_id] ?? 0);
 
                 $stmt = $mysqli->prepare(
@@ -254,13 +275,15 @@ function guardarCamposInforme($mysqli, $usuario_id, $configuracion_informe_id, $
                 "DELETE FROM configuracion_informe_campos
                  WHERE veterinario_id = " . (int)$usuario_id . "
                    AND configuracion_informe_id = " . (int)$configuracion_informe_id . "
-                   AND id NOT IN ($ids_actuales_str)"
+                   AND id NOT IN ($ids_actuales_str)
+                   AND campo_id NOT IN (1,5)"
             );
         } else {
             $mysqli->query(
                 "DELETE FROM configuracion_informe_campos
                  WHERE veterinario_id = " . (int)$usuario_id . "
-                   AND configuracion_informe_id = " . (int)$configuracion_informe_id
+                   AND configuracion_informe_id = " . (int)$configuracion_informe_id . "
+                   AND campo_id NOT IN (1,5)"
             );
         }
     }
@@ -278,12 +301,26 @@ function guardarCamposInforme($mysqli, $usuario_id, $configuracion_informe_id, $
 
         foreach ($campos_nuevos as $campo_id => $data) {
             $campo_id = (int)$campo_id;
-            if ($campo_id <= 0) {
+            if ($campo_id <= 0 || in_array($campo_id, $campos_fijos_ids, true)) {
                 continue;
             }
 
             $visible = isset($data['visible']) ? 1 : 0;
             $ordenBase++;
+
+            $stmtExiste = $mysqli->prepare(
+                "SELECT id
+                 FROM configuracion_informe_campos
+                 WHERE configuracion_informe_id = ? AND veterinario_id = ? AND campo_id = ?
+                 LIMIT 1"
+            );
+            $stmtExiste->bind_param("iii", $configuracion_informe_id, $usuario_id, $campo_id);
+            $stmtExiste->execute();
+            $resExiste = $stmtExiste->get_result();
+
+            if ($resExiste->fetch_assoc()) {
+                continue;
+            }
 
             $stmt = $mysqli->prepare(
                 "INSERT INTO configuracion_informe_campos
@@ -294,8 +331,64 @@ function guardarCamposInforme($mysqli, $usuario_id, $configuracion_informe_id, $
             $stmt->execute();
         }
     }
-}
 
+    foreach ($campos_fijos_ids as $campo_fijo_id) {
+        $stmtExiste = $mysqli->prepare(
+            "SELECT id
+             FROM configuracion_informe_campos
+             WHERE configuracion_informe_id = ? AND veterinario_id = ? AND campo_id = ?
+             LIMIT 1"
+        );
+        $stmtExiste->bind_param("iii", $configuracion_informe_id, $usuario_id, $campo_fijo_id);
+        $stmtExiste->execute();
+        $resExiste = $stmtExiste->get_result();
+        $rowExiste = $resExiste->fetch_assoc();
+
+        if ($rowExiste) {
+            $registro_id = (int)$rowExiste['id'];
+
+            $stmtOrden = $mysqli->prepare(
+                "SELECT orden
+                 FROM configuracion_informe_campos
+                 WHERE id = ? AND veterinario_id = ? AND configuracion_informe_id = ?
+                 LIMIT 1"
+            );
+            $stmtOrden->bind_param("iii", $registro_id, $usuario_id, $configuracion_informe_id);
+            $stmtOrden->execute();
+            $resOrden = $stmtOrden->get_result();
+            $rowOrden = $resOrden->fetch_assoc();
+            $ordenActual = (int)($rowOrden['orden'] ?? 0);
+
+            $stmtUpd = $mysqli->prepare(
+                "UPDATE configuracion_informe_campos
+                 SET visible = 1, orden = ?
+                 WHERE id = ? AND veterinario_id = ? AND configuracion_informe_id = ?"
+            );
+            $stmtUpd->bind_param("iiii", $ordenActual, $registro_id, $usuario_id, $configuracion_informe_id);
+            $stmtUpd->execute();
+        } else {
+            $stmtMax = $mysqli->prepare(
+                "SELECT IFNULL(MAX(orden), 0) AS max_orden
+                 FROM configuracion_informe_campos
+                 WHERE veterinario_id = ? AND configuracion_informe_id = ?"
+            );
+            $stmtMax->bind_param("ii", $usuario_id, $configuracion_informe_id);
+            $stmtMax->execute();
+            $resMax = $stmtMax->get_result();
+            $ordenBase = (int)($resMax->fetch_assoc()['max_orden'] ?? 0);
+            $ordenBase++;
+
+            $visible = 1;
+            $stmtIns = $mysqli->prepare(
+                "INSERT INTO configuracion_informe_campos
+                 (configuracion_informe_id, veterinario_id, campo_id, visible, orden)
+                 VALUES (?, ?, ?, ?, ?)"
+            );
+            $stmtIns->bind_param("iiiii", $configuracion_informe_id, $usuario_id, $campo_fijo_id, $visible, $ordenBase);
+            $stmtIns->execute();
+        }
+    }
+}
 
 function generarNombreCampo($etiqueta) {
     $etiqueta = strtolower($etiqueta);                         // minúsculas

@@ -88,18 +88,33 @@ if ($action === 'modificar') {
     }
 }
 
-$subtitulos = [];
-if (!empty($fila['firma_subtitulo'])) {
-    $decoded = json_decode($fila['firma_subtitulo'], true);
-    if (is_array($decoded)) {
-        $subtitulos = $decoded;
-    } else {
-        $subtitulos = [$fila['firma_subtitulo']];
+$campos_fijos_ids = [1, 5];
+
+$campos_fijos_map = [
+    1 => 'Paciente',
+    5 => 'Propietario'
+];
+
+$campos_configurados_por_campo_id = [];
+foreach ($campos_configurados as $campoCfg) {
+    $campos_configurados_por_campo_id[(int)$campoCfg['campo_id']] = $campoCfg;
+}
+
+foreach ($campos_fijos_ids as $campoFijoId) {
+    if (!isset($campos_configurados_por_campo_id[$campoFijoId])) {
+        $campos_configurados[] = [
+            'id'       => 'fijo-' . $campoFijoId,
+            'campo_id' => $campoFijoId,
+            'etiqueta' => $campos_fijos_map[$campoFijoId] ?? ('Campo ' . $campoFijoId),
+            'visible'  => 1,
+            'orden'    => 0
+        ];
     }
 }
-if (empty($subtitulos)) {
-    $subtitulos[] = '';
-}
+
+usort($campos_configurados, function ($a, $b) {
+    return ((int)($a['orden'] ?? 0)) <=> ((int)($b['orden'] ?? 0));
+});
 ?>
 <style>
   .text-right h4, .text-right p, .text-right small {
@@ -316,14 +331,47 @@ if (empty($subtitulos)) {
             </thead>
             <tbody id="campos-lista">
               <?php foreach ($campos_configurados as $campo): ?>
-                <tr data-id="<?= $campo['id'] ?>" data-campo-id="<?= $campo['campo_id'] ?>">
-                  <td class="orden"><i class="fas fa-arrows-alt-v"></i></td>
-                  <td><?= htmlspecialchars($campo['etiqueta']) ?></td>
-                  <td class="text-center">
-                    <input type="checkbox" name="campos[<?= $campo['id'] ?>][visible]" value="1" <?= $campo['visible'] ? 'checked' : '' ?>>
+                <?php
+                  $campoId = (int)$campo['campo_id'];
+                  $esCampoFijo = in_array($campoId, [1, 5], true);
+                  $registroId = (string)$campo['id'];
+                  $nameVisible = ctype_digit($registroId)
+                      ? 'campos[' . $registroId . '][visible]'
+                      : 'campos_fijos[' . $campoId . '][visible]';
+                ?>
+                <tr
+                  data-id="<?= htmlspecialchars($registroId) ?>"
+                  data-campo-id="<?= $campoId ?>"
+                  data-fixed="<?= $esCampoFijo ? '1' : '0' ?>"
+                >
+                  <td class="orden">
+                    <i class="fas fa-arrows-alt-v"></i>
                   </td>
+
+                  <td>
+                    <?= htmlspecialchars($campo['etiqueta']) ?>
+                  </td>
+
                   <td class="text-center">
-                    <button type="button" class="btn btn-sm btn-danger eliminar-campo"><i class="fas fa-trash"></i></button>
+                    <input
+                      type="checkbox"
+                      name="<?= htmlspecialchars($nameVisible) ?>"
+                      value="1"
+                      <?= !empty($campo['visible']) ? 'checked' : '' ?>
+                      <?= $esCampoFijo ? 'checked disabled' : '' ?>
+                    >
+                  </td>
+
+                  <td class="text-center">
+                    <?php if ($esCampoFijo): ?>
+                      <button type="button" class="btn btn-sm btn-danger eliminar-campo" disabled>
+                        <i class="fas fa-trash"></i>
+                      </button>
+                    <?php else: ?>
+                      <button type="button" class="btn btn-sm btn-danger eliminar-campo">
+                        <i class="fas fa-trash"></i>
+                      </button>
+                    <?php endif; ?>
                   </td>
                 </tr>
               <?php endforeach; ?>
@@ -338,6 +386,7 @@ if (empty($subtitulos)) {
           <div class="d-flex align-items-center mb-3">
             <select id="campo-select" class="form-select me-2" style="max-width:300px;">
               <?php foreach ($campos_permitidos as $id => $etiqueta): ?>
+                <?php if (in_array((int)$id, [1, 5], true)) { continue; } ?>
                 <option value="<?= $id ?>"><?= htmlspecialchars($etiqueta) ?></option>
               <?php endforeach; ?>
             </select>
@@ -528,48 +577,68 @@ if (empty($subtitulos)) {
 </div>
 
 <script>
-$('form').on('submit', function(e) {
-    e.preventDefault();
+(function () {
+    const CAMPOS_FIJOS_CONFIG = [1, 5];
 
-    let idsActuales = [];
-    let ordenesActualizados = {};
+    const $configForm = $('#configuracion_informe form');
 
-    $('#campos-lista tr').each(function(index) {
-        const id = $(this).data('id');
-        if (id && String(id).indexOf('nuevo-') !== 0) {
-            idsActuales.push(id);
-            ordenesActualizados[id] = index + 1;
-        }
-    });
+    $configForm.off('submit.configInformes').on('submit.configInformes', function(e) {
+        e.preventDefault();
 
-    $('#campos_ids_actuales').val(idsActuales.join(','));
+        let idsActuales = [];
+        let ordenesActualizados = {};
 
-    $('#campos_orden').val(JSON.stringify(ordenesActualizados));
+        $('#campos-lista tr').each(function(index) {
+            const id = String($(this).data('id') || '');
+            const campoId = parseInt($(this).data('campo-id'), 10) || 0;
+            const esFijo = CAMPOS_FIJOS_CONFIG.includes(campoId);
 
-    let formData = new FormData(this);
-
-    $.ajax({
-        url: $(this).attr('action'),
-        type: 'POST',
-        data: formData,
-        processData: false,
-        contentType: false,
-        success: function(response) {
-            let jsonResponse = JSON.parse(response);
-            if (jsonResponse.status === 'success') {
-                $('#content').load('configuracion_informe/lisConfiguracion.php');
-                Swal.fire('Éxito', jsonResponse.message, 'success');
-            } else {
-                Swal.fire('Error', jsonResponse.message, 'error');
+            if (id && String(id).indexOf('nuevo-') !== 0 && !String(id).startsWith('fijo-')) {
+                idsActuales.push(id);
+                ordenesActualizados[id] = index + 1;
             }
-        },
-        error: function() {
-            Swal.fire('Error', 'No se pudo guardar la configuración.', 'error');
-        }
-    });
-});
 
-$(document).ready(function () {
+            if (esFijo) {
+                $(this).find('input[type="checkbox"]').prop('checked', true);
+            }
+        });
+
+        $('#campos_ids_actuales').val(idsActuales.join(','));
+        $('#campos_orden').val(JSON.stringify(ordenesActualizados));
+
+        let formData = new FormData(this);
+
+        $('#campos-lista tr').each(function(index) {
+            const id = String($(this).data('id') || '');
+            const campoId = parseInt($(this).data('campo-id'), 10) || 0;
+            const esFijo = CAMPOS_FIJOS_CONFIG.includes(campoId);
+
+            if (esFijo && /^\d+$/.test(id)) {
+                formData.set(`campos[${id}][visible]`, '1');
+            }
+        });
+
+        $.ajax({
+            url: $(this).attr('action'),
+            type: 'POST',
+            data: formData,
+            processData: false,
+            contentType: false,
+            success: function(response) {
+                let jsonResponse = JSON.parse(response);
+                if (jsonResponse.status === 'success') {
+                    $('#content').load('configuracion_informe/lisConfiguracion.php');
+                    Swal.fire('Éxito', jsonResponse.message, 'success');
+                } else {
+                    Swal.fire('Error', jsonResponse.message, 'error');
+                }
+            },
+            error: function() {
+                Swal.fire('Error', 'No se pudo guardar la configuración.', 'error');
+            }
+        });
+    });
+
     $('.select2').select2({
         templateResult: formatState,
         templateSelection: formatState,
@@ -586,6 +655,10 @@ $(document).ready(function () {
         return state.text;
     }
 
+    if ($('#campos-lista').data('ui-sortable')) {
+        $('#campos-lista').sortable('destroy');
+    }
+
     $("#campos-lista").sortable({
         handle: ".orden",
         update: function() {
@@ -593,114 +666,139 @@ $(document).ready(function () {
         }
     });
 
-    actualizarOpcionesSelect();
-    actualizarVistaPrevia();
-});
-
-$(document).on('click', '#agregar-subtitulo', function () {
-    const html = `
-        <div class="input-group mb-2">
-            <input type="text" name="firma_subtitulos[]" class="form-control" placeholder="Nueva línea">
-            <button type="button" class="btn btn-danger eliminar-subtitulo">
-                <i class="fas fa-trash"></i>
-            </button>
-        </div>
-    `;
-    $('#firma-subtitulos-container').append(html);
-});
-
-$(document).on('click', '.eliminar-subtitulo', function () {
-    $(this).closest('.input-group').remove();
-});
-
-$(document).on("click", ".eliminar-campo", function() {
-    $(this).closest('tr').remove();
-    actualizarVistaPrevia();
-    actualizarOpcionesSelect();
-});
-
-$('#agregar-campo').on('click', function () {
-    const selectedId = $('#campo-select').val();
-    const selectedText = $('#campo-select option:selected').text();
-
-    if (!selectedId) {
-        Swal.fire('Atención', 'No hay más campos disponibles para agregar.', 'warning');
-        return;
-    }
-
-    if ($('#campos-lista tr[data-campo-id="' + selectedId + '"]').length > 0) {
-        Swal.fire('Atención', 'Este campo ya está agregado.', 'warning');
-        return;
-    }
-
-    const newRow = `
-        <tr data-id="nuevo-${selectedId}" data-campo-id="${selectedId}">
-            <td class="orden"><i class="fas fa-arrows-alt-v"></i></td>
-            <td>${selectedText}</td>
-            <td class="text-center">
-                <input type="checkbox" name="campos_nuevos[${selectedId}][visible]" value="1" checked>
-            </td>
-            <td class="text-center">
-                <button type="button" class="btn btn-sm btn-danger eliminar-campo"><i class="fas fa-trash"></i></button>
-            </td>
-        </tr>
-    `;
-    $('#campos-lista').append(newRow);
-
-    actualizarOpcionesSelect();
-    actualizarVistaPrevia();
-});
-
-$(document).on('input change', '#campos-lista input', function () {
-    actualizarVistaPrevia();
-});
-
-function actualizarVistaPrevia() {
-    let campos = [];
-
-    $('#campos-lista tr').each(function () {
-        let etiqueta = $(this).find('td:nth-child(2)').text().trim();
-        let visible = $(this).find('input[type="checkbox"]').is(':checked');
-
-        if (etiqueta !== '' && visible) {
-            campos.push(etiqueta);
-        }
+    $(document).off('click.configSubtitulo', '#agregar-subtitulo').on('click.configSubtitulo', '#agregar-subtitulo', function () {
+        const html = `
+            <div class="input-group mb-2">
+                <input type="text" name="firma_subtitulos[]" class="form-control" placeholder="Nueva línea">
+                <button type="button" class="btn btn-danger eliminar-subtitulo">
+                    <i class="fas fa-trash"></i>
+                </button>
+            </div>
+        `;
+        $('#firma-subtitulos-container').append(html);
     });
 
-    let html = '';
-
-    for (let i = 0; i < campos.length; i += 2) {
-        html += '<tr>';
-        html += `<th style="width: 15%; white-space: nowrap;">${campos[i]}:</th><td style="width: 35%;"></td>`;
-
-        if (campos[i + 1]) {
-            html += `<th style="width: 15%; white-space: nowrap;">${campos[i + 1]}:</th><td style="width: 35%;"></td>`;
-        } else {
-            html += '<td colspan="3"></td>';
-        }
-
-        html += '</tr>';
-    }
-
-    $('#vista-previa-campos').html(html);
-}
-
-function actualizarOpcionesSelect() {
-    $('#campo-select option').prop('disabled', false);
-
-    $('#campos-lista tr').each(function () {
-        const campoId = $(this).data('campo-id');
-        $('#campo-select option[value="' + campoId + '"]').prop('disabled', true);
+    $(document).off('click.configEliminarSubtitulo', '.eliminar-subtitulo').on('click.configEliminarSubtitulo', '.eliminar-subtitulo', function () {
+        $(this).closest('.input-group').remove();
     });
 
-    const $primerHabilitado = $('#campo-select option:not(:disabled)').first();
+    $(document).off("click.configEliminarCampo", ".eliminar-campo").on("click.configEliminarCampo", ".eliminar-campo", function() {
+        const $tr = $(this).closest('tr');
+        const campoId = parseInt($tr.data('campo-id'), 10) || 0;
 
-    if ($('#campo-select option:selected').prop('disabled')) {
-        $('#campo-select').val($primerHabilitado.length ? $primerHabilitado.val() : '');
+        if (CAMPOS_FIJOS_CONFIG.includes(campoId)) {
+            Swal.fire('Atención', 'Paciente y Propietario son campos obligatorios y no se pueden eliminar.', 'warning');
+            return;
+        }
+
+        $tr.remove();
+        actualizarVistaPrevia();
+        actualizarOpcionesSelect();
+    });
+
+    $('#agregar-campo').off('click.configAgregarCampo').on('click.configAgregarCampo', function () {
+        const selectedId = $('#campo-select').val();
+        const selectedText = $('#campo-select option:selected').text();
+
+        if (!selectedId) {
+            Swal.fire('Atención', 'No hay más campos disponibles para agregar.', 'warning');
+            return;
+        }
+
+        if (CAMPOS_FIJOS_CONFIG.includes(parseInt(selectedId, 10))) {
+            Swal.fire('Atención', 'Paciente y Propietario ya son obligatorios y siempre estarán incluidos.', 'warning');
+            return;
+        }
+
+        if ($('#campos-lista tr[data-campo-id="' + selectedId + '"]').length > 0) {
+            Swal.fire('Atención', 'Este campo ya está agregado.', 'warning');
+            return;
+        }
+
+        const newRow = `
+            <tr data-id="nuevo-${selectedId}" data-campo-id="${selectedId}" data-fixed="0">
+                <td class="orden"><i class="fas fa-arrows-alt-v"></i></td>
+                <td>${selectedText}</td>
+                <td class="text-center">
+                    <input type="checkbox" name="campos_nuevos[${selectedId}][visible]" value="1" checked>
+                </td>
+                <td class="text-center">
+                    <button type="button" class="btn btn-sm btn-danger eliminar-campo"><i class="fas fa-trash"></i></button>
+                </td>
+            </tr>
+        `;
+        $('#campos-lista').append(newRow);
+
+        actualizarOpcionesSelect();
+        actualizarVistaPrevia();
+    });
+
+    $(document).off('input.configCampos change.configCampos', '#campos-lista input').on('input.configCampos change.configCampos', '#campos-lista input', function () {
+        const $tr = $(this).closest('tr');
+        const campoId = parseInt($tr.data('campo-id'), 10) || 0;
+
+        if (CAMPOS_FIJOS_CONFIG.includes(campoId)) {
+            $(this).prop('checked', true);
+        }
+
+        actualizarVistaPrevia();
+    });
+
+    function actualizarVistaPrevia() {
+        let campos = [];
+
+        $('#campos-lista tr').each(function () {
+            let etiqueta = $(this).find('td:nth-child(2)').clone().children().remove().end().text().trim();
+            let campoId = parseInt($(this).data('campo-id'), 10) || 0;
+            let visible = $(this).find('input[type="checkbox"]').is(':checked');
+
+            if (CAMPOS_FIJOS_CONFIG.includes(campoId)) {
+                visible = true;
+            }
+
+            if (etiqueta !== '' && visible) {
+                campos.push(etiqueta);
+            }
+        });
+
+        let html = '';
+
+        for (let i = 0; i < campos.length; i += 2) {
+            html += '<tr>';
+            html += `<th style="width: 15%; white-space: nowrap;">${campos[i]}:</th><td style="width: 35%;"></td>`;
+
+            if (campos[i + 1]) {
+                html += `<th style="width: 15%; white-space: nowrap;">${campos[i + 1]}:</th><td style="width: 35%;"></td>`;
+            } else {
+                html += '<td colspan="3"></td>';
+            }
+
+            html += '</tr>';
+        }
+
+        $('#vista-previa-campos').html(html);
     }
 
-    if ($('#campo-select option:not(:disabled)').length === 0) {
-        $('#campo-select').val('');
+    function actualizarOpcionesSelect() {
+        $('#campo-select option').prop('disabled', false);
+
+        $('#campos-lista tr').each(function () {
+            const campoId = parseInt($(this).data('campo-id'), 10) || 0;
+            $('#campo-select option[value="' + campoId + '"]').prop('disabled', true);
+        });
+
+        const $primerHabilitado = $('#campo-select option:not(:disabled)').first();
+
+        if ($('#campo-select option:selected').prop('disabled')) {
+            $('#campo-select').val($primerHabilitado.length ? $primerHabilitado.val() : '');
+        }
+
+        if ($('#campo-select option:not(:disabled)').length === 0) {
+            $('#campo-select').val('');
+        }
     }
-}
+
+    actualizarOpcionesSelect();
+    actualizarVistaPrevia();
+})();
 </script>
