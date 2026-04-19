@@ -1,3 +1,5 @@
+//admin/certificado/pacientes/js/paciente.js
+
 function sinAcentos(s) {
   return (s || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '');
 }
@@ -81,6 +83,10 @@ function initSelect2RazaManual() {
   const $sel = $('#manual_raza_select');
   if (!$sel.length) return;
 
+  const razaActualHidden = ($('#manual_raza').val() || '').trim();
+  const razaActualData = ($sel.data('current-text') || '').trim();
+  const razaObjetivo = razaActualHidden || razaActualData;
+
   if ($sel.hasClass('select2-hidden-accessible')) {
     $sel.select2('destroy');
   }
@@ -106,7 +112,11 @@ function initSelect2RazaManual() {
     }
   });
 
-  $sel.trigger('change');
+  if (razaObjetivo) {
+    preselectRazaByTextAndEspecie(razaObjetivo, ($('#manual_especie').val() || '').trim());
+  } else {
+    $sel.trigger('change');
+  }
 }
 
 window.ultimoTriggerModalPaciente = window.ultimoTriggerModalPaciente || null;
@@ -202,26 +212,68 @@ function prefillManualFromData(data) {
 $(function () {
   const $toggle = $('#toggle_manual');
 
-  if ($toggle.is(':checked')) {
-    initSelect2RazaManual();
+  function hasManualData(data) {
+    if (!data || typeof data !== 'object') {
+      return false;
+    }
+
+    return Object.keys(data).some(function (key) {
+      const value = data[key];
+      return value != null && String(value).trim() !== '';
+    });
   }
 
-  aplicarCamposVisiblesFormulario(window.CERT_CAMPOS_VISIBLES);
+  function abrirManualSinLimpiar() {
+    $('#paciente-manual').show();
+    $('#paciente_seleccionado').prop('readonly', true);
 
-  $toggle.on('change', function () {
+    if ($('#manual_raza_select').length && !$('#manual_raza_select').hasClass('select2-hidden-accessible')) {
+      initSelect2RazaManual();
+    }
+
+    aplicarCamposVisiblesFormulario(window.CERT_CAMPOS_VISIBLES);
+  }
+
+  function abrirManualLimpiando() {
+    $('#paciente-manual').slideDown();
+    $('#paciente_seleccionado').prop('readonly', true);
+    $('#paciente_id').val('');
+    $('#paciente_seleccionado').val('').removeData();
+
+    $('#paciente-manual').find('input[type="text"], input[type="date"], input[type="hidden"]').val('');
+    $('#paciente-manual').find('select').val('').trigger('change');
+
+    setTimeout(function () {
+      initSelect2RazaManual();
+      aplicarCamposVisiblesFormulario(window.CERT_CAMPOS_VISIBLES);
+    }, 0);
+  }
+
+  function restaurarManualDesdeData(data) {
+    if (!hasManualData(data)) {
+      return;
+    }
+
+    $toggle.prop('checked', true);
+    abrirManualSinLimpiar();
+
+    if ($('#manual_raza_select').length && !$('#manual_raza_select').hasClass('select2-hidden-accessible')) {
+      initSelect2RazaManual();
+    }
+
+    aplicarCamposVisiblesFormulario(window.CERT_CAMPOS_VISIBLES);
+    prefillManualFromData(data);
+  }
+
+  if ($toggle.is(':checked')) {
+    abrirManualSinLimpiar();
+  } else {
+    aplicarCamposVisiblesFormulario(window.CERT_CAMPOS_VISIBLES);
+  }
+
+  $toggle.off('change.certManual').on('change.certManual', function () {
     if (this.checked) {
-      $('#paciente-manual').slideDown();
-      $('#paciente_seleccionado').prop('readonly', true);
-      $('#paciente_id').val('');
-      $('#paciente_seleccionado').val('').removeData();
-
-      $('#paciente-manual').find('input[type="text"], input[type="date"], input[type="hidden"]').val('');
-      $('#paciente-manual').find('select').val('').trigger('change');
-
-      setTimeout(function () {
-        initSelect2RazaManual();
-        aplicarCamposVisiblesFormulario(window.CERT_CAMPOS_VISIBLES);
-      }, 0);
+      abrirManualLimpiando();
     } else {
       $('#paciente-manual').slideUp();
       $('#paciente_seleccionado').prop('readonly', false);
@@ -230,18 +282,22 @@ $(function () {
   });
 
   const noPacienteSeleccionado = !($('#paciente_id').val() || '').trim();
+  const manualDataDisponible = hasManualData(window.MANUAL_DATA);
 
-  if (window.MANUAL_DATA && noPacienteSeleccionado) {
-    $('#toggle_manual').prop('checked', true).trigger('change');
+  if (manualDataDisponible && noPacienteSeleccionado) {
+    restaurarManualDesdeData(window.MANUAL_DATA);
 
     setTimeout(function () {
-      if ($('#manual_raza_select').length && !$('#manual_raza_select').hasClass('select2-hidden-accessible')) {
-        initSelect2RazaManual();
-      }
+      restaurarManualDesdeData(window.MANUAL_DATA);
+    }, 120);
 
-      aplicarCamposVisiblesFormulario(window.CERT_CAMPOS_VISIBLES);
-      prefillManualFromData(window.MANUAL_DATA);
-    }, 50);
+    setTimeout(function () {
+      restaurarManualDesdeData(window.MANUAL_DATA);
+    }, 400);
+
+    setTimeout(function () {
+      restaurarManualDesdeData(window.MANUAL_DATA);
+    }, 900);
   }
 });
 

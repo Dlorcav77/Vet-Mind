@@ -172,18 +172,24 @@ async function abrirModalCorreo(el, certificadoId) {
     return;
   }
 
-  $.post('certificado/envio_email/get_email_certificado.php', { id: certificadoId }, async function(res) {
-    try {
-      const data = JSON.parse(res);
+  $.ajax({
+    url: 'certificado/envio_email/get_email_certificado.php',
+    type: 'POST',
+    dataType: 'json',
+    data: { id: certificadoId },
+    success: async function(res) {
+      const data = (typeof res === 'string') ? JSON.parse(res) : res;
 
-      if (data.status === 'success') {
+      if (data && data.status === 'success') {
         await setPropietarioYClinicas(data.correo || '');
       } else {
         await setPropietarioYClinicas('');
-        Swal.fire('Aviso', data.message || 'No se encontró el correo del propietario.', 'warning');
+        Swal.fire('Aviso', (data && data.message) || 'No se encontró el correo del propietario.', 'warning');
       }
-    } catch (e) {
-      Swal.fire('Error', 'Respuesta inválida del servidor.', 'error');
+    },
+    error: async function(xhr) {
+      await setPropietarioYClinicas('');
+      Swal.fire('Aviso', 'No se pudo obtener el correo del propietario. Puedes continuar con clínica o correo manual.', 'warning');
     }
   });
 }

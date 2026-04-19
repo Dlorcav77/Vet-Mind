@@ -6,9 +6,11 @@ if (!function_exists('certificado_get_form_data')) {
     {
         $id = (int)($_GET['id'] ?? 0);
         $accion = 'Ingresar';
+        $scopeKey = ($action === 'modificar' && $id > 0) ? 'modificar:' . $id : 'nuevo';
 
         $fila = [
             'paciente_id'               => '',
+            'paciente_label'            => '',
             'tipo_estudio'              => '',
             'fecha_examen'              => date('Y-m-d'),
             'contenido_html'            => '',
@@ -97,6 +99,88 @@ if (!function_exists('certificado_get_form_data')) {
             }
         }
 
+        $hay_borrador = false;
+        $borrador_id = 0;
+        $borrador_updated_at = null;
+        $borrador_payload = null;
+        $modo_ingreso_contenido_inicial = ($action === 'modificar') ? 'manual' : 'audio';
+
+        $stmtBorrador = $mysqli->prepare("
+            SELECT id, payload_json, updated_at
+            FROM certificados_borradores
+            WHERE veterinario_id = ?
+              AND scope_key = ?
+              AND estado = 'activo'
+            ORDER BY updated_at DESC
+            LIMIT 1
+        ");
+
+        if ($stmtBorrador) {
+            $stmtBorrador->bind_param("is", $usuario_id, $scopeKey);
+            $stmtBorrador->execute();
+            $resBorrador = $stmtBorrador->get_result();
+            $rowBorrador = $resBorrador->fetch_assoc();
+
+            if (is_array($rowBorrador) && !empty($rowBorrador['payload_json'])) {
+                $payload = json_decode($rowBorrador['payload_json'], true);
+
+                if (is_array($payload)) {
+                    $hay_borrador = true;
+                    $borrador_id = (int)$rowBorrador['id'];
+                    $borrador_updated_at = $rowBorrador['updated_at'];
+                    $borrador_payload = $payload;
+
+                    if (array_key_exists('paciente_id', $payload)) {
+                        $fila['paciente_id'] = (int)$payload['paciente_id'];
+                    }
+
+                    if (!empty($payload['paciente_label'])) {
+                        $fila['paciente_label'] = (string)$payload['paciente_label'];
+                    }
+
+                    if (!empty($payload['fecha_examen'])) {
+                        $fila['fecha_examen'] = (string)$payload['fecha_examen'];
+                    }
+
+                    if (array_key_exists('contenido_html', $payload)) {
+                        $fila['contenido_html'] = (string)$payload['contenido_html'];
+                    }
+
+                    if (array_key_exists('motivo_examen', $payload)) {
+                        $fila['motivo'] = (string)$payload['motivo_examen'];
+                    }
+
+                    if (array_key_exists('medico_solicitante', $payload)) {
+                        $fila['medico_solicitante'] = (string)$payload['medico_solicitante'];
+                    }
+
+                    if (array_key_exists('recinto', $payload)) {
+                        $fila['recinto'] = (string)$payload['recinto'];
+                    }
+
+                    if (!empty($payload['plantilla_informe_id'])) {
+                        $fila['tipo_estudio'] = (int)$payload['plantilla_informe_id'];
+                    }
+
+                    if (!empty($payload['configuracion_informe_id'])) {
+                        $fila['configuracion_informe_id'] = (int)$payload['configuracion_informe_id'];
+                        $configuracion_informe_id_actual = (int)$payload['configuracion_informe_id'];
+                    }
+
+                    if (!empty($payload['manual_data']) && is_array($payload['manual_data'])) {
+                        $fila['manual_data'] = json_encode(
+                            $payload['manual_data'],
+                            JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES
+                        );
+                    }
+
+                    $modo_ingreso_contenido_inicial = (!empty($payload['toggle_audio_manual']) && (int)$payload['toggle_audio_manual'] === 1)
+                        ? 'manual'
+                        : 'audio';
+                }
+            }
+        }
+
         $campos_permitidos_catalogo = [];
         $resCamposPermitidos = $mysqli->query("
             SELECT id, campo, etiqueta
@@ -135,6 +219,30 @@ if (!function_exists('certificado_get_form_data')) {
             }
         }
 
+        $toggle_manual_inicial = false;
+
+        if (!empty($fila['manual_data'])) {
+            $manualDataArr = json_decode((string)$fila['manual_data'], true);
+
+            if (is_array($manualDataArr)) {
+                foreach ($manualDataArr as $valorManual) {
+                    if (is_string($valorManual) && trim($valorManual) !== '') {
+                        $toggle_manual_inicial = true;
+                        break;
+                    }
+
+                    if (is_numeric($valorManual) && (string)$valorManual !== '') {
+                        $toggle_manual_inicial = true;
+                        break;
+                    }
+                }
+            }
+        }
+
+        if (!empty($fila['paciente_id'])) {
+            $toggle_manual_inicial = false;
+        }
+
         return [
             'id'                              => $id,
             'accion'                          => $accion,
@@ -145,6 +253,13 @@ if (!function_exists('certificado_get_form_data')) {
             'configuracion_informe_id_actual' => $configuracion_informe_id_actual,
             'campos_permitidos_catalogo'      => $campos_permitidos_catalogo,
             'campos_visibles_actuales'        => $campos_visibles_actuales,
+            'hay_borrador'                    => $hay_borrador,
+            'borrador_id'                     => $borrador_id,
+            'borrador_updated_at'             => $borrador_updated_at,
+            'borrador_payload'                => $borrador_payload,
+            'borrador_scope_key'              => $scopeKey,
+            'modo_ingreso_contenido_inicial'  => $modo_ingreso_contenido_inicial,
+            'toggle_manual_inicial'           => $toggle_manual_inicial,
         ];
     }
 }

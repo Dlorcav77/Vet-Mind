@@ -1,3 +1,4 @@
+//admin/certificado/tipo_examen/js/tipo_examen.js
 function cargarCamposVisiblesPorConfiguracion(configuracionInformeId) {
     if (!configuracionInformeId) {
         if (typeof aplicarCamposVisiblesFormulario === 'function') {
@@ -68,23 +69,46 @@ $(function () {
                     console.log('getPlantillaPorTipo response:', res);
 
                     if (res && res.status === 'success') {
-                        $('#plantillaBase').val(res.contenido || '');
-                        $('#plantillaContenido').html(res.contenido || '');
+                        const contenidoPlantilla = (res.contenido || '').trim();
+
+                        $('#plantillaBase').val(contenidoPlantilla);
+                        $('#plantillaContenido').html(contenidoPlantilla);
                         $('#plantillaPlaceholder').hide();
                         $('#plantillaPreview').show();
                         $('#procesarIA').prop('disabled', false);
 
                         if (!ES_MODIFICAR && typeof audio_manual_isManual === 'function' && audio_manual_isManual()) {
-                            if (typeof CKEDITOR !== 'undefined' && CKEDITOR.instances['contenido_html']) {
-                                const actual = CKEDITOR.instances['contenido_html'].getData().trim();
-                                if (!actual) {
-                                    CKEDITOR.instances['contenido_html'].setData(res.contenido || '');
+                            const $txt = $('#contenido_html');
+                            const contenidoTextarea = ($txt.val() || '').trim();
+
+                            if (
+                                window.VetmindTiptap &&
+                                typeof window.VetmindTiptap.getMainEditor === 'function' &&
+                                typeof window.VetmindTiptap.setMainEditorHTML === 'function'
+                            ) {
+                                const editor = window.VetmindTiptap.getMainEditor();
+                                let contenidoEditor = '';
+
+                                if (editor && typeof editor.getHTML === 'function') {
+                                    contenidoEditor = (editor.getHTML() || '').trim();
                                 }
-                            } else {
-                                const $txt = $('#contenido_html');
-                                if ($txt.length && !$txt.val().trim()) {
-                                    $txt.val(res.contenido || '');
+
+                                const editorVacio =
+                                    !contenidoEditor ||
+                                    contenidoEditor === '<p></p>' ||
+                                    contenidoEditor === '<p class="is-editor-empty"></p>';
+
+                                const textareaVacio = !contenidoTextarea;
+
+                                if (editorVacio && textareaVacio) {
+                                    window.VetmindTiptap.setMainEditorHTML(contenidoPlantilla || '<p></p>');
+
+                                    if (typeof window.VetmindTiptap.syncMainEditorToTextarea === 'function') {
+                                        window.VetmindTiptap.syncMainEditorToTextarea();
+                                    }
                                 }
+                            } else if ($txt.length && !$txt.val().trim()) {
+                                $txt.val(contenidoPlantilla);
                             }
                         }
                     } else {

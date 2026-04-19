@@ -1,4 +1,6 @@
 <?php
+// admin/certificado/updCertificados.php
+
 require_once("../config.php");
 require_once("../../vendor/autoload.php");
 require_once("funcionesCertificado.php");
@@ -103,6 +105,8 @@ $recinto                 = trim($_POST['recinto'] ?? '');
 $plantilla_informe_id    = intval($_POST['plantilla_informe_id'] ?? 0);
 $configuracion_informe_id = intval($_POST['configuracion_informe_id'] ?? 0);
 $modo_manual             = isset($_POST['toggle_manual']) && $_POST['toggle_manual'] == '1';
+$borrador_id             = (int)($_POST['borrador_id'] ?? 0);
+$borrador_scope_key      = trim((string)($_POST['borrador_scope_key'] ?? (($action === 'modificar' && $id > 0) ? 'modificar:' . $id : 'nuevo')));
 
 if ($veterinario <= 0) {
     echo json_encode([
@@ -434,6 +438,39 @@ if ($stmt->execute()) {
         $certId = (int)$stmt->insert_id;
     } elseif ($action === 'modificar' && $id > 0) {
         $certId = (int)$id;
+    }
+
+    if ($certId > 0) {
+        if ($borrador_id > 0) {
+            $stmtBorrador = $mysqli->prepare("
+                UPDATE certificados_borradores
+                SET estado = 'finalizado',
+                    certificado_id = ?,
+                    updated_at = NOW()
+                WHERE id = ?
+                  AND veterinario_id = ?
+            ");
+
+            if ($stmtBorrador) {
+                $stmtBorrador->bind_param("iii", $certId, $borrador_id, $veterinario);
+                $stmtBorrador->execute();
+            }
+        } elseif ($borrador_scope_key !== '') {
+            $stmtBorrador = $mysqli->prepare("
+                UPDATE certificados_borradores
+                SET estado = 'finalizado',
+                    certificado_id = ?,
+                    updated_at = NOW()
+                WHERE veterinario_id = ?
+                  AND scope_key = ?
+                  AND estado = 'activo'
+            ");
+
+            if ($stmtBorrador) {
+                $stmtBorrador->bind_param("iis", $certId, $veterinario, $borrador_scope_key);
+                $stmtBorrador->execute();
+            }
+        }
     }
 
     echo json_encode([

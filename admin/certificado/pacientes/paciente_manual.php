@@ -1,5 +1,10 @@
 <?php
 // admin/certificado/pacientes/paciente_manual.php
+$manualDataInicial = $manualDataInicial ?? [];
+
+function manual_value(array $data, string $key): string {
+    return htmlspecialchars((string)($data[$key] ?? ''), ENT_QUOTES, 'UTF-8');
+}
 ?>
 <style>
     #paciente-manual .campo-requerido-manual.is-invalid,
@@ -54,6 +59,7 @@
                 $visibleInicial = in_array($campoKey, $camposVisiblesActuales, true);
                 $esObligatorioManual = in_array($campoKey, ['paciente', 'propietario'], true);
                 $inputId = 'manual_' . $campoKey;
+                $valorInicial = (string)($manualDataInicial[$campoKey] ?? '');
             ?>
             <div
                 class="col-md-4 mb-3 campo-manual-item"
@@ -72,17 +78,25 @@
                         id="manual_raza_select"
                         class="select2 form-select"
                         style="width:100%;"
+                        data-current-text="<?= manual_value($manualDataInicial, 'raza') ?>"
                     >
                         <option value="">Seleccione raza...</option>
                         <?php lisRazas(); ?>
                     </select>
-                    <input type="hidden" id="manual_raza" name="manual_raza">
+                    <input
+                        type="hidden"
+                        id="manual_raza"
+                        name="manual_raza"
+                        value="<?= manual_value($manualDataInicial, 'raza') ?>"
+                    >
 
                 <?php elseif ($campoKey === 'sexo'): ?>
                     <select class="form-select" id="manual_sexo" name="manual_sexo">
                         <option value="">Seleccione...</option>
                         <?php foreach ($sexos_manual as $val => $label): ?>
-                            <option value="<?= htmlspecialchars($val) ?>"><?= htmlspecialchars($label) ?></option>
+                            <option value="<?= htmlspecialchars($val) ?>" <?= $valorInicial === $val ? 'selected' : '' ?>>
+                                <?= htmlspecialchars($label) ?>
+                            </option>
                         <?php endforeach; ?>
                     </select>
 
@@ -92,6 +106,7 @@
                         class="form-control"
                         name="manual_fecha_nacimiento"
                         id="manual_fecha_nacimiento"
+                        value="<?= manual_value($manualDataInicial, 'fecha_nacimiento') ?>"
                     >
 
                 <?php else: ?>
@@ -103,6 +118,7 @@
                         data-required-manual="<?= $esObligatorioManual ? '1' : '0' ?>"
                         data-label="<?= htmlspecialchars($campoLabel) ?>"
                         autocomplete="off"
+                        value="<?= manual_value($manualDataInicial, $campoKey) ?>"
                     >
                     <?php if ($esObligatorioManual): ?>
                         <div class="invalid-feedback-manual" id="feedback_<?= htmlspecialchars($inputId) ?>">

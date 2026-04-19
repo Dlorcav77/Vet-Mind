@@ -1,6 +1,5 @@
 <?php
 // admin/certificado/pacientes/paciente.php
-
 $camposCatalogo = $campos_permitidos_catalogo ?? [];
 $camposVisiblesActuales = $campos_visibles_actuales ?? [];
 
@@ -13,9 +12,28 @@ $sexos_manual = [
     'Hembra Esterilizada' => 'Hembra Esterilizada',
 ];
 
-$toggleManualInitial = empty($fila['paciente_id']) && !empty($fila['manual_data']);
+$manualDataInicial = [];
+if (!empty($fila['manual_data'])) {
+    $tmpManual = json_decode((string)$fila['manual_data'], true);
+    if (is_array($tmpManual)) {
+        $manualDataInicial = $tmpManual;
+    }
+}
+
+$toggleManualInitial = !empty($toggle_manual_inicial);
 $isModificarPaciente = isset($action) && $action === 'modificar';
 $guardarInitial = ($isModificarPaciente && !empty($fila['manual_data'])) ? 0 : 1;
+
+$pacienteSeleccionadoTexto = '';
+if (!empty($fila['paciente_label'])) {
+    $pacienteSeleccionadoTexto = $fila['paciente_label'];
+} elseif (!empty($fila['paciente_id'])) {
+    $pacienteSeleccionadoTexto =
+        ($fila['paciente'] ?? '') .
+        (isset($fila['especie']) ? ', ' . $fila['especie'] : '') .
+        (isset($fila['raza']) ? ', ' . $fila['raza'] : '') .
+        (isset($fila['propietario']) ? ' - Tutor: ' . $fila['propietario'] : '');
+}
 ?>
 <div class="row g-2 mb-3">
     <div class="col-md-9">
@@ -29,16 +47,7 @@ $guardarInitial = ($isModificarPaciente && !empty($fila['manual_data'])) ? 0 : 1
                     id="paciente_seleccionado"
                     placeholder="Seleccione un paciente..."
                     readonly
-                    value="<?php
-                        if (!empty($fila['paciente_id'])) {
-                            echo htmlspecialchars(
-                                ($fila['paciente'] ?? '') .
-                                (isset($fila['especie']) ? ', ' . $fila['especie'] : '') .
-                                (isset($fila['raza']) ? ', ' . $fila['raza'] : '') .
-                                (isset($fila['propietario']) ? ' - Tutor: ' . $fila['propietario'] : '')
-                            );
-                        }
-                    ?>"
+                    value="<?= htmlspecialchars($pacienteSeleccionadoTexto) ?>"
                 >
                 <button type="button" class="btn btn-outline-primary">
                     <i class="fas fa-search"></i> Buscar Paciente
@@ -94,4 +103,4 @@ window.MANUAL_DATA = <?php
     }
 ?>;
 </script>
-<script src="certificado/pacientes/js/paciente.js?v=1"></script>
+<script src="certificado/pacientes/js/paciente.js?v=3"></script>

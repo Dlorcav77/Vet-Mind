@@ -1,7 +1,7 @@
 <?php
 // admin/certificado/metodo_ingreso/metodo_ingreso.php
 $isModificar = isset($action) && $action === 'modificar';
-$initialMode = $isModificar ? 'manual' : 'audio';
+$initialMode = $modo_ingreso_contenido_inicial ?? ($isModificar ? 'manual' : 'audio');
 $isManualInitial = $initialMode === 'manual';
 ?>
 
@@ -160,4 +160,4 @@ $isManualInitial = $initialMode === 'manual';
 
 <script type="module" src="certificado/common/js/tiptap-editor.js?v=10"></script>
 <script src="certificado/metodo_ingreso/js/audio.js?v=1"></script>
-<script src="certificado/metodo_ingreso/js/metodo_ingreso.js?v=6"></script>
+<script src="certificado/metodo_ingreso/js/metodo_ingreso.js?v=7"></script>

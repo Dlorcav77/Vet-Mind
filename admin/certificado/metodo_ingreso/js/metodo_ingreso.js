@@ -46,27 +46,60 @@ function vmMainEditorExists() {
 }
 
 function vmInitMainEditorIfNeeded() {
-  const plantilla = $('#plantillaBase').val() || '';
-  const contenidoActual = $('#contenido_html').val() || '';
+  const plantilla = ($('#plantillaBase').val() || '').trim();
+  const contenidoActual = ($('#contenido_html').val() || '').trim();
+  const esNuevoSinContenido = !ES_MODIFICAR && !contenidoActual && !plantilla;
 
   if (!window.VetmindTiptap || typeof window.VetmindTiptap.initMainEditor !== 'function') {
     return;
   }
 
-  if (!vmMainEditorExists() && typeof window.VetmindTiptap.destroyMainEditor === 'function') {
+  if (typeof window.VetmindTiptap.destroyMainEditor === 'function') {
     window.VetmindTiptap.destroyMainEditor();
   }
 
+  if (esNuevoSinContenido) {
+    $('#contenido_html').val('');
+  }
+
   window.VetmindTiptap.initMainEditor({
-    content: contenidoActual
+    content: esNuevoSinContenido ? '' : contenidoActual
   });
 
   if (ES_MODIFICAR) {
     if (typeof window.VetmindTiptap.setMainEditorHTML === 'function') {
       window.VetmindTiptap.setMainEditorHTML(contenidoActual || '<p></p>');
     }
+  } else if (contenidoActual) {
+    if (typeof window.VetmindTiptap.setMainEditorHTML === 'function') {
+      window.VetmindTiptap.setMainEditorHTML(contenidoActual);
+    }
   } else if (plantilla) {
-    window.VetmindTiptap.insertPlantillaIfEmpty(plantilla);
+    const editor = (typeof window.VetmindTiptap.getMainEditor === 'function')
+      ? window.VetmindTiptap.getMainEditor()
+      : null;
+
+    let contenidoEditor = '';
+    if (editor && typeof editor.getHTML === 'function') {
+      contenidoEditor = (editor.getHTML() || '').trim();
+    }
+
+    const editorVacio =
+      !contenidoEditor ||
+      contenidoEditor === '<p></p>' ||
+      contenidoEditor === '<p class="is-editor-empty"></p>';
+
+    if (editorVacio) {
+      if (typeof window.VetmindTiptap.setMainEditorHTML === 'function') {
+        window.VetmindTiptap.setMainEditorHTML(plantilla);
+      } else if (typeof window.VetmindTiptap.insertPlantillaIfEmpty === 'function') {
+        window.VetmindTiptap.insertPlantillaIfEmpty(plantilla);
+      }
+    }
+  } else {
+    if (typeof window.VetmindTiptap.setMainEditorHTML === 'function') {
+      window.VetmindTiptap.setMainEditorHTML('<p></p>');
+    }
   }
 
   if (typeof window.VetmindTiptap.syncMainEditorToTextarea === 'function') {
