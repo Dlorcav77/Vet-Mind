@@ -42,7 +42,45 @@ if (!isset($tipos_estudio)) {
     #plantillaContenido {
         max-height: 400px;
         overflow-y: auto;
-        padding: 8px;
+        padding: 16px;
+        line-height: 1.55;
+        word-break: break-word;
+    }
+
+    #plantillaContenido table,
+    #plantillaContenido .vm-tiptap-table {
+        width: 100%;
+        border-collapse: collapse;
+        table-layout: auto;
+        margin: 14px 0;
+        background: #ffffff;
+    }
+
+    #plantillaContenido th,
+    #plantillaContenido td {
+        border: 1px solid #cfd6df;
+        padding: 8px 10px;
+        vertical-align: top;
+        min-width: 90px;
+    }
+
+    #plantillaContenido th {
+        background: #eef2f6;
+        font-weight: 700;
+    }
+
+    #plantillaContenido p {
+        margin-bottom: .85rem;
+    }
+
+    #plantillaContenido ul,
+    #plantillaContenido ol {
+        padding-left: 1.4rem;
+        margin-bottom: .85rem;
+    }
+
+    #plantillaContenido strong {
+        font-weight: 700;
     }
 </style>
 
@@ -121,9 +159,29 @@ if (!isset($tipos_estudio)) {
             </div>
 
             <div id="plantillaPreview" style="display:none;">
-                <div class="d-flex justify-content-between align-items-center mb-2" style="min-height: 28px;">
-                    <label class="form-label fw-bold mb-0">Plantilla Asociada</label>
-                    <span style="display:inline-block; min-width:96px;"></span>
+                <div class="d-flex justify-content-between align-items-center mb-2 gap-2 flex-wrap" style="min-height: 28px;">
+                    <label class="form-label fw-bold mb-0">Plantilla Seleccionada</label>
+
+                    <div class="d-flex align-items-center gap-2">
+                        <button
+                            type="button"
+                            class="btn btn-sm btn-outline-primary"
+                            id="btnUsarPlantillaContenido"
+                            style="display:none;"
+                        >
+                            <i class="fas fa-arrow-down"></i>
+                        </button>
+
+                        <button
+                            type="button"
+                            class="btn btn-sm btn-outline-secondary"
+                            id="btnTogglePlantillaPreview"
+                            data-visible="1"
+                            title="Ocultar plantilla asociada"
+                        >
+                            <i class="fas fa-eye-slash"></i>
+                        </button>
+                    </div>
                 </div>
 
                 <div class="border rounded p-3 bg-light" id="plantillaContenido" style="min-height: 400px; overflow-y: auto;">
@@ -142,21 +200,8 @@ if (!isset($tipos_estudio)) {
 
             <?php include __DIR__ . '/bloque_imagenes.php'; ?>
         </div>
-
     </div>
-
-    <div class="row g-1 mb-1" id="fila_preview_plantilla">
-        <div class="col-md-6 mb-2" id="plantillaPreview" style="display:none;">
-            <span class="form-label fw-bold">Plantilla Asociada</span>
-            <div class="border rounded p-3 mt-2 bg-light" id="plantillaContenido" style="min-height: 400px; overflow-y: auto;">
-                <em class="text-muted">Selecciona un tipo de examen para ver su plantilla...</em>
-            </div>
-        </div>
-
-        <div class="col-md-6 mb-2" id="plantillaPlaceholder" style="display:block;"></div>
-    </div>
-
 </div>
 
-<script src="certificado/tipo_examen/js/tipo_examen.js?v=2"></script>
+<script src="certificado/tipo_examen/js/tipo_examen.js?v=5"></script>
 <script src="certificado/tipo_examen/js/imagenes.js?v=1"></script>

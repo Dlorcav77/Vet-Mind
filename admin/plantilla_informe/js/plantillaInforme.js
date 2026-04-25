@@ -104,7 +104,12 @@ const LineHeight = Extension.create({
     }
 
     if (window.__plantillaInformeEditor && typeof window.__plantillaInformeEditor.destroy === 'function') {
-        window.__plantillaInformeEditor.destroy();
+        try {
+            window.__plantillaInformeEditor.destroy();
+        } catch (error) {
+            console.warn('No se pudo destruir el editor anterior:', error);
+        }
+
         window.__plantillaInformeEditor = null;
     }
 
@@ -596,20 +601,33 @@ const LineHeight = Extension.create({
     form.addEventListener('submit', function (e) {
         e.preventDefault();
 
-        syncEditorToTextarea();
+        const editor = window.__plantillaInformeEditor;
 
-        const formData = $(this).serialize();
+        if (editor) {
+            textareaElement.value = editor.getHTML();
+        }
+
+        const formActionUrl = this.getAttribute('action');
+        const formData = new FormData(this);
+
+        if (editor) {
+            formData.set('contenido', editor.getHTML());
+        }
 
         $.ajax({
-            url: this.action,
+            url: formActionUrl,
             type: 'POST',
             data: formData,
+            processData: false,
+            contentType: false,
             success: function (response) {
                 let jsonResponse = null;
 
                 try {
-                    jsonResponse = JSON.parse(response);
+                    jsonResponse = typeof response === 'string' ? JSON.parse(response) : response;
                 } catch (error) {
+                    console.error('Respuesta no válida del servidor:', response);
+
                     Swal.fire({
                         icon: 'error',
                         title: 'Error',
@@ -621,7 +639,12 @@ const LineHeight = Extension.create({
 
                 if (jsonResponse.status === 'success') {
                     if (window.__plantillaInformeEditor && typeof window.__plantillaInformeEditor.destroy === 'function') {
-                        window.__plantillaInformeEditor.destroy();
+                        try {
+                            window.__plantillaInformeEditor.destroy();
+                        } catch (error) {
+                            console.warn('No se pudo destruir el editor anterior:', error);
+                        }
+
                         window.__plantillaInformeEditor = null;
                     }
 
@@ -637,12 +660,14 @@ const LineHeight = Extension.create({
                     Swal.fire({
                         icon: 'error',
                         title: 'Error',
-                        text: jsonResponse.message,
+                        text: jsonResponse.message || 'No se pudo guardar la plantilla.',
                         confirmButtonText: 'OK'
                     });
                 }
             },
-            error: function () {
+            error: function (xhr) {
+                console.error('Error AJAX:', xhr.responseText);
+
                 Swal.fire({
                     icon: 'error',
                     title: 'Error',
@@ -651,5 +676,5 @@ const LineHeight = Extension.create({
                 });
             }
         });
-    }, { once: true });
+    });
 })();

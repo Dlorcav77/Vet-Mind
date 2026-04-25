@@ -22,14 +22,27 @@
 </style>
 
 <div id="imagenesColumna" style="display:none;">
-    <div class="d-flex justify-content-between align-items-center mb-2">
-        <label for="columnasImagenes" class="form-label fw-bold mb-0">Imágeness</label>
-        <select id="columnasImagenes" class="form-select form-select-sm" style="width: auto; min-width: 96px;">
-            <option value="1">1 por fila</option>
-            <option value="2" selected>2 por fila</option>
-            <option value="3">3 por fila</option>
-            <option value="4">4 por fila</option>
-        </select>
+    <div class="d-flex justify-content-between align-items-center mb-2 gap-2 flex-wrap">
+        <label for="columnasImagenes" class="form-label fw-bold mb-0">Imágenes</label>
+
+        <div class="d-flex align-items-center gap-2">
+            <select id="columnasImagenes" class="form-select form-select-sm" style="width: auto; min-width: 96px;">
+                <option value="1">1 por fila</option>
+                <option value="2" selected>2 por fila</option>
+                <option value="3">3 por fila</option>
+                <option value="4">4 por fila</option>
+            </select>
+
+            <button
+                type="button"
+                class="btn btn-sm btn-outline-secondary"
+                id="btnToggleImagenesPreview"
+                data-visible="1"
+                title="Ocultar imágenes"
+            >
+                <i class="fas fa-eye-slash"></i>
+            </button>
+        </div>
     </div>
 
     <div id="imagenesPreview" class="border rounded bg-light" style="min-height: 400px;">

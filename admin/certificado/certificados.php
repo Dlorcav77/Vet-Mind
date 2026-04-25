@@ -232,4 +232,4 @@ $modo_ingreso_contenido_inicial  = $formData['modo_ingreso_contenido_inicial'];
 <script src="certificado/common/js/editor.js?v=3"></script>
 <script src="certificado/metodo_ingreso/js/ia.js?v=5"></script>
 <script src="certificado/preview/js/preview.js?v=1"></script>
-<script src="certificado/guardar/js/guardar.js?v=13"></script>
+<script src="certificado/guardar/js/guardar.js?v=14"></script>

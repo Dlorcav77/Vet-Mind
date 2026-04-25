@@ -236,3 +236,52 @@
 #plantilla_informe .row > [class*="col-"]:last-child {
     padding-right: 0;
 }
+
+.vm-tiptap-editor .ProseMirror,
+.vm-tiptap-editor .tiptap-editor-content {
+    outline: none !important;
+    border: 0 !important;
+    box-shadow: none !important;
+}
+
+.vm-tiptap-editor .ProseMirror:focus,
+.vm-tiptap-editor .tiptap-editor-content:focus {
+    outline: none !important;
+    border: 0 !important;
+    box-shadow: none !important;
+}
+
+.vm-tiptap-editor .ProseMirror p {
+    margin-top: 0;
+}
+
+.vm-tiptap-editor {
+    min-height: 320px;
+    height: 320px;
+    padding: 0 !important;
+    overflow-y: auto;
+    cursor: text;
+}
+
+.vm-tiptap-editor .ProseMirror,
+.vm-tiptap-editor .tiptap-editor-content {
+    min-height: 320px;
+    height: 100%;
+    width: 100%;
+    padding: 14px 16px;
+    outline: none !important;
+    border: 0 !important;
+    box-shadow: none !important;
+    cursor: text;
+}
+
+.vm-tiptap-editor .ProseMirror:focus,
+.vm-tiptap-editor .tiptap-editor-content:focus {
+    outline: none !important;
+    border: 0 !important;
+    box-shadow: none !important;
+}
+
+.vm-tiptap-editor .ProseMirror p {
+    margin-top: 0;
+}

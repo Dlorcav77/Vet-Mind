@@ -44,7 +44,7 @@ $stmt->close();
 $contenidoPlantilla = isset($fila['contenido']) ? (string)$fila['contenido'] : '';
 ?>
 
-<link rel="stylesheet" href="plantilla_informe/css/plantillaInforme.css?v=1">
+<link rel="stylesheet" href="plantilla_informe/css/plantillaInforme.css?v=3">
 
 <div class="card" id="plantilla_informe" data-page-id="plantilla_informe">
     <div class="card-header">
@@ -318,4 +318,5 @@ $contenidoPlantilla = isset($fila['contenido']) ? (string)$fila['contenido'] : '
     </div>
 </div>
 
-<script type="module" src="plantilla_informe/js/plantillaInforme.js?v=1"></script>
+<!-- <script type="module" src="plantilla_informe/js/plantillaInforme.js?v=3"></script> -->
+<script type="module" src="plantilla_informe/js/plantillaInforme.js?v=<?= time(); ?>"></script>

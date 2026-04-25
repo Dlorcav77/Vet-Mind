@@ -1,7 +1,7 @@
 //admin/certificado/guardar/js/guardar.js
 $(function () {
-    // const AUTOSAVE_MS = 20000;
-    const AUTOSAVE_MS = 5000;
+    const AUTOSAVE_MS = 20000;
+    // const AUTOSAVE_MS = 5000;
     const AUTOSAVE_HABILITADO = !(window.ES_MODIFICAR === true);
 
     let draftTimer = null;

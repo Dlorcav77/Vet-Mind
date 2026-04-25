@@ -159,11 +159,27 @@ function audio_manual_setMode(mode) {
       $('#bloque-audio').stop(true, true).slideUp(120);
       $('#bloque-manual').stop(true, true).slideDown(120, function () {
         vmInitMainEditorIfNeeded();
+
+        setTimeout(function () {
+          if (typeof window.vmAplicarPlantillaAlContenidoSiCorresponde === 'function') {
+            window.vmAplicarPlantillaAlContenidoSiCorresponde({
+              force: false
+            });
+          }
+        }, 150);
       });
     } else {
       $('#bloque-audio').hide();
       $('#bloque-manual').show();
       vmInitMainEditorIfNeeded();
+
+      setTimeout(function () {
+        if (typeof window.vmAplicarPlantillaAlContenidoSiCorresponde === 'function') {
+          window.vmAplicarPlantillaAlContenidoSiCorresponde({
+            force: false
+          });
+        }
+      }, 150);
     }
   } else {
     if (window.recorder && window.recorder.state === 'recording') {
