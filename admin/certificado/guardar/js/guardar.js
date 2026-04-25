@@ -1,6 +1,7 @@
 //admin/certificado/guardar/js/guardar.js
 $(function () {
-    const AUTOSAVE_MS = 20000;
+    // const AUTOSAVE_MS = 20000;
+    const AUTOSAVE_MS = 5000;
     const AUTOSAVE_HABILITADO = !(window.ES_MODIFICAR === true);
 
     let draftTimer = null;
@@ -32,6 +33,7 @@ $(function () {
             if (item.name === 'imagenes[]' || item.name === 'imagenes_antiguas') {
                 return;
             }
+
             data[item.name] = item.value;
         });
 
@@ -44,6 +46,115 @@ $(function () {
         data.borrador_scope_key = $('#borrador_scope_key').val() || (window.CERT_BORRADOR?.scopeKey || '');
 
         return data;
+    }
+
+    function textoHtmlLimpio(html) {
+        const raw = String(html || '').trim();
+
+        if (!raw) {
+            return '';
+        }
+
+        const texto = $('<div>').html(raw).text()
+            .replace(/\u00a0/g, ' ')
+            .replace(/\s+/g, ' ')
+            .trim();
+
+        return texto;
+    }
+
+    function campoConValor(value) {
+        return value != null && String(value).replace(/\u00a0/g, ' ').trim() !== '';
+    }
+
+    function esCampoRuidoBorrador(nombre) {
+        const camposRuido = {
+            action: true,
+            id: true,
+            action_borrador: true,
+            borrador_id: true,
+            borrador_scope_key: true,
+            toggle_manual: true,
+            toggle_audio_manual: true,
+            guardar_mascota: true,
+            configuracion_informe_id: true,
+            configuracion_informe_id_hidden: true,
+            fecha_examen: true,
+            contenido_html: true,
+            paciente_id: true,
+            paciente_label: true
+        };
+
+        if (camposRuido[nombre]) {
+            return true;
+        }
+
+        if (nombre.indexOf('borrador_') === 0) {
+            return true;
+        }
+
+        return false;
+    }
+
+    function esCampoVisibleUsuario(nombre) {
+        const fields = document.getElementsByName(nombre);
+
+        if (!fields || !fields.length) {
+            return false;
+        }
+
+        for (let i = 0; i < fields.length; i++) {
+            const el = fields[i];
+            const type = String(el.getAttribute('type') || '').toLowerCase();
+
+            if (type === 'hidden' || type === 'file' || type === 'checkbox' || type === 'radio') {
+                continue;
+            }
+
+            if ($(el).is(':visible')) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    function draftTieneDatosUtiles(data) {
+        if (textoHtmlLimpio(data.contenido_html).length > 0) {
+            return true;
+        }
+
+        if (campoConValor(data.paciente_id) || campoConValor(data.paciente_label)) {
+            return true;
+        }
+
+        return Object.keys(data).some(function (nombre) {
+            if (esCampoRuidoBorrador(nombre)) {
+                return false;
+            }
+
+            if (!campoConValor(data[nombre])) {
+                return false;
+            }
+
+            if (nombre.indexOf('manual_') === 0) {
+                return true;
+            }
+
+            return esCampoVisibleUsuario(nombre);
+        });
+    }
+
+    function restaurarEstadoDraftSinGuardar() {
+        const hayDraft =
+            ($('#borrador_id').val() || '0') !== '0' ||
+            (window.CERT_BORRADOR && window.CERT_BORRADOR.hasDraft);
+
+        if (hayDraft) {
+            updateDraftStatus('Guardado en borrador', 'text-success');
+        } else {
+            updateDraftStatus('Sin cambios guardados', 'text-muted');
+        }
     }
 
     function setInitialDraftSnapshot() {
@@ -91,6 +202,26 @@ $(function () {
             return;
         }
 
+        const data = collectDraftData();
+        const currentHash = JSON.stringify(data);
+
+        if (currentHash === lastDraftHash) {
+            return;
+        }
+
+        if (!draftTieneDatosUtiles(data)) {
+            draftDirty = false;
+            lastDraftHash = currentHash;
+            restaurarEstadoDraftSinGuardar();
+
+            if (draftTimer) {
+                clearTimeout(draftTimer);
+                draftTimer = null;
+            }
+
+            return;
+        }
+
         draftDirty = true;
         updateDraftStatus('Cambios sin guardar', 'text-muted');
 
@@ -117,6 +248,13 @@ $(function () {
 
         const data = collectDraftData();
         const currentHash = JSON.stringify(data);
+
+        if (!draftTieneDatosUtiles(data)) {
+            draftDirty = false;
+            lastDraftHash = currentHash;
+            restaurarEstadoDraftSinGuardar();
+            return;
+        }
 
         if (!opts.force && currentHash === lastDraftHash) {
             return;
@@ -169,6 +307,12 @@ $(function () {
 
         const data = collectDraftData();
         const currentHash = JSON.stringify(data);
+
+        if (!draftTieneDatosUtiles(data)) {
+            lastDraftHash = currentHash;
+            draftDirty = false;
+            return;
+        }
 
         if (currentHash === lastDraftHash) {
             return;
@@ -238,6 +382,14 @@ $(function () {
         });
 
     $(document)
+        .off('input.autodraftTiptap keyup.autodraftTiptap paste.autodraftTiptap cut.autodraftTiptap blur.autodraftTiptap', '.vm-tiptap-editor .ProseMirror')
+        .on('input.autodraftTiptap keyup.autodraftTiptap paste.autodraftTiptap cut.autodraftTiptap blur.autodraftTiptap', '.vm-tiptap-editor .ProseMirror', function () {
+            setTimeout(function () {
+                scheduleDraftSave();
+            }, 120);
+        });
+
+    $(document)
         .off('click.autodraftPaciente', '#resultadosBuscarPaciente [onclick*="seleccionarPaciente"]')
         .on('click.autodraftPaciente', '#resultadosBuscarPaciente [onclick*="seleccionarPaciente"]', function () {
             setTimeout(function () {
@@ -254,8 +406,23 @@ $(function () {
         const currentHash = JSON.stringify(data);
 
         if (currentHash !== lastDraftHash && !draftDirty) {
+            if (!draftTieneDatosUtiles(data)) {
+                draftDirty = false;
+                lastDraftHash = currentHash;
+                restaurarEstadoDraftSinGuardar();
+                return;
+            }
+
             draftDirty = true;
             updateDraftStatus('Cambios sin guardar', 'text-muted');
+
+            if (draftTimer) {
+                clearTimeout(draftTimer);
+            }
+
+            draftTimer = setTimeout(function () {
+                saveDraft({ silent: false, force: false });
+            }, AUTOSAVE_MS);
         }
     }, 2000);
 
