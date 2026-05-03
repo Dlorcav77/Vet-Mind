@@ -168,6 +168,47 @@ function eliminarAudiosAnterioresCertificado($veterinario, $certId, $rutaNuevaFi
     ];
 }
 
+function eliminarAudiosCertificadoFisicos($veterinario, $certId)
+{
+    $baseAudio = realpath("../../uploads/certificados/audio");
+
+    if ($baseAudio === false) {
+        return [
+            'eliminados' => 0,
+            'errores' => 0
+        ];
+    }
+
+    $patron = "../../uploads/certificados/audio/*/*/" . (int)$veterinario . "_" . (int)$certId . "_*.wav";
+
+    $eliminados = 0;
+    $errores = 0;
+
+    foreach (glob($patron) as $archivo) {
+        $archivoReal = realpath($archivo);
+
+        if ($archivoReal === false || !is_file($archivoReal)) {
+            continue;
+        }
+
+        if (strpos($archivoReal, $baseAudio . DIRECTORY_SEPARATOR) !== 0) {
+            $errores++;
+            continue;
+        }
+
+        if (@unlink($archivoReal)) {
+            $eliminados++;
+        } else {
+            $errores++;
+        }
+    }
+
+    return [
+        'eliminados' => $eliminados,
+        'errores' => $errores
+    ];
+}
+
 function moverAudioTemporalCertificado($rutaAudioTmp, $veterinario, $certId)
 {
     $rutaNormalizada = normalizarRutaAudioTmpCertificado($rutaAudioTmp, $veterinario);
@@ -317,6 +358,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'elimi
                 }
             }
         }
+
+        eliminarAudiosCertificadoFisicos($usuario_id, $id);
 
         $del = $mysqli->prepare("DELETE FROM certificados WHERE id = ? AND veterinario_id = ?");
         if (!$del) {
