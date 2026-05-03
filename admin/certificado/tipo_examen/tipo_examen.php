@@ -38,54 +38,9 @@ if (!isset($tipos_estudio)) {
     }
 }
 ?>
-<style>
-    #plantillaContenido {
-        max-height: 400px;
-        overflow-y: auto;
-        padding: 16px;
-        line-height: 1.55;
-        word-break: break-word;
-    }
 
-    #plantillaContenido table,
-    #plantillaContenido .vm-tiptap-table {
-        width: 100%;
-        border-collapse: collapse;
-        table-layout: auto;
-        margin: 14px 0;
-        background: #ffffff;
-    }
-
-    #plantillaContenido th,
-    #plantillaContenido td {
-        border: 1px solid #cfd6df;
-        padding: 8px 10px;
-        vertical-align: top;
-        min-width: 90px;
-    }
-
-    #plantillaContenido th {
-        background: #eef2f6;
-        font-weight: 700;
-    }
-
-    #plantillaContenido p {
-        margin-bottom: .85rem;
-    }
-
-    #plantillaContenido ul,
-    #plantillaContenido ol {
-        padding-left: 1.4rem;
-        margin-bottom: .85rem;
-    }
-
-    #plantillaContenido strong {
-        font-weight: 700;
-    }
-</style>
-
+<link rel="stylesheet" href="certificado/tipo_examen/css/tipo_examen.css?v=1">
 <div class="col-12" id="bloque_tipo_examen">
-
     <div class="row g-1 mb-1" id="fila_campos_generales">
         <div
             class="col-md-4 mb-3"

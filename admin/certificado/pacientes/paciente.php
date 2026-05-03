@@ -35,6 +35,7 @@ if (!empty($fila['paciente_label'])) {
         (isset($fila['propietario']) ? ' - Tutor: ' . $fila['propietario'] : '');
 }
 ?>
+<link rel="stylesheet" href="certificado/pacientes/css/paciente.css?v=1">
 <div class="row g-2 mb-3">
     <div class="col-md-9">
         <span class="form-label fw-bold">Datos del Paciente</span>
