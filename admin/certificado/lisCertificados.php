@@ -1,4 +1,6 @@
 <?php
+// admin/certificado/lisCertificados.php
+
 ###########################################
 require_once("../config.php");
 credenciales('certificado', 'listar');
@@ -187,36 +189,31 @@ function confirmDelete(id, tipo) {
             ? 'certificado/subir_informe/updSubirInforme.php'
             : 'certificado/updCertificados.php';
 
-        $.ajax({
-            url: url,
-            type: 'POST',
-            data: { action: 'eliminar', id: id },
-            success: function (response) {
-                let jsonResponse;
+      $.ajax({
+          url: url,
+          type: 'POST',
+          dataType: 'json',
+          data: { action: 'eliminar', id: id },
+          success: function (response) {
+              const jsonResponse = response;
 
-                try {
-                    jsonResponse = JSON.parse(response);
-                } catch (e) {
-                    Swal.fire('Error', 'La respuesta del servidor no fue válida.', 'error');
-                    console.error('Respuesta inválida al eliminar:', response);
-                    return;
-                }
+              if (jsonResponse.status === 'success') {
+                  if (typeof destroyAllCKEditorsSafe === 'function') {
+                      destroyAllCKEditorsSafe();
+                  }
 
-                if (jsonResponse.status === 'success') {
-                    if (typeof destroyAllCKEditorsSafe === 'function') {
-                        destroyAllCKEditorsSafe();
-                    }
-
-                    $('#content').load('certificado/lisCertificados.php');
-                    Swal.fire('Eliminado', jsonResponse.message, 'success');
-                } else {
-                    Swal.fire('Error', jsonResponse.message || 'No se pudo eliminar el informe.', 'error');
-                }
-            },
-            error: function () {
-                Swal.fire('Error', 'No se pudo eliminar el Informe.', 'error');
-            }
-        });
+                  Swal.fire('Eliminado', jsonResponse.message, 'success').then(() => {
+                      $('#content').load('certificado/lisCertificados.php');
+                  });
+              } else {
+                  Swal.fire('Error', jsonResponse.message || 'No se pudo eliminar el informe.', 'error');
+              }
+          },
+          error: function (xhr) {
+              console.error('Error AJAX al eliminar:', xhr.responseText);
+              Swal.fire('Error', 'No se pudo eliminar el Informe.', 'error');
+          }
+      });
     });
 }
 

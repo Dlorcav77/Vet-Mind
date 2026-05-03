@@ -1,4 +1,6 @@
 <?php
+// admin/certificado/certificados.php
+
 ###########################################
 require_once("../config.php");
 require_once(__DIR__ . "/services/certificado_form_data.php");
