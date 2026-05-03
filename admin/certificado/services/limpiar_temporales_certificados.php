@@ -29,6 +29,7 @@ if (!function_exists('limpiarDirectorioTemporalCertificados')) {
         $rutasPermitidas = [
             realpath($basePath . '/uploads/tmp/img'),
             realpath($basePath . '/uploads/tmp/informe'),
+            realpath($basePath . '/uploads/tmp/audio'),
         ];
 
         $permitido = false;
@@ -119,6 +120,7 @@ if (!function_exists('limpiarTemporalesCertificados')) {
         return [
             'tmp_img' => limpiarDirectorioTemporalCertificados('uploads/tmp/img', $tresHoras, false),
             'tmp_informe' => limpiarDirectorioTemporalCertificados('uploads/tmp/informe', $tresHoras, false),
+            'tmp_audio' => limpiarDirectorioTemporalCertificados('uploads/tmp/audio', $tresHoras, false),
         ];
     }
 }
