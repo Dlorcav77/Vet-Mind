@@ -1,3 +1,4 @@
+// admin/certificado/tipo_examen/js/imagenes.js
 var imagenesArray = [];
 var imagenActual = 0;
 var archivosSeleccionados = [];
@@ -250,7 +251,7 @@ function abrirModalMedir(imgUrl) {
 
                 if (res.status === 'success') {
                     let urlTemporal = res.url;
-                    nombreTempImagen = urlTemporal.replace('/uploads/tmp/', '');
+                    nombreTempImagen = urlTemporal;
                     llamarCalibrar(urlTemporal);
                 } else {
                     Swal.fire('Error', res.message || 'No se recibió la imagen', 'error');

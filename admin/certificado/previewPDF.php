@@ -9,7 +9,7 @@ use Dompdf\Dompdf;
 
 $mysqli = conn();
 
-header('Content-Type: text/plain; charset=utf-8');
+header('Content-Type: application/json; charset=utf-8');
 
 try {
     $veterinario              = intval($_POST['veterinario_id'] ?? 0);
@@ -45,57 +45,78 @@ try {
 
     if ($veterinario <= 0) {
         http_response_code(400);
-        echo "Falta el veterinario del formulario.";
+        echo json_encode([
+            'status' => 'error',
+            'message' => 'Falta el veterinario del formulario.'
+        ], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
         exit;
     }
 
     if ($configuracion_informe_id <= 0) {
         http_response_code(400);
-        echo "Debes seleccionar una plantilla de diseño.";
+        echo json_encode([
+            'status' => 'error',
+            'message' => 'Debes seleccionar una plantilla de diseño.'
+        ], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
         exit;
     }
 
     if ($plantilla_informe_id <= 0) {
         http_response_code(400);
-        echo "Debes seleccionar un tipo de examen.";
+        echo json_encode([
+            'status' => 'error',
+            'message' => 'Debes seleccionar un tipo de examen.'
+        ], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
         exit;
     }
 
     if ($descripcion === '') {
         http_response_code(400);
-        echo "El contenido del informe está vacío.";
+        echo json_encode([
+            'status' => 'error',
+            'message' => 'El contenido del informe está vacío.'
+        ], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
         exit;
     }
 
     if (!$modo_manual && $paciente_id <= 0) {
         http_response_code(400);
-        echo "Debe seleccionar un paciente o ingresar los datos manualmente.";
+        echo json_encode([
+            'status' => 'error',
+            'message' => 'Debe seleccionar un paciente o ingresar los datos manualmente.'
+        ], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
         exit;
     }
 
     if ($modo_manual) {
         $nombrePaciente = trim($paciente['paciente'] ?? '');
+
         if ($nombrePaciente === '') {
             http_response_code(400);
-            echo "En modo manual debes ingresar al menos el nombre del paciente.";
+            echo json_encode([
+                'status' => 'error',
+                'message' => 'En modo manual debes ingresar al menos el nombre del paciente.'
+            ], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
             exit;
         }
     }
 
-    $previewDir = __DIR__ . '/../../uploads/tmp_previews/';
-    $previewImgDir = $previewDir . 'img/';
+    $previewDir = __DIR__ . '/../../uploads/tmp/informe/';
+    $previewImgDir = __DIR__ . '/../../uploads/tmp/img/';
 
     $limiteImagenes = 24;
     $cantidadImagenesAntiguas = 0;
 
     if (!empty($_POST['imagenes_antiguas'])) {
         $tmpAntiguas = json_decode($_POST['imagenes_antiguas'], true);
+
         if (is_array($tmpAntiguas)) {
             $cantidadImagenesAntiguas = count($tmpAntiguas);
         }
     }
 
     $cantidadImagenesNuevas = 0;
+
     if (!empty($_FILES['imagenes']['name']) && is_array($_FILES['imagenes']['name'])) {
         foreach ($_FILES['imagenes']['name'] as $nombreTmp) {
             if (!empty($nombreTmp)) {
@@ -108,7 +129,10 @@ try {
 
     if ($cantidadTotalImagenes > $limiteImagenes) {
         http_response_code(400);
-        echo "Se permiten como máximo {$limiteImagenes} imágenes para la vista previa.";
+        echo json_encode([
+            'status' => 'error',
+            'message' => "Se permiten como máximo {$limiteImagenes} imágenes para la vista previa."
+        ], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
         exit;
     }
 
@@ -133,9 +157,11 @@ try {
     }
 
     $imagenes = [];
+    $imagenesTemporalesPreview = [];
 
     if (!empty($_POST['imagenes_antiguas'])) {
         $imgsAntiguas = json_decode($_POST['imagenes_antiguas'], true);
+
         if (is_array($imgsAntiguas)) {
             foreach ($imgsAntiguas as $img) {
                 if (!empty($img)) {
@@ -156,7 +182,10 @@ try {
                 $destinoFisico = $previewImgDir . $tmpPreviewName;
 
                 if (move_uploaded_file($tmpName, $destinoFisico)) {
-                    $imagenes[] = 'uploads/tmp_previews/img/' . $tmpPreviewName;
+                    $rutaPreviewImg = 'uploads/tmp/img/' . $tmpPreviewName;
+
+                    $imagenes[] = $rutaPreviewImg;
+                    $imagenesTemporalesPreview[] = $rutaPreviewImg;
                 }
             }
         }
@@ -186,12 +215,23 @@ try {
     $tmpFile = $previewDir . uniqid('preview_', true) . '.pdf';
     file_put_contents($tmpFile, $pdf->output());
 
-    $pdfUrl = '/uploads/tmp_previews/' . basename($tmpFile);
-    echo $pdfUrl;
+    $pdfUrl = '/uploads/tmp/informe/' . basename($tmpFile);
+
+    echo json_encode([
+        'status' => 'success',
+        'pdfUrl' => $pdfUrl,
+        'pdf' => basename($tmpFile),
+        'imagenesTemporales' => $imagenesTemporalesPreview
+    ], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
     exit;
 
 } catch (Throwable $e) {
     http_response_code(500);
-    echo "Error interno al generar la vista previa: " . $e->getMessage();
+
+    echo json_encode([
+        'status' => 'error',
+        'message' => 'Error interno al generar la vista previa: ' . $e->getMessage()
+    ], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+
     exit;
 }

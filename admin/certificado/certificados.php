@@ -2,6 +2,7 @@
 ###########################################
 require_once("../config.php");
 require_once(__DIR__ . "/services/certificado_form_data.php");
+require_once(__DIR__ . "/services/limpiar_temporales_certificados.php");
 date_default_timezone_set('America/Santiago');
 ###########################################
 
@@ -13,6 +14,8 @@ if ($action === 'modificar') {
 } else {
     credenciales('certificado', 'ingresar');
 }
+
+limpiarTemporalesCertificados();
 
 $formData = certificado_get_form_data($mysqli, $action, (int)$usuario_id);
 
@@ -231,5 +234,5 @@ $modo_ingreso_contenido_inicial  = $formData['modo_ingreso_contenido_inicial'];
 
 <script src="certificado/common/js/editor.js?v=3"></script>
 <script src="certificado/metodo_ingreso/js/ia.js?v=5"></script>
-<script src="certificado/preview/js/preview.js?v=1"></script>
+<script src="certificado/preview/js/preview.js?v=2"></script>
 <script src="certificado/guardar/js/guardar.js?v=14"></script>

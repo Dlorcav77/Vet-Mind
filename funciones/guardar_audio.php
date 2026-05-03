@@ -6,7 +6,7 @@ header('Content-Type: application/json; charset=utf-8');
 session_start();
 
 // 🟣 rutas base ya corregidas para estar en /funciones/GPT
-$ROOT_DIR = dirname(__DIR__, 2);        // ← sube de /funciones/GPT → /
+$ROOT_DIR = dirname(__DIR__);       // ← sube de /funciones/GPT → /
 $FUNC_DIR = dirname(__DIR__);           // ← /funciones
 $logDir   = $FUNC_DIR . '/logs';
 if (!is_dir($logDir)) {

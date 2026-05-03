@@ -12,6 +12,79 @@ header('Content-Type: application/json; charset=utf-8');
 $pdfDir = "../../uploads/certificados/informes/";
 $mysqli = conn();
 
+function normalizarRutaImagenCertificado($ruta)
+{
+    $ruta = trim((string)$ruta);
+
+    if ($ruta === '') {
+        return null;
+    }
+
+    $ruta = str_replace('\\', '/', $ruta);
+    $ruta = preg_replace('#/+#', '/', $ruta);
+    $ruta = ltrim($ruta, '/');
+
+    $prefix = 'uploads/certificados/img/';
+
+    if (strpos($ruta, $prefix) !== 0) {
+        return null;
+    }
+
+    $nombreArchivo = basename($ruta);
+
+    if ($nombreArchivo === '' || $nombreArchivo === '.' || $nombreArchivo === '..') {
+        return null;
+    }
+
+    return $prefix . $nombreArchivo;
+}
+
+function normalizarListaImagenesCertificado($imagenes)
+{
+    $normalizadas = [];
+
+    if (!is_array($imagenes)) {
+        return $normalizadas;
+    }
+
+    foreach ($imagenes as $img) {
+        $rutaNormalizada = normalizarRutaImagenCertificado($img);
+
+        if ($rutaNormalizada !== null) {
+            $normalizadas[] = $rutaNormalizada;
+        }
+    }
+
+    return array_values(array_unique($normalizadas));
+}
+
+function eliminarImagenCertificadoFisica($ruta)
+{
+    $rutaNormalizada = normalizarRutaImagenCertificado($ruta);
+
+    if ($rutaNormalizada === null) {
+        return false;
+    }
+
+    $baseUploads = realpath("../../uploads/certificados/img");
+
+    if ($baseUploads === false) {
+        return false;
+    }
+
+    $archivo = realpath("../../" . $rutaNormalizada);
+
+    if ($archivo === false || !file_exists($archivo)) {
+        return false;
+    }
+
+    if (strpos($archivo, $baseUploads . DIRECTORY_SEPARATOR) !== 0) {
+        return false;
+    }
+
+    return @unlink($archivo);
+}
+
 if (!$mysqli) {
     echo json_encode([
         'status' => 'error',
@@ -286,10 +359,12 @@ if ($modo_manual && $guardarMascota && !empty($manual)) {
 }
 
 $imagenes = [];
+
 if (!empty($_POST['imagenes_antiguas'])) {
     $imgsAntiguas = json_decode($_POST['imagenes_antiguas'], true);
+
     if (is_array($imgsAntiguas)) {
-        $imagenes = $imgsAntiguas;
+        $imagenes = normalizarListaImagenesCertificado($imgsAntiguas);
     }
 }
 
@@ -306,12 +381,17 @@ if (!empty($_FILES['imagenes']['name'][0])) {
             $rutaDestino = $imgDir . $nombreArchivo;
 
             if (move_uploaded_file($tmpName, $rutaDestino)) {
-                $imagenes[] = "uploads/certificados/img/" . $nombreArchivo;
+                $rutaImagenNueva = normalizarRutaImagenCertificado("uploads/certificados/img/" . $nombreArchivo);
+
+                if ($rutaImagenNueva !== null) {
+                    $imagenes[] = $rutaImagenNueva;
+                }
             }
         }
     }
 }
 
+$imagenes = array_values(array_unique($imagenes));
 $imagenesJson = json_encode($imagenes, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
 
 if (!is_dir($pdfDir)) {
@@ -384,6 +464,26 @@ if ($action === 'ingresar') {
             $rutaAnterior = realpath("../../" . $prev['archivo_pdf']);
             if ($rutaAnterior && file_exists($rutaAnterior)) {
                 @unlink($rutaAnterior);
+            }
+        }
+
+        $imagenesPrevias = [];
+
+        if (!empty($prev['imagenes_json'])) {
+            $imagenesPreviasDecode = json_decode($prev['imagenes_json'], true);
+
+            if (is_array($imagenesPreviasDecode)) {
+                $imagenesPrevias = normalizarListaImagenesCertificado($imagenesPreviasDecode);
+            }
+        }
+
+        $imagenesActuales = normalizarListaImagenesCertificado($imagenes);
+
+        $imagenesEliminadas = array_values(array_diff($imagenesPrevias, $imagenesActuales));
+
+        foreach ($imagenesEliminadas as $imagenEliminada) {
+            if (!in_array($imagenEliminada, $imagenesActuales, true)) {
+                eliminarImagenCertificadoFisica($imagenEliminada);
             }
         }
     }

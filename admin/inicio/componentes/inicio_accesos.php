@@ -6,24 +6,33 @@
       <h5 class="mb-0 text-primary fw-bold">Accesos rápidos</h5>
     </div>
     <div class="row g-3">
-      <div class="col-6 col-md-3">
+      <div class="col-6 col-md-4 col-xl">
         <a href="certificado/certificados.php" class="btn btn-outline-secondary w-100 py-3 shadow-sm ajax-link">
           <i class="fas fa-file-medical me-2"></i> Nuevo informe
         </a>
       </div>
-      <div class="col-6 col-md-3">
+
+      <div class="col-6 col-md-4 col-xl">
         <a href="tutor/lisTutores.php" class="btn btn-outline-secondary w-100 py-3 shadow-sm ajax-link">
           <i class="fas fa-search me-2"></i> Buscar Tutor/Paciente
         </a>
       </div>
-      <div class="col-6 col-md-3">
+
+      <div class="col-6 col-md-4 col-xl">
         <a href="certificado/lisCertificados.php" class="btn btn-outline-secondary w-100 py-3 shadow-sm ajax-link">
           <i class="fas fa-folder-open me-2"></i> Ver informes
         </a>
       </div>
-      <div class="col-6 col-md-3">
+
+      <div class="col-6 col-md-4 col-xl">
         <a href="configuracion_informe/lisConfiguracion.php" class="btn btn-outline-secondary w-100 py-3 shadow-sm ajax-link">
           <i class="fas fa-cog me-2"></i> Configuración Informe
+        </a>
+      </div>
+
+      <div class="col-6 col-md-4 col-xl">
+        <a href="almacenamiento/lisAlmacenamiento.php" class="btn btn-outline-secondary w-100 py-3 shadow-sm ajax-link">
+          <i class="fas fa-hdd me-2"></i> Archivos
         </a>
       </div>
     </div>

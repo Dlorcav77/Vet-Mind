@@ -204,4 +204,4 @@ if (!isset($tipos_estudio)) {
 </div>
 
 <script src="certificado/tipo_examen/js/tipo_examen.js?v=5"></script>
-<script src="certificado/tipo_examen/js/imagenes.js?v=1"></script>
+<script src="certificado/tipo_examen/js/imagenes.js?v=2"></script>

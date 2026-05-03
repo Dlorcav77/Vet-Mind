@@ -1,4 +1,6 @@
 <?php
+// admin/certificado/tipo_examen/subir_temp_imagen.php
+
 require_once("../../config.php");
 
 header('Content-Type: application/json; charset=utf-8');
@@ -37,7 +39,21 @@ if (!in_array($extension, $extPermitidas, true)) {
     $extension = 'png';
 }
 
-$directorioTmp = rtrim($_SERVER['DOCUMENT_ROOT'], '/') . '/uploads/tmp/';
+$documentRoot = rtrim((string)($_SERVER['DOCUMENT_ROOT'] ?? ''), '/');
+
+if ($documentRoot === '') {
+    $documentRoot = realpath(__DIR__ . '/../../../..');
+}
+
+if ($documentRoot === false || $documentRoot === '') {
+    echo json_encode([
+        'status' => 'error',
+        'message' => 'No se pudo resolver DOCUMENT_ROOT.'
+    ], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+    exit;
+}
+
+$directorioTmp = $documentRoot . '/uploads/tmp/img/';
 
 if (!is_dir($directorioTmp)) {
     if (!mkdir($directorioTmp, 0775, true) && !is_dir($directorioTmp)) {
@@ -60,7 +76,7 @@ if (!move_uploaded_file($tmpPath, $rutaDestino)) {
     exit;
 }
 
-$urlPublica = '/uploads/tmp/' . $nombreArchivo;
+$urlPublica = '/uploads/tmp/img/' . $nombreArchivo;
 
 echo json_encode([
     'status' => 'success',
