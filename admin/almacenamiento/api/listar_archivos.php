@@ -115,7 +115,7 @@ function alm_info_archivo(string $ruta): array
 
 function alm_listar_grabaciones_usuario(string $baseProyecto, int $usuarioId): array
 {
-    $baseGrabaciones = $baseProyecto . '/uploads/grabaciones';
+    $baseGrabaciones = $baseProyecto . '/uploads/certificados/audio';
 
     $resultado = [
         'total' => 0,

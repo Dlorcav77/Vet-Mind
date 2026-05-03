@@ -175,7 +175,7 @@ $usuarioActual = (int)($usuario_id ?? ($_SESSION['usuario_id'] ?? 0));
   </div>
 
   <div class="row g-3 mb-4">
-    <div class="col-6 col-lg-3">
+    <div class="col-6 col-lg">
       <div class="alm-card-kpi">
         <div class="alm-kpi-icon">
           <i class="fas fa-hdd"></i>
@@ -186,7 +186,7 @@ $usuarioActual = (int)($usuario_id ?? ($_SESSION['usuario_id'] ?? 0));
       </div>
     </div>
 
-    <div class="col-6 col-lg-3">
+    <div class="col-6 col-lg">
       <div class="alm-card-kpi">
         <div class="alm-kpi-icon">
           <i class="fas fa-file-pdf"></i>
@@ -197,7 +197,7 @@ $usuarioActual = (int)($usuario_id ?? ($_SESSION['usuario_id'] ?? 0));
       </div>
     </div>
 
-    <div class="col-6 col-lg-3">
+    <div class="col-6 col-lg">
       <div class="alm-card-kpi">
         <div class="alm-kpi-icon">
           <i class="fas fa-images"></i>
@@ -208,7 +208,18 @@ $usuarioActual = (int)($usuario_id ?? ($_SESSION['usuario_id'] ?? 0));
       </div>
     </div>
 
-    <div class="col-6 col-lg-3">
+    <div class="col-6 col-lg">
+      <div class="alm-card-kpi">
+        <div class="alm-kpi-icon">
+          <i class="fas fa-microphone-alt"></i>
+        </div>
+        <div class="alm-kpi-label">Grabaciones</div>
+        <div class="alm-kpi-value" id="almTotalGrabaciones">-</div>
+        <div class="alm-kpi-sub" id="almPesoGrabaciones">-</div>
+      </div>
+    </div>
+
+    <div class="col-6 col-lg">
       <div class="alm-card-kpi">
         <div class="alm-kpi-icon">
           <i class="fas fa-users"></i>
@@ -239,6 +250,10 @@ $usuarioActual = (int)($usuario_id ?? ($_SESSION['usuario_id'] ?? 0));
             <option value="con_imagen">Con imágenes</option>
             <option value="con_faltantes">Con faltantes</option>
           </select>
+
+          <button type="button" id="btnVerGrabaciones" class="btn btn-outline-success btn-sm">
+            <i class="fas fa-microphone-alt me-1"></i> Grabaciones
+          </button>
 
           <button type="button" id="btnRecargarAlmacenamiento" class="btn btn-outline-primary btn-sm">
             <i class="fas fa-sync-alt me-1"></i> Recargar
@@ -331,6 +346,47 @@ $usuarioActual = (int)($usuario_id ?? ($_SESSION['usuario_id'] ?? 0));
   </div>
 </div>
 
+<div class="modal fade" id="modalAlmGrabaciones" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-xl modal-dialog-scrollable">
+    <div class="modal-content">
+      <div class="modal-header">
+        <div>
+          <h5 class="modal-title mb-0">
+            <i class="fas fa-microphone-alt text-success me-2"></i>Grabaciones del usuario
+          </h5>
+          <div class="small text-muted" id="modalAlmGrabacionesSubtitulo"></div>
+        </div>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Cerrar"></button>
+      </div>
+
+      <div class="modal-body">
+        <div class="alert alert-info small mb-3">
+          Estas grabaciones se detectan por nombre de archivo asociado al usuario. Por ahora no están agrupadas por paciente o informe.
+        </div>
+
+        <div class="table-responsive">
+          <table class="table table-sm table-bordered align-middle">
+            <thead>
+              <tr>
+                <th>Fecha archivo</th>
+                <th>Archivo</th>
+                <th>Ruta</th>
+                <th>Tamaño</th>
+                <th style="width: 170px;">Acciones</th>
+              </tr>
+            </thead>
+            <tbody id="modalAlmGrabacionesBody"></tbody>
+          </table>
+        </div>
+      </div>
+
+      <div class="modal-footer">
+        <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cerrar</button>
+      </div>
+    </div>
+  </div>
+</div>
+
 <div class="modal fade" id="modalAlmInformes" tabindex="-1" aria-hidden="true">
   <div class="modal-dialog modal-lg modal-dialog-scrollable">
     <div class="modal-content">
@@ -371,4 +427,4 @@ $usuarioActual = (int)($usuario_id ?? ($_SESSION['usuario_id'] ?? 0));
   window.ALMACENAMIENTO_USUARIO_ID = <?= (int)$usuarioActual ?>;
 </script>
 
-<script src="almacenamiento/js/almacenamiento.js?v=3"></script>
+<script src="almacenamiento/js/almacenamiento.js?v=4"></script>

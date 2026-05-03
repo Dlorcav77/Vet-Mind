@@ -3,6 +3,7 @@
 (function () {
     let tablaAlmacenamiento = null;
     let gruposOriginales = [];
+    let grabacionesOriginales = [];
 
     function escapeHtml(value) {
         return String(value ?? '')
@@ -78,8 +79,13 @@
         $('#almTotalImagenes').text(resumen.imagenes_total || 0);
         $('#almPesoImagenes').text(resumen.imagenes_label || '0 B');
 
+        $('#almTotalGrabaciones').text(resumen.grabaciones_total || 0);
+        $('#almPesoGrabaciones').text(resumen.grabaciones_label || '0 B');
+
         $('#almTotalGrupos').text(resumen.total_grupos || 0);
         $('#almTotalFaltantes').text((resumen.faltantes_total || 0) + ' faltantes');
+
+        $('#btnVerGrabaciones').prop('disabled', parseInt(resumen.grabaciones_total || 0, 10) <= 0);
     }
 
     function aplicarFiltros() {
@@ -182,6 +188,7 @@
                 }
 
                 gruposOriginales = response.grupos || [];
+                grabacionesOriginales = response.grabaciones || [];
 
                 pintarResumen(response.resumen || {});
                 aplicarFiltros();
@@ -368,6 +375,46 @@
         modal.show();
     }
 
+    function abrirModalGrabaciones() {
+        const $body = $('#modalAlmGrabacionesBody');
+        $body.empty();
+
+        $('#modalAlmGrabacionesSubtitulo').text(
+            (grabacionesOriginales.length || 0) + ' grabación(es) detectada(s)'
+        );
+
+        if (!grabacionesOriginales.length) {
+            $body.html('<tr><td colspan="5" class="text-center text-muted">Sin grabaciones detectadas.</td></tr>');
+        } else {
+            grabacionesOriginales.forEach(function (audio) {
+                let acciones = '';
+
+                acciones += ''
+                    + '<a href="' + escapeHtml(audio.url_ver) + '" target="_blank" class="btn btn-outline-primary btn-sm me-1" title="Abrir audio">'
+                    + '  <i class="fas fa-play"></i>'
+                    + '</a>';
+
+                acciones += ''
+                    + '<a href="' + escapeHtml(audio.url_descargar) + '" target="_blank" class="btn btn-outline-secondary btn-sm me-1" title="Descargar audio">'
+                    + '  <i class="fas fa-download"></i>'
+                    + '</a>';
+
+                $body.append(
+                    '<tr>'
+                    + '<td>' + escapeHtml(audio.fecha_archivo || '-') + '</td>'
+                    + '<td>' + escapeHtml(audio.nombre || '-') + '</td>'
+                    + '<td><span title="' + escapeHtml(audio.ruta || '') + '">' + escapeHtml(audio.ruta || '-') + '</span></td>'
+                    + '<td>' + escapeHtml(audio.size_label || '0 B') + '</td>'
+                    + '<td>' + acciones + '</td>'
+                    + '</tr>'
+                );
+            });
+        }
+
+        const modal = new bootstrap.Modal(document.getElementById('modalAlmGrabaciones'));
+        modal.show();
+    }
+
     $('#btnRecargarAlmacenamiento')
         .off('click.almacenamiento')
         .on('click.almacenamiento', function () {
@@ -378,6 +425,12 @@
         .off('change.almacenamiento')
         .on('change.almacenamiento', function () {
             aplicarFiltros();
+        });
+
+    $('#btnVerGrabaciones')
+        .off('click.almGrabaciones')
+        .on('click.almGrabaciones', function () {
+            abrirModalGrabaciones();
         });
 
     $(document)
