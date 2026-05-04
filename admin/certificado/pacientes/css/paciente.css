@@ -1,0 +1,18 @@
+    #paciente-manual .campo-requerido-manual.is-invalid,
+    #paciente-manual .form-control.is-invalid,
+    #paciente-manual .form-select.is-invalid,
+    #paciente-manual .select2-selection.is-invalid {
+        border-color: #dc3545 !important;
+    }
+
+    #paciente-manual .invalid-feedback-manual {
+        display: none;
+        width: 100%;
+        margin-top: .25rem;
+        font-size: .875em;
+        color: #dc3545;
+    }
+
+    #paciente-manual .invalid-feedback-manual.d-block {
+        display: block;
+    }

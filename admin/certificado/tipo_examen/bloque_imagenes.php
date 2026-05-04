@@ -2,25 +2,9 @@
 // admin/certificado/tipo_examen/bloque_imagenes.php
 ?>
 <style>
-    #imagenesPreview {
-        display: grid;
-        grid-template-columns: repeat(2, 1fr);
-        gap: 8px;
-        max-height: 400px;
-        overflow-y: auto;
-        padding: 8px;
-    }
 
-    #imagenesPreview img {
-        width: 100%;
-        height: auto;
-        object-fit: contain;
-        border-radius: 8px;
-        border: 1px solid #ddd;
-        display: block;
-    }
 </style>
-
+<link rel="stylesheet" href="certificado/tipo_examen/css/imagenes.css?v=1">
 <div id="imagenesColumna" style="display:none;">
     <div class="d-flex justify-content-between align-items-center mb-2 gap-2 flex-wrap">
         <label for="columnasImagenes" class="form-label fw-bold mb-0">Imágenes</label>

@@ -6,27 +6,6 @@ function manual_value(array $data, string $key): string {
     return htmlspecialchars((string)($data[$key] ?? ''), ENT_QUOTES, 'UTF-8');
 }
 ?>
-<style>
-    #paciente-manual .campo-requerido-manual.is-invalid,
-    #paciente-manual .form-control.is-invalid,
-    #paciente-manual .form-select.is-invalid,
-    #paciente-manual .select2-selection.is-invalid {
-        border-color: #dc3545 !important;
-    }
-
-    #paciente-manual .invalid-feedback-manual {
-        display: none;
-        width: 100%;
-        margin-top: .25rem;
-        font-size: .875em;
-        color: #dc3545;
-    }
-
-    #paciente-manual .invalid-feedback-manual.d-block {
-        display: block;
-    }
-</style>
-
 <div id="paciente-manual" class="my-3 border rounded p-3 bg-light" style="<?= $toggleManualInitial ? '' : 'display:none;' ?>">
     <div class="d-flex justify-content-between align-items-center mb-3">
         <h5 class="fw-bold mb-0">Ingreso Manual</h5>

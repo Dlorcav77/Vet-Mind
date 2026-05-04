@@ -1,0 +1,133 @@
+  .cert-header-top {
+        display: flex;
+        flex-direction: column;
+        gap: .75rem;
+    }
+
+    .cert-title-row {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 1rem;
+        flex-wrap: wrap;
+    }
+
+    .cert-title-wrap {
+        display: flex;
+        align-items: center;
+        gap: .75rem;
+        flex-wrap: wrap;
+    }
+
+    .draft-badge-status {
+        display: inline-flex;
+        align-items: center;
+        gap: .35rem;
+        padding: .28rem .58rem;
+        border-radius: 999px;
+        font-size: .78rem;
+        font-weight: 600;
+        line-height: 1;
+        border: 1px solid transparent;
+        transition: all .2s ease;
+        white-space: nowrap;
+    }
+
+    .draft-badge-status .draft-dot {
+        width: 7px;
+        height: 7px;
+        border-radius: 50%;
+        display: inline-block;
+        flex: 0 0 7px;
+    }
+
+    .draft-badge-trash {
+        border: 0;
+        background: transparent;
+        padding: 0;
+        margin-left: .15rem;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        color: #dc3545;
+        opacity: .9;
+        cursor: pointer;
+        line-height: 1;
+        font-size: .72rem;
+    }
+
+    .draft-badge-trash:hover {
+        color: #bb2d3b;
+        opacity: 1;
+        transform: scale(1.08);
+    }
+
+    .draft-badge-trash:focus {
+        outline: none;
+        box-shadow: none;
+        color: #bb2d3b;
+    }
+
+    .draft-badge-status.is-idle {
+        background: #f8f9fa;
+        color: #6c757d;
+        border-color: #dee2e6;
+    }
+
+    .draft-badge-status.is-idle .draft-dot {
+        background: #adb5bd;
+    }
+
+    .draft-badge-status.is-saving {
+        background: #fff3cd;
+        color: #856404;
+        border-color: #ffe69c;
+    }
+
+    .draft-badge-status.is-saving .draft-dot {
+        background: #f0ad4e;
+        box-shadow: 0 0 0 0 rgba(240, 173, 78, .55);
+        animation: draftPulse 1.2s infinite;
+    }
+
+    .draft-badge-status.is-saved {
+        background: #d1e7dd;
+        color: #0f5132;
+        border-color: #badbcc;
+    }
+
+    .draft-badge-status.is-saved .draft-dot {
+        background: #198754;
+    }
+
+    .draft-badge-status.is-error {
+        background: #f8d7da;
+        color: #842029;
+        border-color: #f1aeb5;
+    }
+
+    .draft-badge-status.is-error .draft-dot {
+        background: #dc3545;
+    }
+
+    @keyframes draftPulse {
+        0% {
+            box-shadow: 0 0 0 0 rgba(240, 173, 78, .55);
+        }
+        70% {
+            box-shadow: 0 0 0 8px rgba(240, 173, 78, 0);
+        }
+        100% {
+            box-shadow: 0 0 0 0 rgba(240, 173, 78, 0);
+        }
+    }
+
+    @media (max-width: 768px) {
+        .cert-title-row {
+            align-items: flex-start;
+        }
+
+        .cert-title-wrap {
+            width: 100%;
+        }
+    }

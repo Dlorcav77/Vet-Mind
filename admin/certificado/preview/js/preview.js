@@ -1,4 +1,7 @@
+// admin/certificado/preview/js/preview.js
 window.ultimoTriggerVistaPrevia = window.ultimoTriggerVistaPrevia || null;
+window.nombreTempPDF = window.nombreTempPDF || null;
+window.imagenesTempPreview = window.imagenesTempPreview || [];
 
 $('#btnVistaPrevia')
     .off('mousedown.storeTriggerVista focus.storeTriggerVista')
@@ -60,6 +63,9 @@ $('#btnVistaPrevia').off('click.vistaPrevia').on('click.vistaPrevia', function (
         return;
     }
 
+    window.nombreTempPDF = null;
+    window.imagenesTempPreview = [];
+
     let form = $('form')[0];
     let formData = new FormData(form);
 
@@ -76,11 +82,23 @@ $('#btnVistaPrevia').off('click.vistaPrevia').on('click.vistaPrevia', function (
         data: formData,
         processData: false,
         contentType: false,
-        success: function (pdfUrl) {
+        dataType: 'json',
+        success: function (data) {
             Swal.close();
-            $('#contenidoVistaPrevia').html('<iframe src="' + pdfUrl + '" style="width:100%;height:80vh;border:none;"></iframe>');
+
+            if (!data || data.status !== 'success' || !data.pdfUrl) {
+                Swal.fire('Error', data?.message || 'No se pudo generar la vista previa del PDF.', 'error');
+                return;
+            }
+
+            $('#contenidoVistaPrevia').html(
+                '<iframe src="' + data.pdfUrl + '" style="width:100%;height:80vh;border:none;"></iframe>'
+            );
+
             $('#modalVistaPrevia').modal('show');
-            window.nombreTempPDF = pdfUrl.split('/').pop();
+
+            window.nombreTempPDF = data.pdf || data.pdfUrl.split('/').pop();
+            window.imagenesTempPreview = Array.isArray(data.imagenesTemporales) ? data.imagenesTemporales : [];
         },
         error: function (xhr) {
             Swal.close();
@@ -89,7 +107,10 @@ $('#btnVistaPrevia').off('click.vistaPrevia').on('click.vistaPrevia', function (
             console.error('previewPDF responseText:', xhr.responseText);
 
             let msg = 'No se pudo generar la vista previa del PDF.';
-            if (xhr && xhr.responseText) {
+
+            if (xhr && xhr.responseJSON && xhr.responseJSON.message) {
+                msg += '\n' + xhr.responseJSON.message;
+            } else if (xhr && xhr.responseText) {
                 msg += '\n' + xhr.responseText;
             }
 
@@ -102,11 +123,13 @@ $('#modalVistaPrevia')
     .off('hide.bs.modal.storeTriggerVista')
     .on('hide.bs.modal.storeTriggerVista', function () {
         const activo = document.activeElement;
+
         if (activo && this.contains(activo)) {
             activo.blur();
         }
 
         const destino = window.ultimoTriggerVistaPrevia || document.getElementById('btnVistaPrevia');
+
         setTimeout(function () {
             if (destino && typeof destino.focus === 'function') {
                 destino.focus();
@@ -118,17 +141,24 @@ $('#modalVistaPrevia')
 $('#modalVistaPrevia')
     .off('hidden.bs.modal.storeTriggerVista')
     .on('hidden.bs.modal.storeTriggerVista', function () {
-        if (window.nombreTempPDF) {
-            $.ajax({
-                url: 'certificado/tipo_examen/eliminar_temp_pdf.php',
-                type: 'POST',
-                data: { pdf: window.nombreTempPDF },
-                success: function () {
-                    window.nombreTempPDF = null;
-                },
-                error: function () {
-                    console.error('Error al eliminar PDF temporal');
-                }
-            });
+        if (!window.nombreTempPDF) {
+            return;
         }
+
+        $.ajax({
+            url: 'certificado/tipo_examen/eliminar_temp_pdf.php',
+            type: 'POST',
+            dataType: 'json',
+            data: {
+                pdf: window.nombreTempPDF,
+                imagenes: JSON.stringify(window.imagenesTempPreview || [])
+            },
+            success: function () {
+                window.nombreTempPDF = null;
+                window.imagenesTempPreview = [];
+            },
+            error: function () {
+                console.error('Error al eliminar temporales de vista previa');
+            }
+        });
     });

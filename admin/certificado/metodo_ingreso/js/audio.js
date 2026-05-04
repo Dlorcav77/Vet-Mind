@@ -1,3 +1,5 @@
+//admin/certificado/metodo_ingreso/js/audio.js
+
 window.canvas = document.getElementById('recorderWave');
 window.ctx = window.canvas ? window.canvas.getContext('2d') : null;
 window.audioCtx = null;
@@ -101,12 +103,16 @@ $('#subir-tab').on('shown.bs.tab', () => {
                         if (data.status === 'success') {
                             $('#recordingStatus').html('✅ <strong>Grabación guardada</strong>');
                             $('#audioPlayback').attr('src', data.audio_url).show();
+
                             $('#audioInfo').html(`
                                 <div class="mt-0">
                                     <button class="btn btn-sm btn-danger ms-2" onclick="deleteRecording()">🗑 Eliminar</button>
                                 </div>
                             `);
-                            $('#bloque-audio').data('audioFilename', data.filename);
+
+                            $('#audio_tmp').val(data.audio_tmp || '');
+                            $('#bloque-audio').data('audioFilename', data.filename || '');
+                            $('#bloque-audio').data('audioTmp', data.audio_tmp || '');
                         } else {
                             Swal.fire('Error', data.message, 'error');
                         }
@@ -191,7 +197,10 @@ $('#subir-tab').on('shown.bs.tab', () => {
         $('#audioPlayback').hide().attr('src', '');
         $('#audioInfo').html('');
         $('#recordingStatus').html('🎤 <span class="text-muted">Listo para grabar</span>');
+
+        $('#audio_tmp').val('');
         $('#bloque-audio').removeData('audioFilename');
+        $('#bloque-audio').removeData('audioTmp');
     };
 })();
 
