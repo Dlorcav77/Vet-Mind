@@ -1,3 +1,4 @@
+//admin/certificado/metodo_ingreso/js/ia.js
 function obtenerDatosPaciente() {
     const esManual = $('#toggle_manual').prop('checked');
     const datos = {};
@@ -170,9 +171,10 @@ $('#procesarIA').on('click', function () {
     }
 
     let audioFile = $('input[name="archivo_audio"]')[0].files[0];
+    let audioTmp = ($('#audio_tmp').val() || '').trim();
     let audioFilename = $('#bloque-audio').data('audioFilename');
 
-    if (!audioFile && !audioFilename) {
+    if (!audioFile && !audioTmp && !audioFilename) {
         Swal.fire('Error', 'Debes subir o grabar un audio antes de procesar.', 'warning');
         $btnProcesar.prop('disabled', false);
         return;
@@ -187,8 +189,11 @@ $('#procesarIA').on('click', function () {
     });
 
     let formData = new FormData();
+
     if (audioFile) {
         formData.append('audio', audioFile);
+    } else if (audioTmp) {
+        formData.append('audio_tmp', audioTmp);
     } else {
         formData.append('audio_filename', audioFilename);
     }
@@ -205,6 +210,12 @@ $('#procesarIA').on('click', function () {
     .then(resp => {
         if (resp.status !== 'success') {
             throw new Error(resp.message || 'Error al transcribir.');
+        }
+
+        if (resp.audio_tmp) {
+            $('#audio_tmp').val(resp.audio_tmp);
+            $('#bloque-audio').data('audioTmp', resp.audio_tmp);
+            $('#bloque-audio').data('audioFilename', resp.audio_tmp.split('/').pop());
         }
 
         const textoTranscrito = (resp.texto || '').trim();
