@@ -3,7 +3,7 @@
 (function () {
     let tablaAlmacenamiento = null;
     let gruposOriginales = [];
-    let grabacionesOriginales = [];
+    let audiosOriginales = [];
 
     function escapeHtml(value) {
         return String(value ?? '')
@@ -64,6 +64,11 @@
             + '  <i class="fas fa-images"></i>'
             + '</button>';
 
+        html += ''
+            + '<button type="button" class="btn btn-outline-warning btn-alm-audios" data-grupo-key="' + key + '" title="Ver audios" ' + ((grupo.audio_total || grupo.audios_total || 0) <= 0 ? 'disabled' : '') + '>'
+            + '  <i class="fas fa-volume-up"></i>'
+            + '</button>';
+
         html += '</div>';
 
         return html;
@@ -79,13 +84,13 @@
         $('#almTotalImagenes').text(resumen.imagenes_total || 0);
         $('#almPesoImagenes').text(resumen.imagenes_label || '0 B');
 
-        $('#almTotalGrabaciones').text(resumen.grabaciones_total || 0);
-        $('#almPesoGrabaciones').text(resumen.grabaciones_label || '0 B');
+        $('#almTotalGrabaciones').text(resumen.audios_total || resumen.grabaciones_total || 0);
+        $('#almPesoGrabaciones').text(resumen.audios_label || resumen.grabaciones_label || '0 B');
 
         $('#almTotalGrupos').text(resumen.total_grupos || 0);
         $('#almTotalFaltantes').text((resumen.faltantes_total || 0) + ' faltantes');
 
-        $('#btnVerGrabaciones').prop('disabled', parseInt(resumen.grabaciones_total || 0, 10) <= 0);
+        $('#btnVerGrabaciones').prop('disabled', parseInt(resumen.audios_total || resumen.grabaciones_total || 0, 10) <= 0);
     }
 
     function aplicarFiltros() {
@@ -188,7 +193,7 @@
                 }
 
                 gruposOriginales = response.grupos || [];
-                grabacionesOriginales = response.grabaciones || [];
+                audiosOriginales = response.audios || response.grabaciones || [];
 
                 pintarResumen(response.resumen || {});
                 aplicarFiltros();
@@ -380,13 +385,61 @@
         $body.empty();
 
         $('#modalAlmGrabacionesSubtitulo').text(
-            (grabacionesOriginales.length || 0) + ' grabación(es) detectada(s)'
+            (audiosOriginales.length || 0) + ' audio(s) detectado(s)'
         );
 
-        if (!grabacionesOriginales.length) {
-            $body.html('<tr><td colspan="5" class="text-center text-muted">Sin grabaciones detectadas.</td></tr>');
+        if (!audiosOriginales.length) {
+            $body.html('<tr><td colspan="5" class="text-center text-muted">Sin audios detectados.</td></tr>');
         } else {
-            grabacionesOriginales.forEach(function (audio) {
+            audiosOriginales.forEach(function (audio) {
+                let acciones = '';
+
+                acciones += ''
+                    + '<a href="' + escapeHtml(audio.url_ver) + '" target="_blank" class="btn btn-outline-primary btn-sm me-1" title="Abrir audio">'
+                    + '  <i class="fas fa-play"></i>'
+                    + '</a>';
+
+                acciones += ''
+                    + '<a href="' + escapeHtml(audio.url_descargar) + '" target="_blank" class="btn btn-outline-secondary btn-sm me-1" title="Descargar audio">'
+                    + '  <i class="fas fa-download"></i>'
+                    + '</a>';
+
+                $body.append(
+                    '<tr>'
+                    + '<td>' + escapeHtml(audio.fecha_archivo || '-') + '</td>'
+                    + '<td>' + escapeHtml(audio.nombre || '-') + '</td>'
+                    + '<td><span title="' + escapeHtml(audio.ruta || '') + '">' + escapeHtml(audio.ruta || '-') + '</span></td>'
+                    + '<td>' + escapeHtml(audio.size_label || '0 B') + '</td>'
+                    + '<td>' + acciones + '</td>'
+                    + '</tr>'
+                );
+            });
+        }
+
+        const modal = new bootstrap.Modal(document.getElementById('modalAlmGrabaciones'));
+        modal.show();
+    }
+
+    function abrirModalAudiosGrupo(grupoKey) {
+        const grupo = getGrupoByKey(grupoKey);
+
+        if (!grupo) {
+            return;
+        }
+
+        const audios = grupo.audios || grupo.grabaciones || [];
+
+        const $body = $('#modalAlmGrabacionesBody');
+        $body.empty();
+
+        $('#modalAlmGrabacionesSubtitulo').text(
+            grupo.paciente + ' / ' + grupo.propietario + ' — ' + (audios.length || 0) + ' audio(s)'
+        );
+
+        if (!audios.length) {
+            $body.html('<tr><td colspan="5" class="text-center text-muted">Sin audios asociados.</td></tr>');
+        } else {
+            audios.forEach(function (audio) {
                 let acciones = '';
 
                 acciones += ''
@@ -443,6 +496,12 @@
         .off('click.almImagenes', '.btn-alm-imagenes')
         .on('click.almImagenes', '.btn-alm-imagenes', function () {
             abrirModalImagenes($(this).data('grupo-key'));
+        });
+
+    $(document)
+        .off('click.almAudios', '.btn-alm-audios')
+        .on('click.almAudios', '.btn-alm-audios', function () {
+            abrirModalAudiosGrupo($(this).data('grupo-key'));
         });
 
     $(document)

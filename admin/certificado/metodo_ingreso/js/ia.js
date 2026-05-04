@@ -212,6 +212,12 @@ $('#procesarIA').on('click', function () {
             throw new Error(resp.message || 'Error al transcribir.');
         }
 
+        if (resp.audio_tmp) {
+            $('#audio_tmp').val(resp.audio_tmp);
+            $('#bloque-audio').data('audioTmp', resp.audio_tmp);
+            $('#bloque-audio').data('audioFilename', resp.audio_tmp.split('/').pop());
+        }
+
         const textoTranscrito = (resp.texto || '').trim();
         if (!textoTranscrito) {
             throw new Error('La transcripción volvió vacía.');

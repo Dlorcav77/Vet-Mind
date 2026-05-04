@@ -104,7 +104,8 @@ function guardarAudioSubidoParaTranscripcion($rootDir, $userId)
         return [
             'status' => 'error',
             'message' => 'No se recibió ningún archivo de audio válido.',
-            'path' => ''
+            'path' => '',
+            'audio_tmp' => ''
         ];
     }
 
@@ -123,7 +124,8 @@ function guardarAudioSubidoParaTranscripcion($rootDir, $userId)
         return [
             'status' => 'error',
             'message' => 'Archivo demasiado grande (máx 25 MB).',
-            'path' => ''
+            'path' => '',
+            'audio_tmp' => ''
         ];
     }
 
@@ -146,7 +148,8 @@ function guardarAudioSubidoParaTranscripcion($rootDir, $userId)
             return [
                 'status' => 'error',
                 'message' => 'No se pudo crear la carpeta temporal de audio.',
-                'path' => ''
+                'path' => '',
+                'audio_tmp' => ''
             ];
         }
     }
@@ -155,27 +158,69 @@ function guardarAudioSubidoParaTranscripcion($rootDir, $userId)
     $day = $now->format('d');
     $hmsms = $now->format('Hisv');
 
-    $nombreArchivo = 'tmp_audio_upload_' . (int)$userId . '_' . $day . '_' . $hmsms . '_' . bin2hex(random_bytes(4)) . '.' . $originalExt;
-    $destino = $baseTmp . '/' . $nombreArchivo;
+    $nombreOriginalTemporal = 'tmp_audio_original_' . (int)$userId . '_' . $day . '_' . $hmsms . '_' . bin2hex(random_bytes(4)) . '.' . $originalExt;
+    $rutaOriginalTemporal = $baseTmp . '/' . $nombreOriginalTemporal;
 
-    if (!move_uploaded_file($tmpFile, $destino)) {
+    $nombreConvertido = 'tmp_audio_' . (int)$userId . '_' . $day . '_' . $hmsms . '_' . bin2hex(random_bytes(4)) . '.wav';
+    $rutaConvertida = $baseTmp . '/' . $nombreConvertido;
+
+    if (!move_uploaded_file($tmpFile, $rutaOriginalTemporal)) {
         return [
             'status' => 'error',
             'message' => 'No se pudo guardar el archivo de audio temporal.',
-            'path' => ''
+            'path' => '',
+            'audio_tmp' => ''
         ];
     }
 
-    @chmod($destino, 0644);
+    $ffmpegPath = trim(shell_exec('command -v ffmpeg 2>/dev/null') ?? '');
+
+    if ($ffmpegPath === '') {
+        @unlink($rutaOriginalTemporal);
+
+        return [
+            'status' => 'error',
+            'message' => 'FFmpeg no está instalado o no está en $PATH.',
+            'path' => '',
+            'audio_tmp' => ''
+        ];
+    }
+
+    $cmd = escapeshellarg($ffmpegPath) . " -nostdin -hide_banner -loglevel error -y " .
+        "-i " . escapeshellarg($rutaOriginalTemporal) . " " .
+        "-vn -sn -dn -map a:0 " .
+        "-ar 16000 -ac 1 -c:a pcm_s16le " .
+        escapeshellarg($rutaConvertida) . " 2>&1";
+
+    exec($cmd, $output, $returnVar);
+
+    @unlink($rutaOriginalTemporal);
+
+    if ($returnVar !== 0) {
+        @unlink($rutaConvertida);
+
+        return [
+            'status' => 'error',
+            'message' => 'Error al convertir el audio subido a WAV.',
+            'path' => '',
+            'audio_tmp' => ''
+        ];
+    }
+
+    @chmod($rutaConvertida, 0644);
+
+    $audioTmp = 'uploads/tmp/audio/' . $nombreConvertido;
 
     return [
         'status' => 'success',
         'message' => 'Audio subido temporalmente.',
-        'path' => $destino
+        'path' => $rutaConvertida,
+        'audio_tmp' => $audioTmp
     ];
 }
 
 $audioPath = '';
+$audioTmpRespuesta = '';
 
 if (isset($_FILES['audio'])) {
     $resultadoUpload = guardarAudioSubidoParaTranscripcion($ROOT_DIR, $userId);
@@ -189,12 +234,16 @@ if (isset($_FILES['audio'])) {
     }
 
     $audioPath = $resultadoUpload['path'];
+    $audioTmpRespuesta = $resultadoUpload['audio_tmp'] ?? '';
 } elseif (!empty($_POST['audio_tmp'])) {
-    $audioPath = resolverAudioTmpFisico($ROOT_DIR, $_POST['audio_tmp'], $userId);
+    $audioTmpRespuesta = trim((string)$_POST['audio_tmp']);
+    $audioPath = resolverAudioTmpFisico($ROOT_DIR, $audioTmpRespuesta, $userId);
 } elseif (!empty($_POST['audio_url'])) {
-    $audioPath = resolverAudioTmpFisico($ROOT_DIR, $_POST['audio_url'], $userId);
+    $audioTmpRespuesta = trim((string)$_POST['audio_url']);
+    $audioPath = resolverAudioTmpFisico($ROOT_DIR, $audioTmpRespuesta, $userId);
 } elseif (!empty($_POST['audio_filename'])) {
-    $audioPath = resolverAudioTmpFisico($ROOT_DIR, 'uploads/tmp/audio/' . basename((string)$_POST['audio_filename']), $userId);
+    $audioTmpRespuesta = 'uploads/tmp/audio/' . basename((string)$_POST['audio_filename']);
+    $audioPath = resolverAudioTmpFisico($ROOT_DIR, $audioTmpRespuesta, $userId);
 }
 
 if (!$audioPath || !file_exists($audioPath)) {
@@ -322,6 +371,7 @@ if (!$text) {
 
 echo json_encode([
     'status' => 'success',
-    'texto' => $text
+    'texto' => $text,
+    'audio_tmp' => $audioTmpRespuesta
 ], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
 exit;

@@ -213,7 +213,7 @@ $usuarioActual = (int)($usuario_id ?? ($_SESSION['usuario_id'] ?? 0));
         <div class="alm-kpi-icon">
           <i class="fas fa-microphone-alt"></i>
         </div>
-        <div class="alm-kpi-label">Grabaciones</div>
+        <div class="alm-kpi-label">Audios</div>
         <div class="alm-kpi-value" id="almTotalGrabaciones">-</div>
         <div class="alm-kpi-sub" id="almPesoGrabaciones">-</div>
       </div>
@@ -238,9 +238,6 @@ $usuarioActual = (int)($usuario_id ?? ($_SESSION['usuario_id'] ?? 0));
           <h5 class="mb-1 fw-bold text-primary">
             <i class="fas fa-folder-open me-2"></i>Archivos agrupados
           </h5>
-          <div class="text-muted small">
-            Información obtenida desde <code>certificados.archivo_pdf</code> e <code>certificados.imagenes_json</code>.
-          </div>
         </div>
 
         <div class="d-flex gap-2 flex-wrap">
@@ -252,7 +249,7 @@ $usuarioActual = (int)($usuario_id ?? ($_SESSION['usuario_id'] ?? 0));
           </select>
 
           <button type="button" id="btnVerGrabaciones" class="btn btn-outline-success btn-sm">
-            <i class="fas fa-microphone-alt me-1"></i> Grabaciones
+            <i class="fas fa-microphone-alt me-1"></i> Audios
           </button>
 
           <button type="button" id="btnRecargarAlmacenamiento" class="btn btn-outline-primary btn-sm">
@@ -352,7 +349,7 @@ $usuarioActual = (int)($usuario_id ?? ($_SESSION['usuario_id'] ?? 0));
       <div class="modal-header">
         <div>
           <h5 class="modal-title mb-0">
-            <i class="fas fa-microphone-alt text-success me-2"></i>Grabaciones del usuario
+            <i class="fas fa-microphone-alt text-success me-2"></i>Audios del usuario
           </h5>
           <div class="small text-muted" id="modalAlmGrabacionesSubtitulo"></div>
         </div>
@@ -361,7 +358,6 @@ $usuarioActual = (int)($usuario_id ?? ($_SESSION['usuario_id'] ?? 0));
 
       <div class="modal-body">
         <div class="alert alert-info small mb-3">
-          Estas grabaciones se detectan por nombre de archivo asociado al usuario. Por ahora no están agrupadas por paciente o informe.
         </div>
 
         <div class="table-responsive">
@@ -427,4 +423,4 @@ $usuarioActual = (int)($usuario_id ?? ($_SESSION['usuario_id'] ?? 0));
   window.ALMACENAMIENTO_USUARIO_ID = <?= (int)$usuarioActual ?>;
 </script>
 
-<script src="almacenamiento/js/almacenamiento.js?v=4"></script>
+<script src="almacenamiento/js/almacenamiento.js?v=5"></script>

@@ -113,6 +113,37 @@ function alm_info_archivo(string $ruta): array
     return $info;
 }
 
+function alm_parse_audio_certificado(string $nombreArchivo, int $usuarioId): array
+{
+    $nombreArchivo = basename(trim($nombreArchivo));
+
+    $resultado = [
+        'ok' => false,
+        'usuario_id' => 0,
+        'certificado_id' => 0
+    ];
+
+    if ($nombreArchivo === '') {
+        return $resultado;
+    }
+
+    if (strtolower(pathinfo($nombreArchivo, PATHINFO_EXTENSION)) !== 'wav') {
+        return $resultado;
+    }
+
+    $pattern = '/^' . preg_quote((string)$usuarioId, '/') . '_(\d+)_(\d{2})_(\d{6,})\.wav$/';
+
+    if (!preg_match($pattern, $nombreArchivo, $matches)) {
+        return $resultado;
+    }
+
+    $resultado['ok'] = true;
+    $resultado['usuario_id'] = $usuarioId;
+    $resultado['certificado_id'] = (int)$matches[1];
+
+    return $resultado;
+}
+
 function alm_listar_grabaciones_usuario(string $baseProyecto, int $usuarioId): array
 {
     $baseGrabaciones = $baseProyecto . '/uploads/certificados/audio';
@@ -138,12 +169,9 @@ function alm_listar_grabaciones_usuario(string $baseProyecto, int $usuarioId): a
         }
 
         $nombre = $fileInfo->getFilename();
+        $audioInfo = alm_parse_audio_certificado($nombre, $usuarioId);
 
-        $esDelUsuario =
-            strpos($nombre, $usuarioId . '_') === 0 ||
-            strpos($nombre, 'upload_' . $usuarioId . '_') === 0;
-
-        if (!$esDelUsuario) {
+        if (empty($audioInfo['ok'])) {
             continue;
         }
 
@@ -157,6 +185,8 @@ function alm_listar_grabaciones_usuario(string $baseProyecto, int $usuarioId): a
         $resultado['bytes'] += $size;
 
         $resultado['items'][] = [
+            'certificado_id' => (int)$audioInfo['certificado_id'],
+            'tipo' => 'Audio',
             'nombre' => $nombre,
             'ruta' => $rutaRelativa,
             'url_ver' => '../' . $rutaRelativa,
@@ -225,6 +255,7 @@ $stmt->execute();
 $res = $stmt->get_result();
 
 $grupos = [];
+$certificadoGrupoMap = [];
 
 $resumen = [
     'total_grupos' => 0,
@@ -235,6 +266,8 @@ $resumen = [
     'pdf_bytes' => 0,
     'imagenes_total' => 0,
     'imagenes_bytes' => 0,
+    'audios_total' => 0,
+    'audios_bytes' => 0,
     'grabaciones_total' => 0,
     'grabaciones_bytes' => 0,
     'faltantes_total' => 0
@@ -286,34 +319,44 @@ while ($row = $res->fetch_assoc()) {
     }
 
     if (!isset($grupos[$grupoKey])) {
-      $grupos[$grupoKey] = [
-          'grupo_key' => $grupoKey,
-          'paciente_id' => $pacienteId,
-          'paciente' => $paciente,
-          'propietario' => $propietario,
+        $grupos[$grupoKey] = [
+            'grupo_key' => $grupoKey,
+            'paciente_id' => $pacienteId,
+            'paciente' => $paciente,
+            'propietario' => $propietario,
 
-          'ultimo_certificado_id' => 0,
-          'ultima_fecha' => '',
-          'ultima_fecha_label' => '-',
-          'ultima_fecha_sort' => '',
+            'ultimo_certificado_id' => 0,
+            'ultima_fecha' => '',
+            'ultima_fecha_label' => '-',
+            'ultima_fecha_sort' => '',
 
-          'informes_total' => 0,
-          'pdf_total' => 0,
-          'pdf_bytes' => 0,
-          'pdf_label' => '0 B',
-          'imagenes_total' => 0,
-          'imagenes_bytes' => 0,
-          'imagenes_label' => '0 B',
-          'total_archivos' => 0,
-          'total_bytes' => 0,
-          'total_label' => '0 B',
-          'faltantes_total' => 0,
+            'informes_total' => 0,
+            'pdf_total' => 0,
+            'pdf_bytes' => 0,
+            'pdf_label' => '0 B',
+            'imagenes_total' => 0,
+            'imagenes_bytes' => 0,
+            'imagenes_label' => '0 B',
+            'audio_total' => 0,
+            'audio_bytes' => 0,
+            'audio_label' => '0 B',
+            'grabaciones_total' => 0,
+            'grabaciones_bytes' => 0,
+            'grabaciones_label' => '0 B',
+            'total_archivos' => 0,
+            'total_bytes' => 0,
+            'total_label' => '0 B',
+            'faltantes_total' => 0,
 
-          'informes' => [],
-          'pdfs' => [],
-          'imagenes' => []
-      ];
+            'informes' => [],
+            'pdfs' => [],
+            'imagenes' => [],
+            'audios' => [],
+            'grabaciones' => []
+        ];
     }
+
+    $certificadoGrupoMap[$certificadoId] = $grupoKey;
 
     $urlInforme = ((string)$row['tipo_ingreso'] === 'manual')
         ? 'certificado/subir_informe/subir_informe.php?action=modificar&id=' . $certificadoId
@@ -440,9 +483,71 @@ while ($row = $res->fetch_assoc()) {
     }
 }
 
+$grabacionesUsuario = alm_listar_grabaciones_usuario($baseProyecto, $usuarioActual);
+
+foreach ($grabacionesUsuario['items'] as $audioItem) {
+    $audioCertId = (int)($audioItem['certificado_id'] ?? 0);
+
+    if ($audioCertId <= 0 || !isset($certificadoGrupoMap[$audioCertId])) {
+        continue;
+    }
+
+    $grupoKeyAudio = $certificadoGrupoMap[$audioCertId];
+
+    if (!isset($grupos[$grupoKeyAudio])) {
+        continue;
+    }
+
+    if (!isset($grupos[$grupoKeyAudio]['audios'])) {
+        $grupos[$grupoKeyAudio]['audios'] = [];
+    }
+
+    if (!isset($grupos[$grupoKeyAudio]['grabaciones'])) {
+        $grupos[$grupoKeyAudio]['grabaciones'] = [];
+    }
+
+    $grupos[$grupoKeyAudio]['audios'][] = $audioItem;
+    $grupos[$grupoKeyAudio]['grabaciones'][] = $audioItem;
+
+    $grupos[$grupoKeyAudio]['audio_total'] = (int)($grupos[$grupoKeyAudio]['audio_total'] ?? 0) + 1;
+    $grupos[$grupoKeyAudio]['audio_bytes'] = (int)($grupos[$grupoKeyAudio]['audio_bytes'] ?? 0) + (int)$audioItem['size_bytes'];
+
+    $grupos[$grupoKeyAudio]['grabaciones_total'] = (int)($grupos[$grupoKeyAudio]['grabaciones_total'] ?? 0) + 1;
+    $grupos[$grupoKeyAudio]['grabaciones_bytes'] = (int)($grupos[$grupoKeyAudio]['grabaciones_bytes'] ?? 0) + (int)$audioItem['size_bytes'];
+
+    $grupos[$grupoKeyAudio]['total_archivos'] = (int)($grupos[$grupoKeyAudio]['total_archivos'] ?? 0) + 1;
+    $grupos[$grupoKeyAudio]['total_bytes'] = (int)($grupos[$grupoKeyAudio]['total_bytes'] ?? 0) + (int)$audioItem['size_bytes'];
+
+    $resumen['audios_total']++;
+    $resumen['audios_bytes'] += (int)$audioItem['size_bytes'];
+
+    $resumen['grabaciones_total']++;
+    $resumen['grabaciones_bytes'] += (int)$audioItem['size_bytes'];
+
+    $resumen['total_archivos']++;
+    $resumen['total_bytes'] += (int)$audioItem['size_bytes'];
+}
+
 foreach ($grupos as &$grupo) {
     $grupo['pdf_label'] = alm_formatear_bytes((int)$grupo['pdf_bytes']);
     $grupo['imagenes_label'] = alm_formatear_bytes((int)$grupo['imagenes_bytes']);
+
+    $grupo['audio_total'] = (int)($grupo['audio_total'] ?? 0);
+    $grupo['audio_bytes'] = (int)($grupo['audio_bytes'] ?? 0);
+    $grupo['audio_label'] = alm_formatear_bytes((int)$grupo['audio_bytes']);
+
+    $grupo['grabaciones_total'] = (int)($grupo['grabaciones_total'] ?? 0);
+    $grupo['grabaciones_bytes'] = (int)($grupo['grabaciones_bytes'] ?? 0);
+    $grupo['grabaciones_label'] = alm_formatear_bytes((int)$grupo['grabaciones_bytes']);
+
+    if (!isset($grupo['audios'])) {
+        $grupo['audios'] = [];
+    }
+
+    if (!isset($grupo['grabaciones'])) {
+        $grupo['grabaciones'] = [];
+    }
+
     $grupo['total_label'] = alm_formatear_bytes((int)$grupo['total_bytes']);
 }
 
@@ -460,14 +565,8 @@ usort($grupos, function ($a, $b) {
     return ((int)$b['ultimo_certificado_id']) <=> ((int)$a['ultimo_certificado_id']);
 });
 
-$grabacionesUsuario = alm_listar_grabaciones_usuario($baseProyecto, $usuarioActual);
-
-$resumen['grabaciones_total'] = (int)$grabacionesUsuario['total'];
-$resumen['grabaciones_bytes'] = (int)$grabacionesUsuario['bytes'];
-$resumen['grabaciones_label'] = $grabacionesUsuario['label'];
-
-$resumen['total_bytes'] += (int)$grabacionesUsuario['bytes'];
-$resumen['total_archivos'] += (int)$grabacionesUsuario['total'];
+$resumen['audios_label'] = alm_formatear_bytes((int)$resumen['audios_bytes']);
+$resumen['grabaciones_label'] = alm_formatear_bytes((int)$resumen['grabaciones_bytes']);
 
 $resumen['total_grupos'] = count($grupos);
 $resumen['total_label'] = alm_formatear_bytes((int)$resumen['total_bytes']);
@@ -479,5 +578,6 @@ alm_json_out([
     'modo' => 'agrupado',
     'resumen' => $resumen,
     'grupos' => $grupos,
+    'audios' => $grabacionesUsuario['items'],
     'grabaciones' => $grabacionesUsuario['items']
 ]);
