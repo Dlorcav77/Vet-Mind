@@ -6,3 +6,4 @@ configP.php
 .idea/
 /.vscode/
 /*.log
+/funciones/logs/*.jsonl
