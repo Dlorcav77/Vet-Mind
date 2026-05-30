@@ -44,7 +44,7 @@ $stmt->close();
 $contenidoPlantilla = isset($fila['contenido']) ? (string)$fila['contenido'] : '';
 ?>
 
-<link rel="stylesheet" href="plantilla_informe/css/plantillaInforme.css?v=3">
+<link rel="stylesheet" href="plantilla_informe/css/plantillaInforme.css?v=<?= time(); ?>">
 
 <div class="card" id="plantilla_informe" data-page-id="plantilla_informe">
     <div class="card-header">
@@ -124,6 +124,15 @@ $contenidoPlantilla = isset($fila['contenido']) ? (string)$fila['contenido'] : '
                                             <option value="2.5">2.5</option>
                                             <option value="3">3</option>
                                         </select>
+                                        <div class="vm-color-control" title="Color de texto">
+                                            <input
+                                                type="color"
+                                                id="contenido_text_color"
+                                                class="vm-color-input"
+                                                value="#000000"
+                                                aria-label="Color de texto"
+                                            >
+                                        </div>
                                     </div>
 
                                     <div class="vm-toolbar-divider"></div>
@@ -211,6 +220,15 @@ $contenidoPlantilla = isset($fila['contenido']) ? (string)$fila['contenido'] : '
                                     <div class="vm-toolbar-divider"></div>
 
                                     <div class="vm-toolbar-group">
+                                        <button
+                                            type="button"
+                                            class="vm-toolbar-icon-btn"
+                                            data-command="insertPageBreak"
+                                            title="Insertar salto de página"
+                                            aria-label="Insertar salto de página"
+                                        >
+                                            <span class="vm-icon-text">↧</span>
+                                        </button>
                                         <button
                                             type="button"
                                             class="vm-toolbar-icon-btn"
@@ -317,6 +335,22 @@ $contenidoPlantilla = isset($fila['contenido']) ? (string)$fila['contenido'] : '
         </div>
     </div>
 </div>
+<script>
+(function () {
+    const scriptUrl = './plantilla_informe/js/plantillaInforme.js?v=<?= time(); ?>';
 
-<!-- <script type="module" src="plantilla_informe/js/plantillaInforme.js?v=3"></script> -->
-<script type="module" src="plantilla_informe/js/plantillaInforme.js?v=<?= time(); ?>"></script>
+    import(scriptUrl)
+        .catch(function (error) {
+            console.error('No se pudo cargar el editor de plantilla de informe:', error);
+
+            if (window.Swal && typeof window.Swal.fire === 'function') {
+                Swal.fire({
+                    icon: 'error',
+                    title: 'Error',
+                    text: 'No se pudo cargar el editor de contenido.',
+                    confirmButtonText: 'OK'
+                });
+            }
+        });
+})();
+</script>

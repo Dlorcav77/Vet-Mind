@@ -1,5 +1,36 @@
 <?php
-function buildInformeHtml($veterinarioId, $configuracionInformeId, $pacienteId, $fecha, $motivo, $descripcion, $imagenes, $recinto, $medico_solicitante, $manual_data = null)
+if (!function_exists('normalizarSaltosPaginaInformeHtml')) {
+    function normalizarSaltosPaginaInformeHtml($html)
+    {
+        $html = (string)$html;
+
+        if ($html === '') {
+            return '';
+        }
+
+        $html = preg_replace(
+            '/<div\b[^>]*data-vm-page-break=["\']1["\'][^>]*>.*?<\/div>/is',
+            '<div class="vm-pdf-page-break"></div><div class="vm-pdf-page-spacer"></div>',
+            $html
+        );
+
+        $html = preg_replace(
+            '/<p>\s*(?:<span[^>]*>)?\s*\[Salto de página del informe\]\s*(?:<\/span>)?\s*<\/p>/is',
+            '<div class="vm-pdf-page-break"></div><div class="vm-pdf-page-spacer"></div>',
+            $html
+        );
+
+        $html = preg_replace(
+            '/<p>\s*(?:<span[^>]*>)?\s*Salto de página\s*(?:<\/span>)?\s*<\/p>/is',
+            '<div class="vm-pdf-page-break"></div><div class="vm-pdf-page-spacer"></div>',
+            $html
+        );
+
+        return $html;
+    }
+}
+
+function buildInformeHtml($veterinarioId, $configuracionInformeId, $pacienteId, $fecha, $motivo, $descripcion, $imagenes, $recinto, $medico_solicitante, $manual_data = null, $plantillaInformeId = 0)
 {
     global $mysqli;
 
@@ -15,6 +46,18 @@ function buildInformeHtml($veterinarioId, $configuracionInformeId, $pacienteId, 
 
     if (!$config) {
         throw new Exception("No se encontró la plantilla de diseño seleccionada.");
+    }
+
+    $manual = [];
+
+    if (is_array($manual_data)) {
+        $manual = $manual_data;
+    } elseif (!empty($manual_data)) {
+        $decodedManual = json_decode((string)$manual_data, true);
+
+        if (is_array($decodedManual)) {
+            $manual = $decodedManual;
+        }
     }
 
     if ($pacienteId) {
@@ -39,13 +82,7 @@ function buildInformeHtml($veterinarioId, $configuracionInformeId, $pacienteId, 
         if (!is_array($paciente)) {
             $paciente = [];
         }
-    } elseif ($manual_data) {
-        $manual = is_array($manual_data) ? $manual_data : json_decode($manual_data, true);
-
-        if (!is_array($manual)) {
-            $manual = [];
-        }
-
+    } elseif (!empty($manual)) {
         $paciente = [
             'paciente'         => $manual['paciente'] ?? '',
             'fecha_nacimiento' => $manual['fecha_nacimiento'] ?? '',
@@ -55,17 +92,54 @@ function buildInformeHtml($veterinarioId, $configuracionInformeId, $pacienteId, 
             'raza'             => $manual['raza'] ?? '',
             'codigo_paciente'  => $manual['codigo_paciente'] ?? '',
             'propietario'      => $manual['propietario'] ?? ($manual['tutor_nombre'] ?? ''),
+            'edad'             => $manual['edad'] ?? '',
         ];
     } else {
         $paciente = [];
     }
 
-    $paciente['antecedentes']  = $motivo;
-    $paciente['recinto']       = $recinto;
-    $paciente['m_solicitante'] = $medico_solicitante;
+    $nombreEstudio = '';
+
+    if ((int)$plantillaInformeId > 0) {
+        $stmtEstudio = $mysqli->prepare("
+            SELECT te.nombre
+            FROM plantilla_informe pi
+            INNER JOIN tipo_examen te ON te.id = pi.tipo_examen_id
+            WHERE pi.id = ?
+            AND te.veterinario_id = ?
+            LIMIT 1
+        ");
+
+        if ($stmtEstudio) {
+            $plantillaInformeIdInt = (int)$plantillaInformeId;
+            $veterinarioIdInt = (int)$veterinarioId;
+
+            $stmtEstudio->bind_param("ii", $plantillaInformeIdInt, $veterinarioIdInt);
+            $stmtEstudio->execute();
+            $resEstudio = $stmtEstudio->get_result();
+            $rowEstudio = $resEstudio->fetch_assoc();
+
+            if (is_array($rowEstudio)) {
+                $nombreEstudio = trim((string)($rowEstudio['nombre'] ?? ''));
+            }
+        }
+    }
+
+    $fecha_dt = new DateTime($fecha);
+    $fecha_emision_simple = $fecha_dt->format('d-m-Y');
+
+    $paciente['antecedentes']    = $motivo;
+    $paciente['recinto']         = $recinto;
+    $paciente['m_solicitante']   = $medico_solicitante;
+    $paciente['N_ficha']         = trim((string)($manual['N_ficha'] ?? ''));
+    $paciente['m_tratante']      = trim((string)($manual['m_tratante'] ?? ''));
+    $paciente['estudio']         = $nombreEstudio;
+    $paciente['fecha_emision']   = $fecha_emision_simple;
+
+    $descripcion = normalizarSaltosPaginaInformeHtml($descripcion);
 
     $stmt = $mysqli->prepare("
-        SELECT x.campo, x.etiqueta
+        SELECT x.campo, x.etiqueta, x.orden_min AS orden
         FROM (
             SELECT 
                 cp.id AS campo_id,
@@ -85,7 +159,19 @@ function buildInformeHtml($veterinarioId, $configuracionInformeId, $pacienteId, 
     $stmt->execute();
     $campos = $stmt->get_result()->fetch_all(MYSQLI_ASSOC);
 
+    $layoutTipo = $config['layout_tipo'] ?? 'clasico';
+
+    if ($layoutTipo === 'inev') {
+        $layoutTipo = 'clinica';
+    }
+
     ob_start();
-    include(__DIR__ . '/planilla_pdf.php');
+
+    if ($layoutTipo === 'clinica') {
+        include(__DIR__ . '/planilla_pdf_clinica.php');
+    } else {
+        include(__DIR__ . '/planilla_pdf.php');
+    }
+
     return ob_get_clean();
 }

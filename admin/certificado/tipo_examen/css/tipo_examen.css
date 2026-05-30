@@ -41,3 +41,37 @@
     #plantillaContenido strong {
         font-weight: 700;
     }
+
+    #plantillaContenido .vm-page-break {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 100%;
+    min-height: 42px;
+    margin: 14px 0;
+    padding: 8px 12px;
+    border: 1px dashed #c7ced8;
+    border-radius: 9px;
+    background: #f8fafc;
+    page-break-after: always;
+    break-after: page;
+    box-sizing: border-box;
+}
+
+#plantillaContenido .vm-page-break::before {
+    content: none;
+}
+
+#plantillaContenido .vm-page-break-label {
+    display: inline-block;
+    color: #7a8594;
+    font-size: 12px;
+    font-style: italic;
+    font-weight: 500;
+    line-height: 1.3;
+    text-align: center;
+    white-space: nowrap;
+    background: transparent;
+    border: 0;
+    padding: 0;
+}

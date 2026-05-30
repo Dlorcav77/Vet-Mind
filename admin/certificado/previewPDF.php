@@ -23,6 +23,24 @@ try {
     $configuracion_informe_id = intval($_POST['configuracion_informe_id'] ?? 0);
     $modo_manual              = isset($_POST['toggle_manual']) && $_POST['toggle_manual'] == '1';
 
+    $manual_data_preview = [];
+
+    foreach ($_POST as $key => $value) {
+        if (strpos($key, 'manual_') !== 0) {
+            continue;
+        }
+
+        $campoManual = substr($key, 7);
+
+        if ($campoManual === '') {
+            continue;
+        }
+
+        $manual_data_preview[$campoManual] = is_array($value)
+            ? $value
+            : trim((string)$value);
+    }
+
     $paciente = null;
 
     if ($modo_manual) {
@@ -40,6 +58,8 @@ try {
             'fecha_nacimiento' => $manual('fecha_nacimiento'),
             'n_chip'           => $manual('n_chip'),
             'codigo_paciente'  => $manual('codigo_paciente'),
+            'N_ficha'          => $manual('N_ficha'),
+            'm_tratante'       => $manual('m_tratante'),
         ];
     }
 
@@ -201,7 +221,8 @@ try {
         $imagenes,
         $recinto,
         $medico_solicitante,
-        $modo_manual ? $paciente : null
+        $modo_manual ? $paciente : $manual_data_preview,
+        $plantilla_informe_id
     );
 
     $pdf = new Dompdf();

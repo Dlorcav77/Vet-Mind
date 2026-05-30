@@ -1,10 +1,11 @@
 //admin/certificado/common/tiptap-editor.js
-import { Editor, Extension } from 'https://esm.sh/@tiptap/core@2.22.3';
+import { Editor, Extension, Node, mergeAttributes } from 'https://esm.sh/@tiptap/core@2.22.3';
 import StarterKit from 'https://esm.sh/@tiptap/starter-kit@2.22.3';
 import Placeholder from 'https://esm.sh/@tiptap/extension-placeholder@2.22.3';
 import Underline from 'https://esm.sh/@tiptap/extension-underline@2.22.3';
 import TextAlign from 'https://esm.sh/@tiptap/extension-text-align@2.22.3';
 import { TextStyle } from 'https://esm.sh/@tiptap/extension-text-style@2.22.3';
+import Color from 'https://esm.sh/@tiptap/extension-color@2.22.3';
 import Table from 'https://esm.sh/@tiptap/extension-table@2.22.3';
 import TableRow from 'https://esm.sh/@tiptap/extension-table-row@2.22.3';
 import TableHeader from 'https://esm.sh/@tiptap/extension-table-header@2.22.3';
@@ -98,6 +99,56 @@ const LineHeight = Extension.create({
   }
 });
 
+const PageBreak = Node.create({
+  name: 'pageBreak',
+
+  group: 'block',
+
+  atom: true,
+
+  selectable: true,
+
+  draggable: false,
+
+  parseHTML() {
+    return [
+      {
+        tag: 'div[data-vm-page-break="1"]'
+      }
+    ];
+  },
+
+  renderHTML({ HTMLAttributes }) {
+    return [
+      'div',
+      mergeAttributes(HTMLAttributes, {
+        'data-vm-page-break': '1',
+        class: 'vm-page-break',
+        style: 'page-break-after: always; break-after: page;'
+      }),
+      ['span', { class: 'vm-page-break-label' }, '[Salto de página del informe]']
+    ];
+  },
+
+  addCommands() {
+    return {
+      insertPageBreak: () => ({ chain }) => {
+        return chain()
+          .insertContent([
+            {
+              type: this.name
+            },
+            {
+              type: 'paragraph'
+            }
+          ])
+          .focus()
+          .run();
+      }
+    };
+  }
+});
+
 (function () {
   if (window.VetmindTiptap) {
     return;
@@ -115,6 +166,7 @@ const LineHeight = Extension.create({
       headingSelect: document.getElementById('contenido_html_heading'),
       fontSizeSelect: document.getElementById('contenido_html_font_size'),
       lineHeightSelect: document.getElementById('contenido_html_line_height'),
+      textColorInput: document.getElementById('contenido_html_text_color'),
       tableActionSelect: document.getElementById('contenido_html_table_actions')
     };
   }
@@ -128,6 +180,7 @@ const LineHeight = Extension.create({
       headingSelect: document.getElementById('editorIA_heading'),
       fontSizeSelect: document.getElementById('editorIA_font_size'),
       lineHeightSelect: document.getElementById('editorIA_line_height'),
+      textColorInput: document.getElementById('editorIA_text_color'),
       tableActionSelect: document.getElementById('editorIA_table_actions')
     };
   }
@@ -180,6 +233,35 @@ const LineHeight = Extension.create({
     return attrs.lineHeight || '1.15';
   }
 
+  function normalizeColorForInput(color) {
+    if (typeof color !== 'string') {
+      return '#000000';
+    }
+
+    const value = color.trim();
+
+    if (/^#[0-9a-fA-F]{6}$/.test(value)) {
+      return value;
+    }
+
+    if (/^#[0-9a-fA-F]{3}$/.test(value)) {
+      return '#' + value
+        .slice(1)
+        .split('')
+        .map((char) => char + char)
+        .join('');
+    }
+
+    return '#000000';
+  }
+
+  function getCurrentTextColor(editor) {
+    if (!editor) return '#000000';
+
+    const attrs = editor.getAttributes('textStyle') || {};
+    return normalizeColorForInput(attrs.color || '#000000');
+  }
+
   function updateHeadingSelect(target) {
     const editor = getEditorByTarget(target);
     const elements = getElementsByTarget(target);
@@ -217,6 +299,17 @@ const LineHeight = Extension.create({
     }
 
     elements.lineHeightSelect.value = getCurrentLineHeight(editor);
+  }
+
+  function updateTextColorInput(target) {
+    const editor = getEditorByTarget(target);
+    const elements = getElementsByTarget(target);
+
+    if (!editor || !elements.textColorInput) {
+      return;
+    }
+
+    elements.textColorInput.value = normalizeColorForInput(getCurrentTextColor(editor));
   }
 
   function updateTableActionVisibility(target) {
@@ -269,6 +362,8 @@ const LineHeight = Extension.create({
         isActive = editor.isActive({ textAlign: 'justify' });
       } else if (command === 'insertTable') {
         isActive = editor.isActive('table');
+      } else if (command === 'insertPageBreak') {
+        isActive = editor.isActive('pageBreak');
       }
 
       button.classList.toggle('active', isActive);
@@ -277,6 +372,7 @@ const LineHeight = Extension.create({
     updateHeadingSelect(target);
     updateFontSizeSelect(target);
     updateLineHeightSelect(target);
+    updateTextColorInput(target);
     updateTableActionVisibility(target);
   }
 
@@ -307,6 +403,8 @@ const LineHeight = Extension.create({
       editor.chain().focus().undo().run();
     } else if (command === 'redo') {
       editor.chain().focus().redo().run();
+    } else if (command === 'insertPageBreak') {
+      editor.commands.insertPageBreak();
     } else if (command === 'insertTable') {
       await insertTable(editor);
     }
@@ -352,6 +450,16 @@ const LineHeight = Extension.create({
     }
 
     editor.chain().focus().setLineHeight(value).run();
+  }
+
+  function applyTextColor(editor, value) {
+    if (!editor) {
+      return;
+    }
+
+    const color = normalizeColorForInput(value);
+
+    editor.chain().focus().setColor(color).run();
   }
 
   async function insertTable(editor) {
@@ -599,6 +707,40 @@ const LineHeight = Extension.create({
       });
     }
 
+    if (elements.textColorInput && elements.textColorInput.dataset.bound !== '1') {
+      elements.textColorInput.dataset.bound = '1';
+
+      elements.textColorInput.addEventListener('mousedown', function (e) {
+        e.stopPropagation();
+      });
+
+      elements.textColorInput.addEventListener('input', function () {
+        const inputTarget = this.getAttribute('data-editor-target') || target;
+        const editor = getEditorByTarget(inputTarget);
+
+        applyTextColor(editor, this.value);
+        syncEditorToTextarea(inputTarget);
+        updateToolbarState(inputTarget);
+
+        if (editor) {
+          editor.commands.focus();
+        }
+      });
+
+      elements.textColorInput.addEventListener('change', function () {
+        const inputTarget = this.getAttribute('data-editor-target') || target;
+        const editor = getEditorByTarget(inputTarget);
+
+        applyTextColor(editor, this.value);
+        syncEditorToTextarea(inputTarget);
+        updateToolbarState(inputTarget);
+
+        if (editor) {
+          editor.commands.focus();
+        }
+      });
+    }
+
     const tableActionSelect = getElementsByTarget(target).tableActionSelect;
     if (tableActionSelect && tableActionSelect.dataset.bound !== '1') {
       tableActionSelect.dataset.bound = '1';
@@ -644,6 +786,9 @@ const LineHeight = Extension.create({
         }),
         Underline,
         TextStyle,
+        Color.configure({
+          types: ['textStyle']
+        }),
         FontSize.configure({
           types: ['textStyle']
         }),
@@ -661,7 +806,8 @@ const LineHeight = Extension.create({
         }),
         TableRow,
         TableHeader,
-        TableCell
+        TableCell,
+        PageBreak
       ],
       content: initialContent || '<p></p>',
       editorProps: {

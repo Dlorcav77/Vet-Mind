@@ -37,9 +37,32 @@ if (!isset($tipos_estudio)) {
         }
     }
 }
+
+$manual_data_certificado = [];
+
+if (!empty($fila['manual_data'])) {
+    $decoded_manual_data = json_decode((string)$fila['manual_data'], true);
+
+    if (is_array($decoded_manual_data)) {
+        $manual_data_certificado = $decoded_manual_data;
+    }
+}
+
+if (!function_exists('valorManualCertificado')) {
+    function valorManualCertificado(array $manual_data_certificado, string $campo): string
+    {
+        $valor = $manual_data_certificado[$campo] ?? '';
+
+        if (is_array($valor)) {
+            return '';
+        }
+
+        return trim((string)$valor);
+    }
+}
 ?>
 
-<link rel="stylesheet" href="certificado/tipo_examen/css/tipo_examen.css?v=1">
+<link rel="stylesheet" href="certificado/tipo_examen/css/tipo_examen.css?v=2">
 <div class="col-12" id="bloque_tipo_examen">
     <div class="row g-1 mb-1" id="fila_campos_generales">
         <div
@@ -73,7 +96,37 @@ if (!isset($tipos_estudio)) {
                 value="<?= htmlspecialchars($fila['medico_solicitante'] ?? '') ?>"
             >
         </div>
+        <div
+            class="col-md-4 mb-3"
+            id="wrap_numero_ficha"
+            data-campo-general="N_ficha"
+            style="<?= in_array('N_ficha', $campos_visibles_actuales ?? [], true) ? '' : 'display:none;' ?>"
+        >
+            <label for="manual_N_ficha" class="form-label fw-bold">Numero de ficha</label>
+            <input
+                type="text"
+                class="form-control"
+                name="manual_N_ficha"
+                id="manual_N_ficha"
+                value="<?= htmlspecialchars(valorManualCertificado($manual_data_certificado, 'N_ficha')) ?>"
+            >
+        </div>
 
+        <div
+            class="col-md-4 mb-3"
+            id="wrap_medico_tratante"
+            data-campo-general="m_tratante"
+            style="<?= in_array('m_tratante', $campos_visibles_actuales ?? [], true) ? '' : 'display:none;' ?>"
+        >
+            <label for="manual_m_tratante" class="form-label fw-bold">Médico Tratante</label>
+            <input
+                type="text"
+                class="form-control"
+                name="manual_m_tratante"
+                id="manual_m_tratante"
+                value="<?= htmlspecialchars(valorManualCertificado($manual_data_certificado, 'm_tratante')) ?>"
+            >
+        </div>
         <div
             class="col-md-4 mb-3"
             id="wrap_recinto"

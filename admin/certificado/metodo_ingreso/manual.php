@@ -51,6 +51,16 @@ $contenidoInforme = isset($fila['contenido_html']) ? (string)$fila['contenido_ht
                     <option value="2.5">2.5</option>
                     <option value="3">3</option>
                 </select>
+                <div class="vm-color-control" title="Color de texto">
+                    <input
+                        type="color"
+                        id="contenido_html_text_color"
+                        class="vm-color-input"
+                        data-editor-target="contenido_html"
+                        value="#000000"
+                        aria-label="Color de texto"
+                    >
+                </div>
             </div>
 
             <div class="vm-toolbar-divider"></div>
@@ -138,6 +148,15 @@ $contenidoInforme = isset($fila['contenido_html']) ? (string)$fila['contenido_ht
             <div class="vm-toolbar-divider"></div>
 
             <div class="vm-toolbar-group">
+                <button
+                    type="button"
+                    class="vm-toolbar-icon-btn"
+                    data-command="insertPageBreak"
+                    title="Insertar salto de página"
+                    aria-label="Insertar salto de página"
+                >
+                    <span class="vm-icon-text">↧</span>
+                </button>
                 <button
                     type="button"
                     class="vm-toolbar-icon-btn"
