@@ -56,11 +56,11 @@ require_once __DIR__ . '/previews/preview_loader.php';
 
 <div id="configuracion_informe" data-page-id="configuracion_informe">
     <div class="d-flex justify-content-between align-items-center mb-3">
-        <h1 class="h3 mb-0"><strong>Configuración de Informes</strong></h1>
+        <h1 class="h3 mb-0"><strong>Diseños de Informe</strong></h1>
 
         <?php if (in_array('ingresar', $acceso_aplicaciones['configuracion_informe'] ?? [])): ?>
             <a href="configuracion_informe/configuracion.php?action=ingresar" class="btn btn-primary ajax-link">
-                <i class="fas fa-plus"></i> Nueva plantilla
+                <i class="fas fa-plus"></i> Nueva diseño
             </a>
         <?php endif; ?>
     </div>

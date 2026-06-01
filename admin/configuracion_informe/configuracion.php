@@ -181,7 +181,7 @@ $clinica_config = array_merge(
       </div>
 
       <div class="config-toolbar-field config-toolbar-layout">
-        <label for="layout_tipo" class="form-label mb-1">Plantilla</label>
+        <label for="layout_tipo" class="form-label mb-1">Diseño </label>
         <select
           name="layout_tipo"
           id="layout_tipo"

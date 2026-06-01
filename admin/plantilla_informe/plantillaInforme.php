@@ -48,7 +48,7 @@ $contenidoPlantilla = isset($fila['contenido']) ? (string)$fila['contenido'] : '
 
 <div class="card" id="plantilla_informe" data-page-id="plantilla_informe">
     <div class="card-header">
-        <h1 class="h3 mb-3"><strong><?= $accion; ?> Plantilla de Informe</strong></h1>
+        <h1 class="h3 mb-3"><strong><?= $accion; ?> plantilla de contenido</strong></h1>
         <div class="w-100">
             <div class="card-body w-100 px-0">
                 <form id="formPlantillaInforme" method="post" action="plantilla_informe/updPlantillaInforme.php">
