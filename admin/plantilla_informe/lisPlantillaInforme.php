@@ -36,7 +36,7 @@ $res = $stmt->get_result();
 </style>
 
 <div id="plantilla_informe" data-page-id="plantilla_informe">
-  <h1 class="h3 mb-3"><strong>Plantillas de Informes</strong></h1>
+  <h1 class="h3 mb-3"><strong>Plantillas de Contenido</strong></h1>
   <div class="card">
     <div class="card-header">
       <div class="col-xl-12 col-xxl-12 d-flex">

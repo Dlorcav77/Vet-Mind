@@ -1,0 +1,807 @@
+/* admin/configuracion_informe/css/configuracion_informe.css */
+
+/* =========================================================
+   Contenedor general
+   ========================================================= */
+
+#configuracion_informe {
+    background: transparent;
+    border: 0;
+    box-shadow: none;
+    border-radius: 0;
+}
+
+#configuracion_informe .configuracion-informe-body {
+    background: #fff;
+    border: 1px solid #edf0f4;
+    border-radius: 8px;
+    padding: 10px 18px 16px 18px;
+}
+
+/* =========================================================
+   Toolbar superior
+   ========================================================= */
+
+#configuracion_informe .config-toolbar {
+    display: flex;
+    align-items: end;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 12px;
+    padding: 0 0 10px 0;
+    background: transparent;
+    border: 0;
+}
+
+#configuracion_informe .config-toolbar-title {
+    font-size: 22px;
+    line-height: 1;
+    font-weight: 700;
+    color: #000;
+    padding-bottom: 8px;
+}
+
+#configuracion_informe .config-toolbar-controls {
+    display: flex;
+    align-items: end;
+    justify-content: flex-end;
+    flex-wrap: wrap;
+    gap: 12px;
+    max-width: 980px;
+}
+
+#configuracion_informe .config-toolbar-field {
+    margin-bottom: 0;
+}
+
+#configuracion_informe .config-toolbar-name {
+    width: 280px;
+}
+
+#configuracion_informe .config-toolbar-layout {
+    width: 220px;
+}
+
+#configuracion_informe .config-toolbar-default {
+    width: 104px;
+}
+
+#configuracion_informe .config-toolbar-colores {
+    width: 84px;
+}
+
+#configuracion_informe .config-toolbar-colores-buttons {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+/* =========================================================
+   Tabs
+   ========================================================= */
+
+#configuracion_informe .nav-tabs {
+    margin-bottom: 12px !important;
+}
+
+#configuracion_informe .nav-tabs .nav-link {
+    padding: 8px 16px;
+    font-size: 14px;
+}
+
+/* =========================================================
+   Tipografía y títulos
+   ========================================================= */
+
+#configuracion_informe h5 {
+    font-size: 15px;
+    margin-top: 14px !important;
+    margin-bottom: 14px !important;
+}
+
+#configuracion_informe h6 {
+    font-size: 14px;
+}
+
+#configuracion_informe .form-label {
+    font-size: 14px;
+    margin-bottom: 4px;
+    color: #000;
+    font-weight: 600;
+}
+
+#configuracion_informe .text-muted {
+    color: #6c757d !important;
+    font-weight: 400;
+}
+
+#configuracion_informe .text-right h4,
+#configuracion_informe .text-right p,
+#configuracion_informe .text-right small {
+    text-align: right;
+}
+
+/* =========================================================
+   Inputs compactos
+   ========================================================= */
+
+#configuracion_informe .form-control,
+#configuracion_informe .form-select,
+#configuracion_informe .select2-container--default .select2-selection--single {
+    min-height: 32px;
+    height: 32px;
+    padding-top: 4px;
+    padding-bottom: 4px;
+    font-size: 14px;
+}
+
+#configuracion_informe textarea.form-control {
+    height: auto;
+    min-height: 70px;
+}
+
+#configuracion_informe input[type="file"].form-control {
+    height: 32px;
+    padding: 3px;
+    font-size: 13px;
+}
+
+#configuracion_informe input[type="color"].form-control-color {
+    width: 48px;
+    height: 32px;
+    padding: 3px;
+}
+
+/* =========================================================
+   Select2
+   ========================================================= */
+
+#configuracion_informe .select2-container--default .select2-selection--single .select2-selection__rendered {
+    line-height: 30px;
+    font-size: 14px;
+    color: #000;
+    font-weight: 500;
+}
+
+#configuracion_informe .select2-container--default .select2-selection--single .select2-selection__arrow {
+    height: 30px;
+}
+
+.select2-container--default .select2-results__option {
+    color: #000;
+    font-weight: 500;
+}
+
+/* =========================================================
+   Espaciados compactos
+   ========================================================= */
+
+#configuracion_informe hr {
+    margin-top: 16px !important;
+    margin-bottom: 16px !important;
+}
+
+#configuracion_informe .row.mt-4 {
+    margin-top: 12px !important;
+}
+
+#configuracion_informe .mb-2 {
+    margin-bottom: 8px !important;
+}
+
+#configuracion_informe .mb-3 {
+    margin-bottom: 10px !important;
+}
+
+#configuracion_informe .border.rounded.p-3 {
+    padding: 12px !important;
+}
+
+#configuracion_informe .btn {
+    padding: 6px 14px;
+    font-size: 14px;
+}
+
+/* =========================================================
+   Botones de color compactos
+   ========================================================= */
+
+#configuracion_informe .color-input-hidden {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    opacity: 0;
+    pointer-events: none;
+}
+
+#configuracion_informe .color-mini-button {
+    width: 30px;
+    height: 28px;
+    border: 1px solid #cfd6df;
+    border-radius: 8px;
+    cursor: pointer;
+    display: inline-block;
+    transition: transform .12s ease, opacity .12s ease;
+}
+
+#configuracion_informe .color-mini-button:hover {
+    opacity: .88;
+}
+
+#configuracion_informe .color-mini-button:active {
+    transform: scale(.96);
+}
+
+/* =========================================================
+   General - diseño visual
+   ========================================================= */
+
+#configuracion_informe #titulo_informe,
+#configuracion_informe #subtitulo,
+#configuracion_informe #imagenes_por_fila,
+#configuracion_informe #logo_position,
+#configuracion_informe #logo_size,
+#configuracion_informe #marca_agua_size {
+    width: 100%;
+}
+
+/* =========================================================
+   Campos - toolbar
+   ========================================================= */
+
+#configuracion_informe .campos-toolbar {
+    display: flex;
+    align-items: end;
+    flex-wrap: wrap;
+    gap: 10px;
+}
+
+#configuracion_informe .campos-toolbar-select {
+    width: 280px;
+}
+
+#configuracion_informe .campos-toolbar-action .btn {
+    min-width: 150px;
+}
+
+#configuracion_informe #campo-select,
+#configuracion_informe #campo-select option {
+    color: #000 !important;
+    font-weight: 600;
+}
+
+/* =========================================================
+   Campos - layout compacto
+   ========================================================= */
+
+#configuracion_informe .campos-layout-grid {
+    align-items: stretch;
+}
+
+#configuracion_informe .campos-builder-card,
+#configuracion_informe .campos-preview-card {
+    border: 1px solid #dfe4ea;
+    border-radius: 12px;
+    background: #fbfcfd;
+    padding: 12px;
+}
+
+#configuracion_informe .campos-builder-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    margin-bottom: 10px;
+}
+
+#configuracion_informe .campos-builder-header strong {
+    font-size: 15px;
+    color: #1f2937;
+}
+
+#configuracion_informe .campos-builder-header small {
+    font-size: 12px;
+}
+
+/* =========================================================
+   Campos - constructor visual
+   ========================================================= */
+
+#configuracion_informe .campos-rows-list {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    min-height: 52px;
+    border: 1px dashed #cfd6df;
+    border-radius: 10px;
+    background: #fff;
+    padding: 10px;
+}
+
+#configuracion_informe .campos-chip-row {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 8px;
+    min-height: 38px;
+    width: 100%;
+    padding: 3px;
+    border-radius: 10px;
+}
+
+#configuracion_informe .campos-chip-row:hover {
+    background: #f8fafc;
+}
+
+#configuracion_informe .campos-chip-row-hover {
+    background: #eef5ff !important;
+    outline: 1px dashed #6c8ebf;
+}
+
+#configuracion_informe .campo-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 7px;
+    border: 1px solid #cfd6df;
+    border-radius: 999px;
+    background: #fff;
+    padding: 5px 7px 5px 9px;
+    color: #111;
+    font-size: 14px;
+    line-height: 1;
+    box-shadow: 0 1px 2px rgba(15, 23, 42, .05);
+    cursor: grab;
+    user-select: none;
+    position: relative;
+}
+
+#configuracion_informe .campo-chip[draggable="true"] {
+    cursor: grab;
+}
+
+#configuracion_informe .campo-chip:active,
+#configuracion_informe .campo-chip[draggable="true"]:active {
+    cursor: grabbing;
+}
+
+#configuracion_informe .campo-chip-dragging {
+    opacity: .45;
+}
+
+#configuracion_informe .campo-chip-fijo {
+    background: #f5f7fa;
+}
+
+#configuracion_informe .campo-chip-oculto {
+    opacity: .48;
+}
+
+#configuracion_informe .campo-chip-handle {
+    color: #6c757d;
+    font-size: 13px;
+    pointer-events: none;
+}
+
+#configuracion_informe .campo-chip-label {
+    font-weight: 600;
+    white-space: nowrap;
+}
+
+#configuracion_informe .campo-chip-btn {
+    width: 24px;
+    height: 24px;
+    border: 1px solid #e5e7eb;
+    border-radius: 999px;
+    padding: 0;
+    line-height: 1;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    color: #495057;
+    background: #f1f3f5;
+}
+
+#configuracion_informe .campo-chip-btn:hover:not(:disabled) {
+    background: #e9ecef;
+    color: #000;
+}
+
+#configuracion_informe .campo-chip-btn:disabled {
+    opacity: .55;
+    cursor: not-allowed;
+}
+
+#configuracion_informe .campo-chip-placeholder {
+    display: inline-flex;
+    width: 110px !important;
+    height: 32px !important;
+    border: 1px dashed #6c8ebf;
+    border-radius: 999px;
+    background: #eef5ff;
+}
+
+#configuracion_informe .campos-chip-row-placeholder {
+    min-height: 36px;
+    border: 1px dashed #9aa4b2;
+    border-radius: 10px;
+    background: #f8f9fa;
+}
+
+/* =========================================================
+   Campos - vista previa por layout
+   ========================================================= */
+
+#configuracion_informe .vista-previa-campos-layout {
+    background: #fff;
+}
+
+#configuracion_informe .campos-preview-card .vista-previa-campos-layout {
+    min-height: 220px;
+}
+
+#configuracion_informe #vista-previa-campos th,
+#configuracion_informe #vista-previa-campos td {
+    padding: 2px 4px;
+}
+
+#configuracion_informe .preview-campo-clinica-linea {
+    font-size: 14px;
+    line-height: 1.38;
+    color: #000;
+    padding: 2px 0;
+}
+
+#configuracion_informe .preview-campo-clinica-linea strong {
+    font-weight: 700;
+}
+
+#configuracion_informe .preview-campo-clinica-linea span {
+    color: #777;
+    font-style: italic;
+}
+
+/* =========================================================
+   Firma - layout compacto
+   ========================================================= */
+
+#configuracion_informe .firma-config-grid {
+    display: grid;
+    grid-template-columns: minmax(280px, 0.9fr) minmax(420px, 1.4fr);
+    gap: 12px;
+    align-items: stretch;
+}
+
+#configuracion_informe .firma-card {
+    border: 1px solid #dfe4ea;
+    border-radius: 12px;
+    background: #fbfcfd;
+    padding: 12px;
+    height: 100%;
+}
+
+#configuracion_informe .firma-card-header {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 10px;
+    margin-bottom: 10px;
+}
+
+#configuracion_informe .firma-card-title {
+    font-size: 14px;
+    font-weight: 700;
+    color: #000;
+}
+
+/* =========================================================
+   Firma - imagen escaneada
+   ========================================================= */
+
+#configuracion_informe .firma-imagen-layout {
+    display: grid;
+    grid-template-columns: minmax(220px, 1fr) 170px;
+    gap: 12px;
+    align-items: end;
+}
+
+#configuracion_informe .firma-imagen-controls {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+#configuracion_informe .firma-switch-box,
+#configuracion_informe .firma-file-box,
+#configuracion_informe .firma-preview-box {
+    width: 100%;
+}
+
+#configuracion_informe .firma-preview-frame {
+    height: 92px;
+    border: 1px solid #dfe4ea;
+    border-radius: 10px;
+    background: #fff;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 8px;
+    overflow: hidden;
+}
+
+#configuracion_informe .firma-preview-img {
+    max-height: 72px;
+    max-width: 100%;
+    object-fit: contain;
+    display: block;
+}
+
+/* =========================================================
+   Firma - datos y subtítulos
+   ========================================================= */
+
+#configuracion_informe .firma-subtitulos-box {
+    border-top: 1px solid #edf0f4;
+    padding-top: 10px;
+}
+
+#configuracion_informe .firma-subtitulos-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    margin-bottom: 8px;
+}
+
+#configuracion_informe .firma-subtitulos-list {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+#configuracion_informe .firma-subtitulo-row {
+    margin-bottom: 0 !important;
+}
+
+#configuracion_informe .firma-subtitulo-row .btn {
+    padding-left: 10px;
+    padding-right: 10px;
+}
+
+#configuracion_informe .firma-subtitulos-empty {
+    margin-top: 6px;
+}
+
+/* =========================================================
+   Firma - pie de página y fecha integrados
+   ========================================================= */
+
+#configuracion_informe .firma-extra-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+    align-items: stretch;
+}
+
+#configuracion_informe .firma-card-footer,
+#configuracion_informe .firma-card-fecha {
+    min-height: 100%;
+}
+
+#configuracion_informe .firma-footer-textarea {
+    min-height: 72px;
+    resize: vertical;
+}
+
+#configuracion_informe .firma-card-fecha #formato_fecha,
+#configuracion_informe .firma-card-fecha #lugar_fecha,
+#configuracion_informe .firma-card-fecha #fecha_align {
+    width: 100%;
+}
+
+#configuracion_informe .firma-card-fecha .select2-container {
+    width: 100% !important;
+}
+
+/* =========================================================
+   Firma - controles inline en headers
+   ========================================================= */
+
+#configuracion_informe .firma-footer-header,
+#configuracion_informe .firma-fecha-header {
+    align-items: flex-start;
+}
+
+#configuracion_informe .firma-header-control-inline {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 8px;
+}
+
+#configuracion_informe .firma-header-control-inline .form-label {
+    white-space: nowrap;
+    font-size: 14px;
+}
+
+#configuracion_informe .firma-footer-align-box {
+    width: 230px;
+    flex: 0 0 230px;
+}
+
+#configuracion_informe .firma-footer-align-box select,
+#configuracion_informe .firma-footer-align-box .select2-container {
+    width: 145px !important;
+}
+
+#configuracion_informe .firma-fecha-switch-box {
+    width: 165px;
+    flex: 0 0 165px;
+}
+
+#configuracion_informe .firma-fecha-switch-box .form-check {
+    min-height: 32px;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+/* =========================================================
+   Clínica - configuración institucional
+   ========================================================= */
+
+#configuracion_informe .layout-config-bloque {
+    width: 100%;
+}
+
+/* =========================================================
+   Responsive - toolbar y tabs
+   ========================================================= */
+
+@media (max-width: 992px) {
+    #configuracion_informe .config-toolbar {
+        align-items: flex-start;
+    }
+
+    #configuracion_informe .config-toolbar-controls {
+        justify-content: flex-start;
+        max-width: 100%;
+    }
+
+    #configuracion_informe .config-toolbar-name,
+    #configuracion_informe .config-toolbar-layout {
+        width: 100%;
+        max-width: 320px;
+    }
+}
+
+@media (max-width: 576px) {
+    #configuracion_informe .configuracion-informe-body {
+        padding: 10px 12px 14px 12px;
+    }
+
+    #configuracion_informe .config-toolbar-name,
+    #configuracion_informe .config-toolbar-layout,
+    #configuracion_informe .config-toolbar-default,
+    #configuracion_informe .config-toolbar-colores,
+    #configuracion_informe .config-toolbar-preview {
+        width: 100%;
+    }
+
+    #configuracion_informe .config-toolbar-preview {
+        margin-left: 0;
+        flex: 0 0 auto;
+    }
+
+    #configuracion_informe .nav-tabs .nav-link {
+        padding: 7px 10px;
+        font-size: 13px;
+    }
+}
+
+/* =========================================================
+   Responsive - campos
+   ========================================================= */
+
+@media (max-width: 768px) {
+    #configuracion_informe .campos-toolbar {
+        flex-direction: column;
+        align-items: stretch;
+    }
+
+    #configuracion_informe .campos-toolbar-select {
+        width: 100%;
+    }
+
+    #configuracion_informe .campos-toolbar-action .btn {
+        width: 100%;
+    }
+}
+
+/* =========================================================
+   Responsive - firma y cierre
+   ========================================================= */
+
+@media (max-width: 1200px) {
+    #configuracion_informe .firma-config-grid,
+    #configuracion_informe .firma-extra-grid {
+        grid-template-columns: 1fr;
+    }
+
+    #configuracion_informe .firma-imagen-layout {
+        grid-template-columns: 1fr 180px;
+    }
+}
+
+@media (max-width: 768px) {
+    #configuracion_informe .firma-imagen-layout {
+        grid-template-columns: 1fr;
+    }
+
+    #configuracion_informe .firma-preview-frame {
+        height: 88px;
+    }
+
+    #configuracion_informe .firma-subtitulos-header,
+    #configuracion_informe .firma-footer-header,
+    #configuracion_informe .firma-fecha-header {
+        align-items: flex-start;
+        flex-direction: column;
+    }
+
+    #configuracion_informe .firma-header-control-inline {
+        justify-content: flex-start;
+    }
+
+    #configuracion_informe .firma-footer-align-box,
+    #configuracion_informe .firma-fecha-switch-box {
+        width: 100%;
+        flex: 0 0 auto;
+    }
+
+    #configuracion_informe .firma-footer-align-box select,
+    #configuracion_informe .firma-footer-align-box .select2-container {
+        width: 100% !important;
+    }
+}
+
+/* =========================================================
+   Toolbar - botón vista previa
+   ========================================================= */
+
+#configuracion_informe .config-toolbar-preview {
+    width: 46px;
+    flex: 0 0 46px;
+    margin-left: -24px;
+}
+
+#configuracion_informe .btn-preview-circle {
+    width: 40px;
+    height: 40px;
+    padding: 0;
+    border-radius: 50%;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+}
+
+#configuracion_informe .btn-preview-circle i {
+    font-size: 16px;
+    line-height: 1;
+}
+
+/* =========================================================
+   Modal - vista previa de plantilla
+   ========================================================= */
+
+.modal-preview-plantilla .modal-body {
+    background: #f4f6f9;
+}
+
+#vista-previa-plantilla-contenido {
+    min-height: 280px;
+}
+
+#vista-previa-plantilla-contenido .vista-previa-plantilla {
+    margin-top: 0 !important;
+    margin-bottom: 0 !important;
+}

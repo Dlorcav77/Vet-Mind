@@ -9,6 +9,13 @@ $usuario_id = $_SESSION['usuario_id'] ?? 0;
 
 $nombre_plantilla     = trim($_POST['nombre_plantilla'] ?? 'Plantilla principal');
 $es_predeterminada    = isset($_POST['es_predeterminada']) ? 1 : 0;
+
+$layouts_permitidos = ['clasico', 'clinica'];
+$layout_tipo = $_POST['layout_tipo'] ?? 'clasico';
+if (!in_array($layout_tipo, $layouts_permitidos, true)) {
+    $layout_tipo = 'clasico';
+}
+
 $logo_position        = $_POST['logo_position'] ?? 'center';
 $mostrar_marca_agua   = isset($_POST['mostrar_marca_agua']) ? 1 : 0;
 $color_primario       = $_POST['color_primario'] ?? '#3498db';
@@ -32,6 +39,8 @@ $titulo_informe       = trim($_POST['titulo_informe'] ?? 'INFORME ECOGRÁFICO');
 $mostrar_firma_imagen = isset($_POST['mostrar_firma_imagen']) ? 1 : 0;
 $subtitulo            = trim($_POST['subtitulo'] ?? '');
 $subtitulo_align      = $_POST['subtitulo_align'] ?? 'center';
+$layout_config_post = $_POST['layout_config'] ?? [];
+$layout_config_json = prepararLayoutConfigJson($layout_config_post);
 
 $firma_imagen_subida = null;
 if (isset($_FILES['firma_imagen']) && !empty($_FILES['firma_imagen']['name'])) {
@@ -63,6 +72,7 @@ if ($action === 'modificar' && !empty($id)) {
     $sql = "UPDATE configuracion_informes SET
         nombre_plantilla = ?,
         es_predeterminada = ?,
+        layout_tipo = ?,
         logo_url = ?, logo_position = ?, logo_size = ?, 
         marca_agua_url = ?, marca_agua_size = ?, mostrar_marca_agua = ?,
         color_primario = ?, color_secundario = ?,
@@ -70,14 +80,16 @@ if ($action === 'modificar' && !empty($id)) {
         footer_texto = ?, footer_align = ?, mostrar_fecha = ?, formato_fecha = ?, 
         lugar_fecha = ?, fecha_align = ?, imagenes_por_fila = ?, titulo_informe = ?, 
         firma_imagen_url = ?, mostrar_firma_imagen = ?, subtitulo = ?, subtitulo_align = ?,
+        layout_config_json = ?,
         updated_at = NOW()
         WHERE id = ? AND veterinario_id = ?";
 
     $stmt = $mysqli->prepare($sql);
     $stmt->bind_param(
-        "sisssssissssssssisssississii",
+        "sissssssissssssssisssississsii",
         $nombre_plantilla,
         $es_predeterminada,
+        $layout_tipo,
         $logo_subido, $logo_position, $logo_size,
         $marca_agua_subida, $marca_agua_size, $mostrar_marca_agua,
         $color_primario, $color_secundario,
@@ -85,7 +97,7 @@ if ($action === 'modificar' && !empty($id)) {
         $footer_texto, $footer_align,
         $mostrar_fecha, $formato_fecha, $lugar_fecha, $fecha_align,
         $imagenes_por_fila, $titulo_informe, $firma_imagen_subida, $mostrar_firma_imagen,
-        $subtitulo, $subtitulo_align,
+        $subtitulo, $subtitulo_align, $layout_config_json,
         $id, $usuario_id
     );
 
@@ -124,22 +136,22 @@ if ($action === 'modificar' && !empty($id)) {
 //
 if ($action === 'ingresar') {
     $sql = "INSERT INTO configuracion_informes 
-        (veterinario_id, nombre_plantilla, es_predeterminada, logo_url, logo_position, logo_size, marca_agua_url, marca_agua_size, mostrar_marca_agua,
+        (veterinario_id, nombre_plantilla, es_predeterminada, layout_tipo, logo_url, logo_position, logo_size, marca_agua_url, marca_agua_size, mostrar_marca_agua,
         color_primario, color_secundario, firma_nombre, firma_titulo, firma_subtitulo, firma_align,
         footer_texto, footer_align, mostrar_fecha, formato_fecha, lugar_fecha, fecha_align, 
-        imagenes_por_fila, titulo_informe, firma_imagen_url, mostrar_firma_imagen, subtitulo, subtitulo_align,
+        imagenes_por_fila, titulo_informe, firma_imagen_url, mostrar_firma_imagen, subtitulo, subtitulo_align, layout_config_json,
         created_at, updated_at)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), NOW())";
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), NOW())";
 
     $stmt = $mysqli->prepare($sql);
     $stmt->bind_param(
-        "isisssssissssssssisssississ",
-        $usuario_id, $nombre_plantilla, $es_predeterminada,
+        "isissssssissssssssisssississs",
+        $usuario_id, $nombre_plantilla, $es_predeterminada, $layout_tipo,
         $logo_subido, $logo_position, $logo_size, $marca_agua_subida, $marca_agua_size, $mostrar_marca_agua,
         $color_primario, $color_secundario, $firma_nombre, $firma_titulo, $firma_subtitulo, $firma_align,
         $footer_texto, $footer_align, $mostrar_fecha, $formato_fecha, $lugar_fecha, $fecha_align,
         $imagenes_por_fila, $titulo_informe, $firma_imagen_subida, $mostrar_firma_imagen,
-        $subtitulo, $subtitulo_align
+        $subtitulo, $subtitulo_align, $layout_config_json
     );
 
     if ($stmt->execute()) {
@@ -176,7 +188,27 @@ if ($action === 'ingresar') {
 echo json_encode(['status' => 'error', 'message' => 'Acción no válida.']);
 
 
+function prepararLayoutConfigJson($layout_config_post) {
+    $layout_config = [];
 
+    if (isset($layout_config_post['clinica']) && is_array($layout_config_post['clinica'])) {
+        $clinica = $layout_config_post['clinica'];
+
+        $layout_config['clinica'] = [
+            'institucion_nombre' => trim($clinica['institucion_nombre'] ?? ''),
+            'direccion'          => trim($clinica['direccion'] ?? ''),
+            'telefonos'          => trim($clinica['telefonos'] ?? ''),
+            'correo'             => trim($clinica['correo'] ?? ''),
+            'web'                => trim($clinica['web'] ?? '')
+        ];
+    }
+
+    if (empty($layout_config)) {
+        return null;
+    }
+
+    return json_encode($layout_config, JSON_UNESCAPED_UNICODE);
+}
 
 //
 // ✅ Función auxiliar
@@ -221,12 +253,12 @@ function subir_imagen($campo, $directorio, $veterinario_id, $tipo) {
 function guardarCamposInforme($mysqli, $usuario_id, $configuracion_informe_id, $modo = 'ingresar', $campos_nuevos = [], $campos_existentes = [], $campos_ids_actuales = []) {
     $campos_fijos_ids = [1, 5];
 
-    if ($modo === 'modificar') {
-        $ordenes_actualizados = json_decode($_POST['campos_orden'] ?? '{}', true);
-        if (!is_array($ordenes_actualizados)) {
-            $ordenes_actualizados = [];
-        }
+    $ordenes_actualizados = json_decode($_POST['campos_orden'] ?? '{}', true);
+    if (!is_array($ordenes_actualizados)) {
+        $ordenes_actualizados = [];
+    }
 
+    if ($modo === 'modificar') {
         if (!empty($campos_existentes)) {
             foreach ($campos_existentes as $registro_id => $data) {
                 $registro_id = (int)$registro_id;
@@ -249,7 +281,11 @@ function guardarCamposInforme($mysqli, $usuario_id, $configuracion_informe_id, $
                 $es_fijo = in_array($campo_id_actual, $campos_fijos_ids, true);
 
                 $visible = $es_fijo ? 1 : (isset($data['visible']) ? 1 : 0);
-                $nuevo_orden = (int)($ordenes_actualizados[$registro_id] ?? 0);
+                $nuevo_orden = (int)($ordenes_actualizados[(string)$registro_id] ?? 0);
+
+                if ($nuevo_orden <= 0) {
+                    $nuevo_orden = 999;
+                }
 
                 $stmt = $mysqli->prepare(
                     "UPDATE configuracion_informe_campos
@@ -306,7 +342,14 @@ function guardarCamposInforme($mysqli, $usuario_id, $configuracion_informe_id, $
             }
 
             $visible = isset($data['visible']) ? 1 : 0;
-            $ordenBase++;
+
+            $claveOrdenNuevo = 'nuevo-' . $campo_id;
+            $ordenNuevo = (int)($ordenes_actualizados[$claveOrdenNuevo] ?? 0);
+
+            if ($ordenNuevo <= 0) {
+                $ordenBase++;
+                $ordenNuevo = $ordenBase;
+            }
 
             $stmtExiste = $mysqli->prepare(
                 "SELECT id
@@ -327,7 +370,7 @@ function guardarCamposInforme($mysqli, $usuario_id, $configuracion_informe_id, $
                  (configuracion_informe_id, veterinario_id, campo_id, visible, orden)
                  VALUES (?, ?, ?, ?, ?)"
             );
-            $stmt->bind_param("iiiii", $configuracion_informe_id, $usuario_id, $campo_id, $visible, $ordenBase);
+            $stmt->bind_param("iiiii", $configuracion_informe_id, $usuario_id, $campo_id, $visible, $ordenNuevo);
             $stmt->execute();
         }
     }
@@ -347,36 +390,53 @@ function guardarCamposInforme($mysqli, $usuario_id, $configuracion_informe_id, $
         if ($rowExiste) {
             $registro_id = (int)$rowExiste['id'];
 
-            $stmtOrden = $mysqli->prepare(
-                "SELECT orden
-                 FROM configuracion_informe_campos
-                 WHERE id = ? AND veterinario_id = ? AND configuracion_informe_id = ?
-                 LIMIT 1"
-            );
-            $stmtOrden->bind_param("iii", $registro_id, $usuario_id, $configuracion_informe_id);
-            $stmtOrden->execute();
-            $resOrden = $stmtOrden->get_result();
-            $rowOrden = $resOrden->fetch_assoc();
-            $ordenActual = (int)($rowOrden['orden'] ?? 0);
+            $ordenActualizado = (int)($ordenes_actualizados[(string)$registro_id] ?? 0);
+
+            if ($ordenActualizado <= 0) {
+                $ordenActualizado = (int)($ordenes_actualizados['fijo-' . $campo_fijo_id] ?? 0);
+            }
+
+            if ($ordenActualizado <= 0) {
+                $stmtOrden = $mysqli->prepare(
+                    "SELECT orden
+                     FROM configuracion_informe_campos
+                     WHERE id = ? AND veterinario_id = ? AND configuracion_informe_id = ?
+                     LIMIT 1"
+                );
+                $stmtOrden->bind_param("iii", $registro_id, $usuario_id, $configuracion_informe_id);
+                $stmtOrden->execute();
+                $resOrden = $stmtOrden->get_result();
+                $rowOrden = $resOrden->fetch_assoc();
+                $ordenActualizado = (int)($rowOrden['orden'] ?? 0);
+            }
+
+            if ($ordenActualizado <= 0) {
+                $ordenActualizado = 999;
+            }
 
             $stmtUpd = $mysqli->prepare(
                 "UPDATE configuracion_informe_campos
                  SET visible = 1, orden = ?
                  WHERE id = ? AND veterinario_id = ? AND configuracion_informe_id = ?"
             );
-            $stmtUpd->bind_param("iiii", $ordenActual, $registro_id, $usuario_id, $configuracion_informe_id);
+            $stmtUpd->bind_param("iiii", $ordenActualizado, $registro_id, $usuario_id, $configuracion_informe_id);
             $stmtUpd->execute();
         } else {
-            $stmtMax = $mysqli->prepare(
-                "SELECT IFNULL(MAX(orden), 0) AS max_orden
-                 FROM configuracion_informe_campos
-                 WHERE veterinario_id = ? AND configuracion_informe_id = ?"
-            );
-            $stmtMax->bind_param("ii", $usuario_id, $configuracion_informe_id);
-            $stmtMax->execute();
-            $resMax = $stmtMax->get_result();
-            $ordenBase = (int)($resMax->fetch_assoc()['max_orden'] ?? 0);
-            $ordenBase++;
+            $claveOrdenFijo = 'fijo-' . $campo_fijo_id;
+            $ordenNuevoFijo = (int)($ordenes_actualizados[$claveOrdenFijo] ?? 0);
+
+            if ($ordenNuevoFijo <= 0) {
+                $stmtMax = $mysqli->prepare(
+                    "SELECT IFNULL(MAX(orden), 0) AS max_orden
+                     FROM configuracion_informe_campos
+                     WHERE veterinario_id = ? AND configuracion_informe_id = ?"
+                );
+                $stmtMax->bind_param("ii", $usuario_id, $configuracion_informe_id);
+                $stmtMax->execute();
+                $resMax = $stmtMax->get_result();
+                $ordenBase = (int)($resMax->fetch_assoc()['max_orden'] ?? 0);
+                $ordenNuevoFijo = $ordenBase + 1;
+            }
 
             $visible = 1;
             $stmtIns = $mysqli->prepare(
@@ -384,7 +444,7 @@ function guardarCamposInforme($mysqli, $usuario_id, $configuracion_informe_id, $
                  (configuracion_informe_id, veterinario_id, campo_id, visible, orden)
                  VALUES (?, ?, ?, ?, ?)"
             );
-            $stmtIns->bind_param("iiiii", $configuracion_informe_id, $usuario_id, $campo_fijo_id, $visible, $ordenBase);
+            $stmtIns->bind_param("iiiii", $configuracion_informe_id, $usuario_id, $campo_fijo_id, $visible, $ordenNuevoFijo);
             $stmtIns->execute();
         }
     }

@@ -408,8 +408,8 @@ while ($row = $res->fetch_assoc()) {
             'estado' => $infoPdf['existe'] ? 'Existe' : 'No existe',
             'size_bytes' => $infoPdf['size_bytes'],
             'size_label' => $infoPdf['size_label'],
-            'url_ver' => 'certificado/descargar.php?id=' . $certificadoId,
-            'url_descargar' => 'certificado/descargar.php?id=' . $certificadoId . '&dl=1',
+            'url_ver' => 'certificado/pdf/descargar.php?id=' . $certificadoId,
+            'url_descargar' => 'certificado/pdf/descargar.php?id=' . $certificadoId . '&dl=1',
             'url_informe' => $urlInforme
         ];
 

@@ -81,7 +81,7 @@ $res = $stmt->get_result();
                   <th>Paciente</th>
                   <th>Propietario</th>
                   <th>Tipo Examen</th>
-                  <th>Médico Solicitante</th>
+                  <th>M. Solicitante</th>
                   <th>Recinto</th>
                   <th>Fecha Examen</th>
                   <th>Acciones</th>
@@ -90,27 +90,45 @@ $res = $stmt->get_result();
               <tbody>
                 <?php $i = 1; ?>
                 <?php while ($fila = $res->fetch_assoc()): ?>
-                  <?php
-                    $paciente = $fila['paciente'] ?? '';
-                    $propietario = $fila['propietario'] ?? '';
-                    $tipo_ingreso = $fila['tipo_ingreso'] ?? 'sistema';
+                <?php
+                  $paciente = $fila['paciente'] ?? '';
+                  $propietario = $fila['propietario'] ?? '';
+                  $tipo_ingreso = $fila['tipo_ingreso'] ?? 'sistema';
 
-                    if (empty($paciente) && !empty($fila['manual_data'])) {
-                        $manual = json_decode($fila['manual_data'], true);
-                        $paciente = $manual['paciente'] ?? 'Sin nombre';
-                    }
+                  $manual = [];
 
-                    if (empty($propietario) && !empty($fila['manual_data'])) {
-                        $manual = $manual ?? json_decode($fila['manual_data'], true);
-                        $propietario = $manual['propietario'] ?? '-';
-                    }
-                  ?>
+                  if (!empty($fila['manual_data'])) {
+                      $manualTmp = json_decode($fila['manual_data'], true);
+
+                      if (is_array($manualTmp)) {
+                          $manual = $manualTmp;
+                      }
+                  }
+
+                  if (empty($paciente)) {
+                      $paciente = $manual['paciente'] ?? 'Sin nombre';
+                  }
+
+                  if (empty($propietario)) {
+                      $propietario = $manual['propietario'] ?? '-';
+                  }
+
+                  $medicoListado = trim((string)($fila['medico_solicitante'] ?? ''));
+
+                  if ($medicoListado === '') {
+                      $medicoListado = trim((string)($manual['m_tratante'] ?? ''));
+                  }
+
+                  if ($medicoListado === '') {
+                      $medicoListado = '-';
+                  }
+                ?>
                   <tr>
                     <td><?= $i++ ?></td>
                     <td><?= htmlspecialchars($paciente) ?></td>
                     <td><?= htmlspecialchars($propietario) ?></td>
                     <td><?= htmlspecialchars($fila['tipo_examen'] ?? '-') ?></td>
-                    <td><?= htmlspecialchars($fila['medico_solicitante'] ?? '-') ?></td>
+                    <td><?= htmlspecialchars($medicoListado) ?></td>
                     <td><?= htmlspecialchars($fila['recinto'] ?? '-') ?></td>
                     <td><?= date('d-m-Y', strtotime($fila['fecha_examen'])) ?></td>
                     <td>
@@ -134,23 +152,23 @@ $res = $stmt->get_result();
                             <i class="fas fa-trash-alt me-2 text-danger"></i> Eliminar
                           </a>
 
-                          <a class="dropdown-item" href="certificado/descargar.php?id=<?= (int)$fila['id'] ?>" target="_blank">
+                          <a class="dropdown-item" href="certificado/pdf/descargar.php?id=<?= (int)$fila['id'] ?>" target="_blank">
                             <i class="fas fa-file-pdf me-2 text-danger"></i>Ver PDF
                           </a>
 
-                          <a class="dropdown-item" href="certificado/descargar.php?id=<?= (int)$fila['id'] ?>&dl=1">
+                          <a class="dropdown-item" href="certificado/pdf/descargar.php?id=<?= (int)$fila['id'] ?>&dl=1">
                             <i class="fas fa-download me-2 text-primary"></i>Descargar PDF
                           </a>
 
                           <div class="dropdown-divider"></div>
 
                           <a class="dropdown-item" href="#"
-                             onclick="abrirModalCorreo(this, <?= (int)$fila['id'] ?>)"
-                             data-id="<?= (int)$fila['id'] ?>"
-                             data-paciente="<?= htmlspecialchars($paciente) ?>"
-                             data-propietario="<?= htmlspecialchars($propietario) ?>"
-                             data-tipo_examen="<?= htmlspecialchars($fila['tipo_examen'] ?? '-') ?>"
-                             data-email="<?= htmlspecialchars($fila['email'] ?? '') ?>">
+                              onclick="abrirModalCorreo(this, <?= (int)$fila['id'] ?>)"
+                              data-id="<?= (int)$fila['id'] ?>"
+                              data-paciente="<?= htmlspecialchars($paciente) ?>"
+                              data-propietario="<?= htmlspecialchars($propietario) ?>"
+                              data-tipo_examen="<?= htmlspecialchars($fila['tipo_examen'] ?? '-') ?>"
+                              data-email="<?= htmlspecialchars($fila['email'] ?? '') ?>">
                             <i class="fas fa-envelope me-2 text-success"></i> Enviar por correo
                           </a>
                         </div>

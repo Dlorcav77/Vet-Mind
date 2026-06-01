@@ -1,9 +1,10 @@
-import { Editor, Extension } from 'https://esm.sh/@tiptap/core@2.22.3';
+import { Editor, Extension, Node, mergeAttributes } from 'https://esm.sh/@tiptap/core@2.22.3';
 import StarterKit from 'https://esm.sh/@tiptap/starter-kit@2.22.3';
 import Placeholder from 'https://esm.sh/@tiptap/extension-placeholder@2.22.3';
 import Underline from 'https://esm.sh/@tiptap/extension-underline@2.22.3';
 import TextAlign from 'https://esm.sh/@tiptap/extension-text-align@2.22.3';
 import { TextStyle } from 'https://esm.sh/@tiptap/extension-text-style@2.22.3';
+import Color from 'https://esm.sh/@tiptap/extension-color@2.22.3';
 import Table from 'https://esm.sh/@tiptap/extension-table@2.22.3';
 import TableRow from 'https://esm.sh/@tiptap/extension-table-row@2.22.3';
 import TableHeader from 'https://esm.sh/@tiptap/extension-table-header@2.22.3';
@@ -97,6 +98,56 @@ const LineHeight = Extension.create({
     }
 });
 
+const PageBreak = Node.create({
+    name: 'pageBreak',
+
+    group: 'block',
+
+    atom: true,
+
+    selectable: true,
+
+    draggable: false,
+
+    parseHTML() {
+        return [
+            {
+                tag: 'div[data-vm-page-break="1"]'
+            }
+        ];
+    },
+
+    renderHTML({ HTMLAttributes }) {
+        return [
+            'div',
+            mergeAttributes(HTMLAttributes, {
+                'data-vm-page-break': '1',
+                class: 'vm-page-break',
+                style: 'page-break-after: always; break-after: page;'
+            }),
+            ['span', { class: 'vm-page-break-label' }, '[Salto de página del informe]']
+        ];
+    },
+
+    addCommands() {
+        return {
+            insertPageBreak: () => ({ chain }) => {
+                return chain()
+                    .insertContent([
+                        {
+                            type: this.name
+                        },
+                        {
+                            type: 'paragraph'
+                        }
+                    ])
+                    .focus()
+                    .run();
+            }
+        };
+    }
+});
+
 (function initPlantillaInformeTiptap() {
     const root = document.getElementById('plantilla_informe');
     if (!root) {
@@ -120,6 +171,7 @@ const LineHeight = Extension.create({
     const headingSelect = document.getElementById('contenido_heading');
     const fontSizeSelect = document.getElementById('contenido_font_size');
     const lineHeightSelect = document.getElementById('contenido_line_height');
+    const textColorInput = document.getElementById('contenido_text_color');
     const tableActionSelect = document.getElementById('contenido_table_actions');
 
     if (!form || !editorElement || !textareaElement || !toolbarElement) {
@@ -150,6 +202,35 @@ const LineHeight = Extension.create({
         return attrs.lineHeight || '1.15';
     }
 
+    function normalizeColorForInput(color) {
+        if (typeof color !== 'string') {
+            return '#000000';
+        }
+
+        const value = color.trim();
+
+        if (/^#[0-9a-fA-F]{6}$/.test(value)) {
+            return value;
+        }
+
+        if (/^#[0-9a-fA-F]{3}$/.test(value)) {
+            return '#' + value
+                .slice(1)
+                .split('')
+                .map((char) => char + char)
+                .join('');
+        }
+
+        return '#000000';
+    }
+
+    function getCurrentTextColor(editor) {
+        if (!editor) return '#000000';
+
+        const attrs = editor.getAttributes('textStyle') || {};
+        return normalizeColorForInput(attrs.color || '#000000');
+    }
+
     function updateHeadingSelect(editor) {
         if (!editor || !headingSelect) {
             return;
@@ -178,6 +259,14 @@ const LineHeight = Extension.create({
         }
 
         lineHeightSelect.value = getCurrentLineHeight(editor);
+    }
+
+    function updateTextColorInput(editor) {
+        if (!editor || !textColorInput) {
+            return;
+        }
+
+        textColorInput.value = normalizeColorForInput(getCurrentTextColor(editor));
     }
 
     function updateTableActionVisibility(editor) {
@@ -225,6 +314,8 @@ const LineHeight = Extension.create({
                 isActive = editor.isActive({ textAlign: 'justify' });
             } else if (command === 'insertTable') {
                 isActive = editor.isActive('table');
+            } else if (command === 'insertPageBreak') {
+                isActive = editor.isActive('pageBreak');
             }
 
             button.classList.toggle('active', isActive);
@@ -233,6 +324,7 @@ const LineHeight = Extension.create({
         updateHeadingSelect(editor);
         updateFontSizeSelect(editor);
         updateLineHeightSelect(editor);
+        updateTextColorInput(editor);
         updateTableActionVisibility(editor);
     }
 
@@ -370,6 +462,8 @@ const LineHeight = Extension.create({
             editor.chain().focus().undo().run();
         } else if (command === 'redo') {
             editor.chain().focus().redo().run();
+        } else if (command === 'insertPageBreak') {
+            editor.commands.insertPageBreak();
         } else if (command === 'insertTable') {
             insertTable(editor);
             return;
@@ -428,6 +522,23 @@ const LineHeight = Extension.create({
             editor.chain().focus().unsetLineHeight().run();
         } else {
             editor.chain().focus().setLineHeight(value).run();
+        }
+
+        syncEditorToTextarea();
+        updateToolbarState();
+        editor.commands.focus();
+    }
+
+    function applyTextColor(value) {
+        const editor = window.__plantillaInformeEditor;
+        if (!editor) {
+            return;
+        }
+
+        if (!value) {
+            editor.chain().focus().unsetColor().run();
+        } else {
+            editor.chain().focus().setColor(value).run();
         }
 
         syncEditorToTextarea();
@@ -535,6 +646,22 @@ const LineHeight = Extension.create({
         });
     }
 
+    if (textColorInput && textColorInput.dataset.bound !== '1') {
+        textColorInput.dataset.bound = '1';
+
+        textColorInput.addEventListener('mousedown', function (e) {
+            e.stopPropagation();
+        });
+
+        textColorInput.addEventListener('input', function () {
+            applyTextColor(this.value);
+        });
+
+        textColorInput.addEventListener('change', function () {
+            applyTextColor(this.value);
+        });
+    }
+
     if (tableActionSelect && tableActionSelect.dataset.bound !== '1') {
         tableActionSelect.dataset.bound = '1';
 
@@ -560,6 +687,9 @@ const LineHeight = Extension.create({
             }),
             Underline,
             TextStyle,
+            Color.configure({
+                types: ['textStyle']
+            }),
             FontSize.configure({
                 types: ['textStyle']
             }),
@@ -577,7 +707,8 @@ const LineHeight = Extension.create({
             }),
             TableRow,
             TableHeader,
-            TableCell
+            TableCell,
+            PageBreak
         ],
         content: textareaElement.value || '<p></p>',
         editorProps: {

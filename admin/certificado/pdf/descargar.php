@@ -1,5 +1,5 @@
 <?php
-require_once("../config.php");
+require_once(__DIR__ . "/../../config.php");
 date_default_timezone_set('America/Santiago');
 
 $mysqli = conn();
@@ -58,9 +58,10 @@ if ($codigoPaciente !== '') {
 $downloadName = $base . '.pdf';
 
 $rel = ltrim((string)$row['archivo_pdf'], '/');
-$full = realpath(__DIR__ . "/../../" . $rel);
+$full = realpath(__DIR__ . "/../../../" . $rel);
 
-$allowedBase = realpath(__DIR__ . "/../../uploads/certificados/informes");
+$allowedBase = realpath(__DIR__ . "/../../../uploads/certificados/informes");
+
 if (!$full || !$allowedBase || strpos($full, $allowedBase) !== 0 || !file_exists($full)) {
     http_response_code(404);
     echo "Archivo inválido.";

@@ -3,7 +3,7 @@
 
 require_once("../config.php");
 require_once("../../vendor/autoload.php");
-require_once("funcionesCertificado.php");
+require_once(__DIR__ . "/pdf/funcionesCertificado.php");
 
 use Dompdf\Dompdf;
 
@@ -452,6 +452,18 @@ foreach ($_POST as $k => $v) {
     }
 }
 
+$manual_extra_data = [];
+
+foreach ($manual as $campoManual => $valorManual) {
+    $valorManual = trim((string)$valorManual);
+
+    if ($valorManual === '') {
+        continue;
+    }
+
+    $manual_extra_data[$campoManual] = $valorManual;
+}
+
 if ($modo_manual) {
     $manualPaciente = trim((string)($manual['paciente'] ?? ''));
     $manualPropietario = trim((string)($manual['propietario'] ?? ''));
@@ -478,7 +490,9 @@ if ($action === 'modificar' && $id > 0) {
     }
 }
 
-$manual_data = null;
+$manual_data = !empty($manual_extra_data)
+    ? json_encode($manual_extra_data, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES)
+    : null;
 
 if ($modo_manual && $guardarMascota && !empty($manual)) {
     $tutorNombre = trim($manual['propietario'] ?? '');
@@ -638,7 +652,8 @@ $html = buildInformeHtml(
     $imagenes,
     $recinto,
     $medico_solicitante,
-    $manual_data
+    $manual_data,
+    $plantilla_informe_id
 );
 
 $pdf = new Dompdf();
