@@ -3,6 +3,28 @@ window.ultimoTriggerVistaPrevia = window.ultimoTriggerVistaPrevia || null;
 window.nombreTempPDF = window.nombreTempPDF || null;
 window.imagenesTempPreview = window.imagenesTempPreview || [];
 
+window.vmPreviewBodyPaddingOriginal = window.vmPreviewBodyPaddingOriginal || '';
+
+function vmPreviewGuardarEstadoBody() {
+    window.vmPreviewBodyPaddingOriginal = document.body.style.paddingRight || '';
+}
+
+function vmPreviewRestaurarEstadoBody() {
+    document.body.style.paddingRight = window.vmPreviewBodyPaddingOriginal || '';
+
+    if (!document.body.getAttribute('style')) {
+        document.body.removeAttribute('style');
+    }
+}
+
+function vmPreviewLimpiarPaddingBodyAcumulado() {
+    const hayModalVisible = document.querySelector('.modal.show');
+
+    if (!hayModalVisible) {
+        document.body.style.paddingRight = '';
+    }
+}
+
 $('#btnVistaPrevia')
     .off('mousedown.storeTriggerVista focus.storeTriggerVista')
     .on('mousedown.storeTriggerVista focus.storeTriggerVista', function () {
@@ -66,6 +88,9 @@ $('#btnVistaPrevia').off('click.vistaPrevia').on('click.vistaPrevia', function (
     window.nombreTempPDF = null;
     window.imagenesTempPreview = [];
 
+    vmPreviewLimpiarPaddingBodyAcumulado();
+    vmPreviewGuardarEstadoBody();
+
     let form = $('form')[0];
     let formData = new FormData(form);
 
@@ -77,7 +102,7 @@ $('#btnVistaPrevia').off('click.vistaPrevia').on('click.vistaPrevia', function (
     });
 
     $.ajax({
-        url: 'certificado/previewPDF.php',
+        url: 'certificado/pdf/previewPDF.php',
         type: 'POST',
         data: formData,
         processData: false,
@@ -87,18 +112,23 @@ $('#btnVistaPrevia').off('click.vistaPrevia').on('click.vistaPrevia', function (
             Swal.close();
 
             if (!data || data.status !== 'success' || !data.pdfUrl) {
+                vmPreviewRestaurarEstadoBody();
                 Swal.fire('Error', data?.message || 'No se pudo generar la vista previa del PDF.', 'error');
                 return;
             }
 
-            $('#contenidoVistaPrevia').html(
-                '<iframe src="' + data.pdfUrl + '" style="width:100%;height:80vh;border:none;"></iframe>'
-            );
+            setTimeout(function () {
+                vmPreviewRestaurarEstadoBody();
 
-            $('#modalVistaPrevia').modal('show');
+                $('#contenidoVistaPrevia').html(
+                    '<iframe src="' + data.pdfUrl + '" style="width:100%;height:80vh;border:none;"></iframe>'
+                );
 
-            window.nombreTempPDF = data.pdf || data.pdfUrl.split('/').pop();
-            window.imagenesTempPreview = Array.isArray(data.imagenesTemporales) ? data.imagenesTemporales : [];
+                $('#modalVistaPrevia').modal('show');
+
+                window.nombreTempPDF = data.pdf || data.pdfUrl.split('/').pop();
+                window.imagenesTempPreview = Array.isArray(data.imagenesTemporales) ? data.imagenesTemporales : [];
+            }, 0);
         },
         error: function (xhr) {
             Swal.close();
@@ -141,6 +171,9 @@ $('#modalVistaPrevia')
 $('#modalVistaPrevia')
     .off('hidden.bs.modal.storeTriggerVista')
     .on('hidden.bs.modal.storeTriggerVista', function () {
+        $('#contenidoVistaPrevia').empty();
+        vmPreviewRestaurarEstadoBody();
+
         if (!window.nombreTempPDF) {
             return;
         }

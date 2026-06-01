@@ -168,9 +168,9 @@ function buildInformeHtml($veterinarioId, $configuracionInformeId, $pacienteId, 
     ob_start();
 
     if ($layoutTipo === 'clinica') {
-        include(__DIR__ . '/planilla_pdf_clinica.php');
+        include(__DIR__ . '/plantillas/planilla_pdf_clinica.php');
     } else {
-        include(__DIR__ . '/planilla_pdf.php');
+        include(__DIR__ . '/plantillas/planilla_pdf.php');
     }
 
     return ob_get_clean();

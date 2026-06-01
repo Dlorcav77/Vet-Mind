@@ -75,3 +75,66 @@
     border: 0;
     padding: 0;
 }
+
+/* Layout dinámico de campos generales del informe */
+#fila_campos_generales.vm-campos-generales {
+    display: grid;
+    grid-template-columns: repeat(12, minmax(0, 1fr));
+    column-gap: 8px;
+    row-gap: 0;
+    width: 100%;
+}
+
+#fila_campos_generales .vm-campo-general {
+    min-width: 0;
+}
+
+#fila_campos_generales .vm-campo-general input,
+#fila_campos_generales .vm-campo-general select,
+#fila_campos_generales .vm-campo-general textarea {
+    width: 100%;
+}
+
+/* 1 campo visible: centrado */
+#fila_campos_generales.vm-campos-1 .vm-campo-general.vm-visible {
+    grid-column: 4 / span 6;
+}
+
+/* 2 campos visibles: mitad y mitad */
+#fila_campos_generales.vm-campos-2 .vm-campo-general.vm-visible {
+    grid-column: span 6;
+}
+
+/* 3 campos visibles: 3 columnas normales */
+#fila_campos_generales.vm-campos-3 .vm-campo-general.vm-visible {
+    grid-column: span 4;
+}
+
+/* 4 campos visibles: 2 y 2 */
+#fila_campos_generales.vm-campos-4 .vm-campo-general.vm-visible {
+    grid-column: span 6;
+}
+
+/* 5 campos visibles: 3 arriba y 2 abajo centrados */
+#fila_campos_generales.vm-campos-5 .vm-campo-general.vm-visible {
+    grid-column: span 4;
+}
+
+#fila_campos_generales.vm-campos-5 .vm-campo-general.vm-visible:nth-of-type(4) {
+    grid-column: 3 / span 4;
+}
+
+#fila_campos_generales.vm-campos-5 .vm-campo-general.vm-visible:nth-of-type(5) {
+    grid-column: 7 / span 4;
+}
+
+/* 6 o más: 3 por fila */
+#fila_campos_generales.vm-campos-mas .vm-campo-general.vm-visible {
+    grid-column: span 4;
+}
+
+@media (max-width: 767.98px) {
+    #fila_campos_generales.vm-campos-generales .vm-campo-general.vm-visible {
+        grid-column: 1 / -1 !important;
+    }
+}

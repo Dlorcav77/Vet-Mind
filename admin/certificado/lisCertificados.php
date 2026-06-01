@@ -152,23 +152,23 @@ $res = $stmt->get_result();
                             <i class="fas fa-trash-alt me-2 text-danger"></i> Eliminar
                           </a>
 
-                          <a class="dropdown-item" href="certificado/descargar.php?id=<?= (int)$fila['id'] ?>" target="_blank">
+                          <a class="dropdown-item" href="certificado/pdf/descargar.php?id=<?= (int)$fila['id'] ?>" target="_blank">
                             <i class="fas fa-file-pdf me-2 text-danger"></i>Ver PDF
                           </a>
 
-                          <a class="dropdown-item" href="certificado/descargar.php?id=<?= (int)$fila['id'] ?>&dl=1">
+                          <a class="dropdown-item" href="certificado/pdf/descargar.php?id=<?= (int)$fila['id'] ?>&dl=1">
                             <i class="fas fa-download me-2 text-primary"></i>Descargar PDF
                           </a>
 
                           <div class="dropdown-divider"></div>
 
                           <a class="dropdown-item" href="#"
-                             onclick="abrirModalCorreo(this, <?= (int)$fila['id'] ?>)"
-                             data-id="<?= (int)$fila['id'] ?>"
-                             data-paciente="<?= htmlspecialchars($paciente) ?>"
-                             data-propietario="<?= htmlspecialchars($propietario) ?>"
-                             data-tipo_examen="<?= htmlspecialchars($fila['tipo_examen'] ?? '-') ?>"
-                             data-email="<?= htmlspecialchars($fila['email'] ?? '') ?>">
+                              onclick="abrirModalCorreo(this, <?= (int)$fila['id'] ?>)"
+                              data-id="<?= (int)$fila['id'] ?>"
+                              data-paciente="<?= htmlspecialchars($paciente) ?>"
+                              data-propietario="<?= htmlspecialchars($propietario) ?>"
+                              data-tipo_examen="<?= htmlspecialchars($fila['tipo_examen'] ?? '-') ?>"
+                              data-email="<?= htmlspecialchars($fila['email'] ?? '') ?>">
                             <i class="fas fa-envelope me-2 text-success"></i> Enviar por correo
                           </a>
                         </div>

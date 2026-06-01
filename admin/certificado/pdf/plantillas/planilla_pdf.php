@@ -1,9 +1,9 @@
 <?php
-// admin/certificado/plantilla_pdf.php
+// admin/certificado/pdf/plantillas/planilla_pdf.php
 
 /**
- * Esta plantilla se incluye desde buildInformeHtml().
- * Las variables principales vienen preparadas desde funcionesCertificado.php.
+ * Esta plantilla se incluye desde pdf/funcionesCertificado.php.
+ * Las variables principales vienen preparadas desde buildInformeHtml().
  *
  * @var array $config
  * @var array $paciente
@@ -72,7 +72,8 @@ function base64Image($path) {
         return $path;
     }
 
-    $fullPath = realpath(__DIR__ . '/../../' . ltrim($path, '/'));
+    $fullPath = realpath(__DIR__ . '/../../../../' . ltrim($path, '/'));
+
     if ($fullPath && file_exists($fullPath)) {
         $mime = mime_content_type($fullPath);
         $data = base64_encode(file_get_contents($fullPath));

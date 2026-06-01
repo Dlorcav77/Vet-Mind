@@ -1,9 +1,9 @@
 <?php
-// admin/certificado/planilla_pdf_clinica.php
+// admin/certificado/pdf/plantillas/planilla_pdf_clinica.php
 
 /**
- * Esta plantilla se incluye desde buildInformeHtml().
- * Las variables principales vienen preparadas desde funcionesCertificado.php.
+ * Esta plantilla se incluye desde pdf/funcionesCertificado.php.
+ * Las variables principales vienen preparadas desde buildInformeHtml().
  *
  * @var array $config
  * @var array $paciente
@@ -92,13 +92,52 @@ if (!in_array($footer_align, $align_permitidos, true)) {
     $footer_align = 'center';
 }
 
+$fecha_align = $config['fecha_align'] ?? 'right';
+if (!in_array($fecha_align, $align_permitidos, true)) {
+    $fecha_align = 'right';
+}
+
+$subtitulo_align = $config['subtitulo_align'] ?? 'left';
+if (!in_array($subtitulo_align, $align_permitidos, true)) {
+    $subtitulo_align = 'left';
+}
+
+$logo_size = $config['logo_size'] ?? 'large';
+
+$logo_sizes_clinica = [
+    'small' => [
+        'width' => '115px',
+        'max_width' => '115px',
+        'max_height' => '128px'
+    ],
+    'medium' => [
+        'width' => '145px',
+        'max_width' => '145px',
+        'max_height' => '170px'
+    ],
+    'large' => [
+        'width' => '180px',
+        'max_width' => '180px',
+        'max_height' => '205px'
+    ]
+];
+
+$logo_config_clinica = $logo_sizes_clinica[$logo_size] ?? $logo_sizes_clinica['large'];
+
 $firma_margin_map = [
-    'left'   => '42px auto 0 0',
-    'center' => '42px auto 0 auto',
-    'right'  => '42px 36px 0 auto'
+    'left'   => '60px auto 0 0',
+    'center' => '60px auto 0 auto',
+    'right'  => '60px 36px 0 auto'
+];
+
+$firma_img_margin_map = [
+    'left'   => '0 auto 8px 0',
+    'center' => '0 auto 8px auto',
+    'right'  => '0 0 8px auto'
 ];
 
 $firma_margin = $firma_margin_map[$firma_align] ?? $firma_margin_map['right'];
+$firma_img_margin = $firma_img_margin_map[$firma_align] ?? $firma_img_margin_map['right'];
 
 $fecha_dt = new DateTime($fecha);
 $dia = $fecha_dt->format('j');
@@ -123,6 +162,19 @@ $mes_en = $fecha_dt->format('F');
 $mes_es = $meses[$mes_en] ?? strtolower($mes_en);
 $fecha_emision = $dia . ' ' . $mes_es . ' ' . $anio;
 
+$lugar = trim($config['lugar_fecha'] ?? '');
+$mes_es_formateado = ucfirst($mes_es);
+$formato_fecha = $config['formato_fecha'] ?? '{{day}}/{{month}}/{{year}}';
+
+$fecha_str = str_replace(
+    ['{{day}}', '{{month}}', '{{year}}'],
+    [$dia, $mes_es_formateado, $anio],
+    $formato_fecha
+);
+
+$fecha_str = ucfirst($fecha_str);
+$fecha_informe_str = ($lugar !== '' ? $lugar . ', ' : '') . $fecha_str;
+
 $imagenes_por_fila = (int)($config['imagenes_por_fila'] ?? 2);
 
 if ($imagenes_por_fila < 1) {
@@ -144,7 +196,7 @@ function base64ImageClinica($path) {
         return $path;
     }
 
-    $fullPath = realpath(__DIR__ . '/../../' . ltrim($path, '/'));
+    $fullPath = realpath(__DIR__ . '/../../../../' . ltrim($path, '/'));
 
     if ($fullPath && file_exists($fullPath)) {
         $mime = mime_content_type($fullPath);
@@ -374,9 +426,9 @@ $filas_campos_clinica = agruparCamposPdfClinicaPorOrden($campos);
         }
 
         .header-logo {
-            width: 180px;
-            max-width: 180px;
-            max-height: 205px;
+            width: <?= htmlspecialchars($logo_config_clinica['width']) ?>;
+            max-width: <?= htmlspecialchars($logo_config_clinica['max_width']) ?>;
+            max-height: <?= htmlspecialchars($logo_config_clinica['max_height']) ?>;
             display: block;
             margin: 0 auto;
         }
@@ -609,7 +661,7 @@ $filas_campos_clinica = agruparCamposPdfClinicaPorOrden($campos);
         .firma-box {
             width: 290px;
             margin: <?= $firma_margin ?>;
-            text-align: center;
+            text-align: <?= htmlspecialchars($firma_align) ?>;
             font-size: 14px;
             line-height: 1.35;
             color: #000000;
@@ -624,7 +676,16 @@ $filas_campos_clinica = agruparCamposPdfClinicaPorOrden($campos);
             max-height: 72px;
             max-width: 220px;
             display: block;
-            margin: 0 auto 8px auto;
+            margin: <?= $firma_img_margin ?>;
+        }
+
+        .fecha-informe {
+            text-align: <?= htmlspecialchars($fecha_align) ?>;
+            color: #555555;
+            font-size: 13px;
+            font-weight: bold;
+            margin: 18px 0 0 0;
+            page-break-inside: avoid;
         }
 
         .footer-texto {
@@ -822,18 +883,22 @@ $filas_campos_clinica = agruparCamposPdfClinicaPorOrden($campos);
 
         <div class="separador"></div>
 
-        <h2 class="titulo-seccion">DESCRIPCIÓN DEL ESTUDIO</h2>
+        <?php if (!empty($config['subtitulo'])): ?>
+            <h2 class="titulo-seccion" style="text-align: <?= htmlspecialchars($subtitulo_align) ?>;">
+                <?= htmlspecialchars($config['subtitulo']) ?>
+            </h2>
+        <?php endif; ?>
 
         <div class="descripcion">
             <?= $descripcion ?>
 
-            <div class="saludo">
+            <!-- <div class="saludo">
                 Saluda atentamente a usted.
-            </div>
+            </div> -->
         </div>
 
         <div class="firma-box">
-            <div class="firma-saludo">Atentamente,</div>
+            <div class="firma-saludo">Saluda atentamente a usted.</div>
 
             <?php if ($firma_src): ?>
                 <img src="<?= $firma_src ?>" alt="Firma" class="firma-img">
@@ -848,6 +913,12 @@ $filas_campos_clinica = agruparCamposPdfClinicaPorOrden($campos);
                 </small>
             <?php endforeach; ?>
         </div>
+
+        <?php if (!empty($config['mostrar_fecha'])): ?>
+            <div class="fecha-informe">
+                <?= htmlspecialchars($fecha_informe_str) ?>
+            </div>
+        <?php endif; ?>
     </div>
 </div>
 

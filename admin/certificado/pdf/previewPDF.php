@@ -1,9 +1,9 @@
 <?php
-// admin/certificado/previewPDF.php
+// admin/certificado/pdf/previewPDF.php
 
-require_once("../config.php");
-require_once("../../vendor/autoload.php");
-require_once("funcionesCertificado.php");
+require_once(__DIR__ . "/../../config.php");
+require_once(__DIR__ . "/../../../vendor/autoload.php");
+require_once(__DIR__ . "/funcionesCertificado.php");
 
 use Dompdf\Dompdf;
 
@@ -121,8 +121,8 @@ try {
         }
     }
 
-    $previewDir = __DIR__ . '/../../uploads/tmp/informe/';
-    $previewImgDir = __DIR__ . '/../../uploads/tmp/img/';
+    $previewDir = __DIR__ . '/../../../uploads/tmp/informe/';
+    $previewImgDir = __DIR__ . '/../../../uploads/tmp/img/';
 
     $limiteImagenes = 24;
     $cantidadImagenesAntiguas = 0;

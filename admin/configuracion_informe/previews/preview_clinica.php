@@ -205,6 +205,38 @@ function renderVistaPreviaPlantillaClinica($mysqli, $fila) {
         $footer_align = 'center';
     }
 
+    $fecha_align = $fila['fecha_align'] ?? 'right';
+    if (!in_array($fecha_align, $align_permitidos, true)) {
+        $fecha_align = 'right';
+    }
+
+    $subtitulo_align = $fila['subtitulo_align'] ?? 'center';
+    if (!in_array($subtitulo_align, $align_permitidos, true)) {
+        $subtitulo_align = 'center';
+    }
+
+    $logo_size = $fila['logo_size'] ?? 'large';
+
+    $logo_sizes_clinica = [
+        'small' => [
+            'width' => '145px',
+            'max_height' => '128px',
+            'cell_width' => '240px'
+        ],
+        'medium' => [
+            'width' => '190px',
+            'max_height' => '170px',
+            'cell_width' => '240px'
+        ],
+        'large' => [
+            'width' => '240px',
+            'max_height' => '212px',
+            'cell_width' => '240px'
+        ]
+    ];
+
+    $logo_config_clinica = $logo_sizes_clinica[$logo_size] ?? $logo_sizes_clinica['large'];
+
     $firma_margin_map = [
         'left'   => '42px auto 0 0',
         'center' => '42px auto 0 auto',
@@ -212,6 +244,8 @@ function renderVistaPreviaPlantillaClinica($mysqli, $fila) {
     ];
 
     $firma_margin = $firma_margin_map[$firma_align] ?? $firma_margin_map['right'];
+
+    $lugar = trim($fila['lugar_fecha'] ?? '');
 
     $fecha = new DateTime();
     $dia = $fecha->format('j');
@@ -234,7 +268,18 @@ function renderVistaPreviaPlantillaClinica($mysqli, $fila) {
 
     $mes_en = $fecha->format('F');
     $mes_es = $meses[$mes_en] ?? strtolower($mes_en);
-    $fecha_str = $dia . ' ' . $mes_es . ' ' . $anio;
+    $mes_es_formateado = ucfirst($mes_es);
+
+    $formato_fecha = $fila['formato_fecha'] ?? '{{day}}/{{month}}/{{year}}';
+
+    $fecha_str = str_replace(
+        ['{{day}}', '{{month}}', '{{year}}'],
+        [$dia, $mes_es_formateado, $anio],
+        $formato_fecha
+    );
+
+    $fecha_str = ucfirst($fecha_str);
+    $fecha_informe_str = ($lugar !== '' ? $lugar . ', ' : '') . $fecha_str;
 
     $imagenes_por_fila = (int)($fila['imagenes_por_fila'] ?? 2);
 
@@ -275,20 +320,19 @@ function renderVistaPreviaPlantillaClinica($mysqli, $fila) {
                 min-height:215px;
                 align-items:flex-start;
             ">
-                <div style="
-                    width:240px;
-                    padding:4px 1px 0 1px;
-                    box-sizing:border-box;
-                    /* background: blue; */
-                ">
-                    <?php if (!empty($fila['logo_url'])): ?>
-                        <img src="../<?= htmlspecialchars($fila['logo_url']) ?>" alt="Logo" style="
-                            width:240px;
-                            max-height:212px;
-                            object-fit:contain;
-                            display:block;
-                            margin-top:0;
-                        ">
+            <div style="
+                width:<?= htmlspecialchars($logo_config_clinica['cell_width']) ?>;
+                padding:4px 1px 0 1px;
+                box-sizing:border-box;
+            ">
+                <?php if (!empty($fila['logo_url'])): ?>
+                    <img src="../<?= htmlspecialchars($fila['logo_url']) ?>" alt="Logo" style="
+                        width:<?= htmlspecialchars($logo_config_clinica['width']) ?>;
+                        max-height:<?= htmlspecialchars($logo_config_clinica['max_height']) ?>;
+                        object-fit:contain;
+                        display:block;
+                        margin:0 auto;
+                    ">
                     <?php else: ?>
                         <div style="
                             width:170px;
@@ -463,20 +507,23 @@ function renderVistaPreviaPlantillaClinica($mysqli, $fila) {
                     margin:14px -10px 12px -10px;
                 "></div>
 
-                <h2 style="
-                    margin:0 0 8px 0;
-                    color:<?= htmlspecialchars($color_secundario) ?>;
-                    font-size:24px;
-                    line-height:1;
-                    font-weight:800;
-                    text-transform:uppercase;
-                ">
-                    DESCRIPCIÓN DEL ESTUDIO
-                </h2>
+                <?php if (!empty($fila['subtitulo'])): ?>
+                    <h2 style="
+                        margin:0 0 8px 0;
+                        color:<?= htmlspecialchars($color_secundario) ?>;
+                        font-size:24px;
+                        line-height:1;
+                        font-weight:800;
+                        text-transform:uppercase;
+                        text-align:<?= htmlspecialchars($subtitulo_align) ?>;
+                    ">
+                        <?= htmlspecialchars($fila['subtitulo']) ?>
+                    </h2>
+                <?php endif; ?>
 
                 <div style="
                     padding:22px 18px;
-                    margin:18px 0 0 0;
+                    margin:<?= !empty($fila['subtitulo']) ? '18px 0 0 0' : '8px 0 0 0' ?>;
                     background-color:#f8f9fa;
                     border:1px dashed #ccc;
                     border-radius:8px;
@@ -517,6 +564,18 @@ function renderVistaPreviaPlantillaClinica($mysqli, $fila) {
                         </small>
                     <?php endforeach; ?>
                 </div>
+
+                <?php if (!empty($fila['mostrar_fecha'])): ?>
+                    <div style="
+                        text-align:<?= htmlspecialchars($fecha_align) ?>;
+                        color:#555;
+                        font-size:13px;
+                        font-weight:bold;
+                        margin:18px 0 0 0;
+                    ">
+                        <?= htmlspecialchars($fecha_informe_str) ?>
+                    </div>
+                <?php endif; ?>
             </div>
 
             <?php if ($footer_texto !== ''): ?>
