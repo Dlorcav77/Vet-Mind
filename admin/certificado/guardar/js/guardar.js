@@ -584,7 +584,7 @@ $('#btnGuardarCertificado').off('click.guardarCertificado').on('click.guardarCer
                 let certId = response.id || 0;
 
                 if (certId) {
-                    window.open('certificado/descargar.php?id=' + encodeURIComponent(certId), '_blank');
+                    window.open('certificado/pdf/descargar.php?id=' + encodeURIComponent(certId), '_blank');
                 } else {
                     let rutaPdf = response.rutaPdf || null;
                     if (rutaPdf) {

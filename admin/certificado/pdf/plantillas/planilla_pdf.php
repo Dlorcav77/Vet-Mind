@@ -1,5 +1,17 @@
 <?php
-// admin/certificado/plantilla_pdf.php
+// admin/certificado/pdf/plantillas/planilla_pdf.php
+
+/**
+ * Esta plantilla se incluye desde pdf/funcionesCertificado.php.
+ * Las variables principales vienen preparadas desde buildInformeHtml().
+ *
+ * @var array $config
+ * @var array $paciente
+ * @var array $campos
+ * @var array $imagenes
+ * @var string $fecha
+ * @var string $descripcion
+ */
 
 $align_map = ['left' => 'left', 'center' => 'center', 'right' => 'right'];
 $logo_align = $align_map[$config['logo_position']] ?? 'center';
@@ -60,7 +72,8 @@ function base64Image($path) {
         return $path;
     }
 
-    $fullPath = realpath(__DIR__ . '/../../' . ltrim($path, '/'));
+    $fullPath = realpath(__DIR__ . '/../../../../' . ltrim($path, '/'));
+
     if ($fullPath && file_exists($fullPath)) {
         $mime = mime_content_type($fullPath);
         $data = base64_encode(file_get_contents($fullPath));
@@ -68,6 +81,46 @@ function base64Image($path) {
     }
 
     return null;
+}
+
+function calcularEdadPdfClasico($fechaNacimientoValor) {
+    $fechaNacimientoValor = trim((string)$fechaNacimientoValor);
+
+    if ($fechaNacimientoValor === '') {
+        return '';
+    }
+
+    try {
+        $fechaNacimiento = new DateTime($fechaNacimientoValor);
+        $hoy = new DateTime();
+
+        if ($fechaNacimiento > $hoy) {
+            return '';
+        }
+
+        $diff = $hoy->diff($fechaNacimiento);
+
+        $anios = (int)$diff->y;
+        $meses = (int)$diff->m;
+
+        $partes = [];
+
+        if ($anios > 0) {
+            $partes[] = $anios . ' ' . ($anios === 1 ? 'año' : 'años');
+        }
+
+        if ($meses > 0) {
+            $partes[] = $meses . ' ' . ($meses === 1 ? 'mes' : 'meses');
+        }
+
+        if (empty($partes)) {
+            return '0 meses';
+        }
+
+        return implode(' ', $partes);
+    } catch (Throwable $e) {
+        return '';
+    }
 }
 ?>
 <html>
@@ -151,6 +204,34 @@ function base64Image($path) {
         .descripcion div {
             margin: 0;
             line-height: 1.15;
+        }
+
+        .descripcion .vm-pdf-page-break {
+            display: block;
+            height: 0;
+            margin: 0;
+            padding: 0;
+            border: 0;
+            page-break-after: always;
+            break-after: page;
+            line-height: 0;
+            font-size: 0;
+        }
+
+        .descripcion .vm-pdf-page-spacer {
+            display: block;
+            height: 32px;
+            margin: 0;
+            padding: 0;
+            border: 0;
+            line-height: 0;
+            font-size: 0;
+        }
+
+        .descripcion .vm-pdf-page-break::after {
+            content: "";
+            display: block;
+            height: 0;
         }
 
         .descripcion br {
@@ -343,13 +424,7 @@ function base64Image($path) {
                     $campoNombre = $campos[$i]['campo'];
 
                     if ($campoNombre == 'edad') {
-                        if (!empty($paciente['fecha_nacimiento'])) {
-                            $fechaNacimiento = new DateTime($paciente['fecha_nacimiento']);
-                            $hoy = new DateTime();
-                            $valorCampo = $hoy->diff($fechaNacimiento)->y . " años";
-                        } else {
-                            $valorCampo = '';
-                        }
+                        $valorCampo = calcularEdadPdfClasico($paciente['fecha_nacimiento'] ?? '');
                     } elseif ($campoNombre == 'fecha_nacimiento' && !empty($paciente['fecha_nacimiento'])) {
                         $fechaNacimiento = new DateTime($paciente['fecha_nacimiento']);
                         $valorCampo = $fechaNacimiento->format('d-m-Y');
@@ -366,13 +441,7 @@ function base64Image($path) {
                         $campoNombre2 = $campos[$i + 1]['campo'];
 
                         if ($campoNombre2 == 'edad') {
-                            if (!empty($paciente['fecha_nacimiento'])) {
-                                $fechaNacimiento = new DateTime($paciente['fecha_nacimiento']);
-                                $hoy = new DateTime();
-                                $valorCampo2 = $hoy->diff($fechaNacimiento)->y . " años";
-                            } else {
-                                $valorCampo2 = '';
-                            }
+                            $valorCampo2 = calcularEdadPdfClasico($paciente['fecha_nacimiento'] ?? '');
                         } elseif ($campoNombre2 == 'fecha_nacimiento' && !empty($paciente['fecha_nacimiento'])) {
                             $fechaNacimiento = new DateTime($paciente['fecha_nacimiento']);
                             $valorCampo2 = $fechaNacimiento->format('d-m-Y');

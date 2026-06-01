@@ -25,6 +25,8 @@ function cargarCamposVisiblesPorConfiguracion(configuracionInformeId) {
                 if (typeof aplicarCamposVisiblesFormulario === 'function') {
                     aplicarCamposVisiblesFormulario(res.campos || []);
                 }
+
+                setTimeout(vmAjustarLayoutCamposGenerales, 0);
             } else {
                 Swal.fire(
                     'Error',
@@ -50,6 +52,45 @@ function cargarCamposVisiblesPorConfiguracion(configuracionInformeId) {
         }
     });
 }
+
+function vmAjustarLayoutCamposGenerales() {
+    const $fila = $('#fila_campos_generales');
+
+    if (!$fila.length) {
+        return;
+    }
+
+    const $campos = $fila.find('[data-campo-general]');
+    let visibles = 0;
+
+    $campos.each(function () {
+        const $campo = $(this);
+        const visible = $campo.is(':visible') && $campo.css('display') !== 'none';
+
+        $campo.removeClass('vm-visible');
+
+        if (visible) {
+            visibles++;
+            $campo.addClass('vm-visible');
+        }
+    });
+
+    $fila.removeClass('vm-campos-0 vm-campos-1 vm-campos-2 vm-campos-3 vm-campos-4 vm-campos-5 vm-campos-mas');
+
+    if (visibles <= 0) {
+        $fila.addClass('vm-campos-0');
+        return;
+    }
+
+    if (visibles >= 6) {
+        $fila.addClass('vm-campos-mas');
+        return;
+    }
+
+    $fila.addClass('vm-campos-' + visibles);
+}
+
+window.vmAjustarLayoutCamposGenerales = vmAjustarLayoutCamposGenerales;
 
 function vmNormalizarHtmlParaComparar(html) {
     const raw = String(html || '').trim();
@@ -365,7 +406,37 @@ $(function () {
             }
         });
 
-    if ($('#plantilla_informe_id').val()) {
-        $('#plantilla_informe_id').trigger('change');
+    vmAjustarLayoutCamposGenerales();
+
+    const filaCamposGenerales = document.getElementById('fila_campos_generales');
+
+    if (filaCamposGenerales) {
+        let vmAjustandoLayoutCampos = false;
+        let vmTimerLayoutCampos = null;
+
+        const observerCamposGenerales = new MutationObserver(function () {
+            if (vmAjustandoLayoutCampos) {
+                return;
+            }
+
+            clearTimeout(vmTimerLayoutCampos);
+
+            vmTimerLayoutCampos = setTimeout(function () {
+                vmAjustandoLayoutCampos = true;
+
+                vmAjustarLayoutCamposGenerales();
+
+                setTimeout(function () {
+                    vmAjustandoLayoutCampos = false;
+                }, 50);
+            }, 50);
+        });
+
+        observerCamposGenerales.observe(filaCamposGenerales, {
+            attributes: true,
+            childList: true,
+            subtree: true,
+            attributeFilter: ['style']
+        });
     }
 });
