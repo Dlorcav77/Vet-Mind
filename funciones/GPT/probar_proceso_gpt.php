@@ -4,7 +4,7 @@
 // URL del endpoint real
 // $endpoint = 'http://localhost/funciones/GPT/proceso_gpt.php';
 // si lo tienes en el dominio:
-$endpoint = 'https://app.vet-mind.cl/funciones/GPT/proceso_gpt.php';
+$endpoint = 'https://dev-app.vet-mind.cl/funciones/GPT/proceso_gpt.php';
 
 
 

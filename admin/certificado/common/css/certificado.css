@@ -131,3 +131,21 @@
             width: 100%;
         }
     }
+
+
+
+
+
+    
+    /* Flags del asistente en informes ecográficos */
+.flag {
+  font-weight: 700;
+  font-size: 0.85em;
+  cursor: help;
+  padding: 0 1px;
+}
+.flag[data-tipo="valor_sospechoso"] { color: #e67e22; } /* naranjo */
+.flag[data-tipo="falta_unidad"]     { color: #d35400; } /* naranjo oscuro */
+.flag[data-tipo="termino_confuso"]  { color: #8e44ad; } /* morado */
+.flag[data-tipo="incongruencia"]    { color: #c0392b; } /* rojo */
+.flag[data-tipo="medida_ilegible"]  { color: #2980b9; } /* azul */
