@@ -38,7 +38,7 @@ $borrador_payload                = $formData['borrador_payload'];
 $borrador_scope_key              = $formData['borrador_scope_key'];
 $modo_ingreso_contenido_inicial  = $formData['modo_ingreso_contenido_inicial'];
 ?>
-<link rel="stylesheet" href="certificado/common/css/certificado.css?v=1">
+<link rel="stylesheet" href="certificado/common/css/certificado.css?v=2">
 <div class="card" id="certificado" data-page-id="certificado">
     <div class="card-header pb-1">
         <div class="cert-header-top">
@@ -135,6 +135,6 @@ document.addEventListener('DOMContentLoaded', function () {
 </script>
 
 <script src="certificado/common/js/editor.js?v=3"></script>
-<script src="certificado/metodo_ingreso/js/ia.js?v=6"></script>
+<script src="certificado/metodo_ingreso/js/ia.js?v=11"></script>
 <script src="certificado/preview/js/preview.js?v=4"></script>
 <script src="certificado/guardar/js/guardar.js?v=15"></script>

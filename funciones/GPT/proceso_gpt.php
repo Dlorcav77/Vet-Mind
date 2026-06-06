@@ -1,4 +1,5 @@
 <?php
+// funciones/GPT/proceso_gpt.php
 declare(strict_types=1);
 const GPT_SNAPSHOT = 1;
 
@@ -15,6 +16,31 @@ require_once($FUNC_DIR . "/logs/logger.php");
 require_once($GPT_DIR . "/lib/gpt_prompt.php");
 require_once($GPT_DIR . "/lib/gpt_postprocess.php");
 
+/////////////////////////////////////////////////////////////////
+/////////////////////////////////////////////////////////////////
+// Motor manual para pruebas.
+// Valores:
+// - ''       => usa GPT normal en este mismo archivo
+// - 'gpt'    => usa GPT normal en este mismo archivo
+// - 'claude' => deriva a funciones/GPT/proceso_claude.php
+// - 'grok'   => deriva a funciones/GPT/proceso_grok.php
+$motor = 'grok';
+
+// Normalizar por seguridad
+$motor = strtolower(trim($motor));
+
+if ($motor === 'claude') {
+    require_once($GPT_DIR . '/proceso_claude.php');
+    exit;
+}
+
+if ($motor === 'grok') {
+    require_once($GPT_DIR . '/proceso_grok.php');
+    exit;
+}
+/////////////////////////////////////////////////////////////////
+/////////////////////////////////////////////////////////////////
+
 date_default_timezone_set('America/Santiago');
 
 header('Content-Type: application/json; charset=utf-8');
@@ -25,6 +51,8 @@ $mysqli = conn();
 define('MAX_PROMPT_BYTES_SOFT', 102400);   // 100 KB
 define('MAX_PROMPT_BYTES_HARD', 307200);   // 300 KB
 define('MAX_OUTPUT_TOKENS',     1500);
+
+define('GPT_MODEL', 'gpt-4o');
 
 // 1. validar entrada mínima
 $texto_dictado = trim((string)($_POST['texto'] ?? ''));
@@ -79,7 +107,8 @@ $user_tag = 'anon_' . substr(hash('sha256', ($ip ?: '-') . '|' . ($ua ?: '-')), 
 
 app_log('request', [
     'rid'          => $rid,
-    'model'        => 'gpt-4o',
+    'provider'     => 'gpt',
+    'model'        => GPT_MODEL,
     'plantilla_id' => $plantilla_id,
     'prompt_bytes' => $prompt_bytes,
     'client_ip'    => $ip,
@@ -94,20 +123,18 @@ app_log_body('prompt', [
 
 // 7. llamada a OpenAI
 $payload = [
-    'model'     => 'gpt-4o',
-    // 'model'  => 'gpt-4o-mini',
-    // 'model'  => 'gpt-5-nano',
-    // 'model'  => 'gpt-5-mini',
-    // 'model'  => 'gpt-5',
+    'model'     => GPT_MODEL,
     'messages'  => [
         ['role' => 'system', 'content' => $system],
         ['role' => 'user',   'content' => $prompt],
     ],
-    'temperature' => 0.1,
-    'user'        => $user_tag,
-    'max_tokens'  => MAX_OUTPUT_TOKENS,
+    'user'                  => $user_tag,
+    'max_completion_tokens' => MAX_OUTPUT_TOKENS,
 ];
 
+if (!in_array(GPT_MODEL, ['gpt-5.5'], true)) {
+    $payload['temperature'] = 0.1;
+}
 $jsonPayload = json_encode($payload, JSON_UNESCAPED_UNICODE);
 
 $t0 = microtime(true);
@@ -189,7 +216,7 @@ $usage = $result['usage'] ?? [];
 $prompt_tokens     = (int)($usage['prompt_tokens']     ?? ($usage['input_tokens']  ?? 0));
 $completion_tokens = (int)($usage['completion_tokens'] ?? ($usage['output_tokens'] ?? 0));
 $total_tokens      = (int)($usage['total_tokens']      ?? ($prompt_tokens + $completion_tokens));
-$cost_usd          = gpt_estimate_cost_usd('gpt-4o', $prompt_tokens, $completion_tokens);
+$cost_usd = gpt_estimate_cost_usd(GPT_MODEL, $prompt_tokens, $completion_tokens);
 
 app_log('response', [
     'rid'               => $rid,
@@ -213,6 +240,8 @@ if (GPT_SNAPSHOT === 1) {
     $snapshot = [
         'rid'           => $rid,
         'datetime'      => date('c'),
+        'provider'      => 'gpt',
+        'model'         => GPT_MODEL,
         'input'         => $input,
         'system'        => $system,
         'prompt'        => $prompt,

@@ -111,18 +111,8 @@ USO DE PLANTILLA BASE
 - Si una sección de la plantilla ya existe y el DICTADO entrega información para esa misma sección, actualiza esa sección con el contenido clínico del DICTADO.
 - Si la plantilla trae texto normal, pero el DICTADO entrega una alteración para esa zona u órgano, reemplaza o ajusta el texto normal usando el hallazgo del DICTADO.
 - Si el DICTADO no menciona una zona u órgano, conserva el texto base salvo que claramente no aplique.
-- Si el DICTADO trae un órgano o hallazgo que no está en la PLANTILLA BASE, intégralo en su posición anatómica correcta dentro del informe, NO al final por defecto:
-  - Próstata: como párrafo propio inmediatamente después de Vejiga urinaria.
-  - Testículos: como párrafo propio inmediatamente después de Próstata (o después de Vejiga si no hay próstata).
-  - Íleon: dentro del párrafo de Gastro entero, entre Yeyuno y Colon.
-  - Cualquier otro órgano o hallazgo extra que no encaje en una posición anatómica clara: agrégalo al final, después de Glándulas adrenales, en un bloque:
-    <p style="text-align:justify"><strong>HALLAZGOS ADICIONALES:</strong> ...</p>
-- Un órgano extra que SÍ tiene posición anatómica conocida (próstata, testículos, íleon) nunca debe ir en HALLAZGOS ADICIONALES.
-
-ESTILO DE REDACCIÓN
-- Para las unidades de medida usa siempre la forma abreviada "cm" (y "mm" cuando corresponda), nunca la palabra "centímetros" ni "milímetros", aunque el DICTADO use la palabra completa.
-- No transformes el valor numérico ni la magnitud de la unidad; solo abrevia la palabra de la unidad.
-- Transcribe la ecogenicidad tal como viene en el DICTADO, sin completar componentes que no se dijeron. Si el DICTADO solo menciona la ecogenicidad cortical (por ejemplo "ecogenicidad cortical aumentada"), escribe únicamente la cortical y NO agregues "y medular". Solo menciona cortical y medular juntas si el DICTADO las nombra a ambas.
+- Si el DICTADO trae un órgano o hallazgo que no está en la PLANTILLA BASE, agrégalo al final en un bloque:
+  <p style="text-align:justify"><strong>HALLAZGOS ADICIONALES:</strong> ...</p>
 
 TRANSCRIPCIÓN CLÍNICA
 - Transcribe solo contenido clínico del DICTADO.
@@ -130,13 +120,8 @@ TRANSCRIPCIÓN CLÍNICA
 - Respeta números y unidades tal como vienen en el DICTADO, incluyendo coma o punto decimal.
 - No transformes cm a mm ni mm a cm.
 - No cambies un valor sospechoso por el valor que parezca correcto.
-- Distingue entre un número LEGIBLE y un número ILEGIBLE:
-  - LEGIBLE: se entiende qué número es, aunque parezca raro o clínicamente improbable. Escríbelo tal cual viene. Si es muy improbable, márcalo con flag valor_sospechoso, pero el número SÍ va escrito.
-  - ILEGIBLE: no se puede determinar qué número es (balbuceo, varios números pegados sin saber cuál corresponde, frase cortada). En ese caso NO escribas el texto roto: pon "XX" en lugar de la medida y márcalo con flag medida_ilegible.
-- El criterio para usar XX es "¿se entiende qué número es?", NO "¿el número es normal?". La rareza de un valor no justifica reemplazarlo por XX; solo la ilegibilidad lo justifica.
-- Si una palabra o frase (no numérica) parece error de dictado, conserva el término original, márcalo con flag termino_confuso y explica la duda en Observaciones del Asistente.
+- Si un dato parece error de dictado, conserva el dato original, márcalo con flag y explica la duda en Observaciones del Asistente.
 - No muevas hallazgos, medidas ni descripciones entre órganos, zonas anatómicas o lateralidades.
-- Si el DICTADO dice que un órgano tiene "mismas características" que otro (por ejemplo "riñón derecho mismas características que el izquierdo"), NUNCA escribas literalmente "mismas características" en el informe. Copia explícitamente todos los atributos del órgano de referencia y aplícales solo los cambios que el DICTADO indique para este órgano (por ejemplo su propio tamaño). El resultado debe quedar redactado completo, igual que el órgano de referencia, no abreviado.
 - Si el DICTADO indica lateralidad, respétala estrictamente.
 - Si el DICTADO dice “renal izquierda”, ese dato debe quedar solo en la sección renal izquierda.
 - Si el DICTADO dice “renal derecha”, ese dato debe quedar solo en la sección renal derecha.
@@ -154,7 +139,6 @@ CONCLUSIÓN
 
 FLAGS OBLIGATORIOS
 - Usa flags solo cuando exista una duda real.
-- IMPORTANTE: los flags se colorean mediante el CSS del sistema usando la clase "flag" y el atributo data-tipo. NO generes ningún bloque <style>, ni atributo style propio, ni color en línea para los flags. Devuelve el flag exactamente como <sup class="flag" data-flag="N" data-tipo="TIPO">(N)</sup> y nada más. Generar un <style> hace inválida la respuesta.
 - Marca con:
   <sup class="flag" data-flag="N" data-tipo="TIPO">(N)</sup>
 - N debe ser correlativo: 1, 2, 3... según orden de aparición.
@@ -195,14 +179,6 @@ TIPOS DE FLAGS
 - No elimines silenciosamente ninguna de las dos frases contradictorias si ambas vienen del DICTADO.
 - Conserva ambas afirmaciones contradictorias cuando sea necesario para que el humano pueda revisar.
 - Marca con flag la primera zona donde aparece claramente la contradicción.
-
-5. medida_ilegible
-- Úsalo cuando en el DICTADO había una medida pero no se puede descifrar qué número era (balbuceo, números pegados, frase cortada).
-- NUNCA elimines ni omitas en silencio una medida ilegible. Si la borras sin avisar, la respuesta es inválida.
-- Obligatorio: escribe "XX" en el lugar exacto donde iría la medida y pega el flag inmediatamente después de "XX".
-  Ejemplo correcto: masa redonda ovalada de tamaño XX cm<sup class="flag" data-flag="1" data-tipo="medida_ilegible">(1)</sup>
-- Conserva el resto de la descripción del hallazgo (forma, ecogenicidad, etc.); solo la cifra ilegible se reemplaza por "XX".
-- La observación debe indicar que en esa zona el DICTADO traía una medida que no se pudo descifrar y debe revisarse en el audio original.
 
 OBSERVACIONES DEL ASISTENTE
 - Incluye el bloque Observaciones del Asistente si existe al menos un flag en el informe.

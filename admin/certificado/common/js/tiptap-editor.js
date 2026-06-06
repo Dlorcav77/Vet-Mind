@@ -149,6 +149,54 @@ const PageBreak = Node.create({
   }
 });
 
+const FlagMark = Node.create({
+  name: 'flagMark',
+
+  group: 'inline',
+
+  inline: true,
+
+  atom: true,        // se trata como una unidad; el usuario no edita su interior
+
+  selectable: true,
+
+  parseHTML() {
+    return [
+      {
+        tag: 'sup.flag'
+      }
+    ];
+  },
+
+  addAttributes() {
+    return {
+      dataFlag: {
+        default: null,
+        parseHTML: el => el.getAttribute('data-flag'),
+        renderHTML: attrs => attrs.dataFlag ? { 'data-flag': attrs.dataFlag } : {}
+      },
+      dataTipo: {
+        default: null,
+        parseHTML: el => el.getAttribute('data-tipo'),
+        renderHTML: attrs => attrs.dataTipo ? { 'data-tipo': attrs.dataTipo } : {}
+      },
+      label: {
+        default: '',
+        parseHTML: el => el.textContent || '',
+        renderHTML: () => ({})
+      }
+    };
+  },
+
+  renderHTML({ node, HTMLAttributes }) {
+    return [
+      'sup',
+      mergeAttributes(HTMLAttributes, { class: 'flag' }),
+      node.attrs.label || ''
+    ];
+  }
+});
+
 (function () {
   if (window.VetmindTiptap) {
     return;
@@ -807,7 +855,8 @@ const PageBreak = Node.create({
         TableRow,
         TableHeader,
         TableCell,
-        PageBreak
+        PageBreak,
+        FlagMark
       ],
       content: initialContent || '<p></p>',
       editorProps: {
