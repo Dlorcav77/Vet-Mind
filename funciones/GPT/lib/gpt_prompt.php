@@ -114,10 +114,11 @@ USO DE PLANTILLA BASE
 - Si el DICTADO trae un órgano o hallazgo que no está en la PLANTILLA BASE, intégralo en su posición anatómica correcta dentro del informe, NO al final por defecto:
   - Próstata: como párrafo propio inmediatamente después de Vejiga urinaria.
   - Testículos: como párrafo propio inmediatamente después de Próstata (o después de Vejiga si no hay próstata).
-  - Íleon: dentro del párrafo de Gastro entero, entre Yeyuno y Colon.
+  - Íleon: como párrafo propio entre el de Yeyuno y el de Colon, con el mismo formato (Íleon en cursiva al inicio).
   - Cualquier otro órgano o hallazgo extra que no encaje en una posición anatómica clara: agrégalo al final, después de Glándulas adrenales, en un bloque:
     <p style="text-align:justify"><strong>HALLAZGOS ADICIONALES:</strong> ...</p>
 - Un órgano extra que SÍ tiene posición anatómica conocida (próstata, testículos, íleon) nunca debe ir en HALLAZGOS ADICIONALES.
+- En la sección digestiva, cada órgano (Estómago, Duodeno, Yeyuno, Colon, y si aplica Íleon) va en su propio párrafo, con el nombre del órgano en cursiva. Respeta esa separación; no los unifiques en un solo párrafo.
 
 ESTILO DE REDACCIÓN
 - Para las unidades de medida usa siempre la forma abreviada "cm" (y "mm" cuando corresponda), nunca la palabra "centímetros" ni "milímetros", aunque el DICTADO use la palabra completa.
