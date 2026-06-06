@@ -184,13 +184,13 @@ function gpt_placeholder_observacion(int $n, string $tipo): string
  */
 function gpt_marcar_xx_faltantes(string $html): string
 {
-    // Recorre el HTML y solo envuelve los XX que NO estén ya seguidos de un <sup flag>.
-    // (?!\s*<sup\b[^>]*class=["\']flag) evita re-marcar un XX ya flageado por la IA.
     return preg_replace_callback(
         '/\bXX\b(?!\s*<sup\b[^>]*class=["\']flag)/',
         function () {
-            // data-flag se asigna luego en gpt_renumerar_flags; va 0 temporal.
-            return 'XX<sup class="flag" data-flag="0" data-tipo="valor_faltante">(0)</sup>';
+            // Envuelve el XX en <mark> para resaltarlo en amarillo y le pega el flag.
+            // El <mark> viaja con el contenido hasta el PDF: si un XX se cuela, salta a la vista.
+            return '<mark class="xx-faltante">XX</mark>'
+                 . '<sup class="flag" data-flag="0" data-tipo="valor_faltante">(0)</sup>';
         },
         $html
     );

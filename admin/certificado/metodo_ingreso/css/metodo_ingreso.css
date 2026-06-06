@@ -550,10 +550,10 @@
 
     /* Flags del asistente en informes ecográficos */
 .flag {
-  font-weight: 700;
-  font-size: 0.85em;
-  cursor: help;
-  padding: 0 1px;
+    font-weight: 700;
+    font-size: 0.85em;
+    cursor: help;
+    padding: 0 1px;
 }
 .flag[data-tipo="valor_sospechoso"] { color: #e67e22; } /* naranjo */
 .flag[data-tipo="falta_unidad"]     { color: #d35400; } /* naranjo oscuro */
@@ -561,3 +561,11 @@
 .flag[data-tipo="incongruencia"]    { color: #c0392b; } /* rojo */
 .flag[data-tipo="medida_ilegible"]  { color: #2980b9; } /* azul */
 .flag[data-tipo="valor_faltante"]   { color: #16a085; } /* verde azulado */
+
+mark.xx-faltante {
+    background: #fff3a0;   /* amarillo resaltador */
+    color: #000;
+    padding: 0 2px;
+    border-radius: 2px;
+    font-weight: 700;
+}

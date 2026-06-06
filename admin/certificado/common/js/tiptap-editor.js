@@ -197,6 +197,44 @@ const FlagMark = Node.create({
   }
 });
 
+const XxFaltanteMark = Node.create({
+  name: 'xxFaltante',
+
+  group: 'inline',
+
+  inline: true,
+
+  atom: true,
+
+  selectable: true,
+
+  parseHTML() {
+    return [
+      {
+        tag: 'mark.xx-faltante'
+      }
+    ];
+  },
+
+  addAttributes() {
+    return {
+      label: {
+        default: 'XX',
+        parseHTML: el => el.textContent || 'XX',
+        renderHTML: () => ({})
+      }
+    };
+  },
+
+  renderHTML({ node }) {
+    return [
+      'mark',
+      { class: 'xx-faltante' },
+      node.attrs.label || 'XX'
+    ];
+  }
+});
+
 (function () {
   if (window.VetmindTiptap) {
     return;
@@ -856,7 +894,8 @@ const FlagMark = Node.create({
         TableHeader,
         TableCell,
         PageBreak,
-        FlagMark
+        FlagMark,
+        XxFaltanteMark
       ],
       content: initialContent || '<p></p>',
       editorProps: {
