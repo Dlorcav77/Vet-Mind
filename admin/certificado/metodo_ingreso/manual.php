@@ -1,5 +1,10 @@
 <?php
 // admin/certificado/metodo_ingreso/manual.php
+/**
+ *
+ * @var string $isManualInitial
+ */
+
 $contenidoInforme = isset($fila['contenido_html']) ? (string)$fila['contenido_html'] : '';
 ?>
 <div id="bloque-manual" class="col-12 mb-1" style="<?= $isManualInitial ? '' : 'display:none;' ?>">

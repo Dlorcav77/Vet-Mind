@@ -135,6 +135,6 @@ document.addEventListener('DOMContentLoaded', function () {
 </script>
 
 <script src="certificado/common/js/editor.js?v=3"></script>
-<script src="certificado/metodo_ingreso/js/ia.js?v=8"></script>
+<script src="certificado/metodo_ingreso/js/ia.js?v=11"></script>
 <script src="certificado/preview/js/preview.js?v=4"></script>
 <script src="certificado/guardar/js/guardar.js?v=15"></script>
