@@ -7,3 +7,4 @@ configP.php
 /.vscode/
 /*.log
 /funciones/logs/*.jsonl
+funciones/GPT/snapshots/

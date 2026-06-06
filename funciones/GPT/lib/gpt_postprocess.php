@@ -2,248 +2,196 @@
 declare(strict_types=1);
 
 /**
- * funciones para arreglar lo que viene de GPT:
- * - quitar conclusión si no iba
- * - renumerar flags
- * - recrear Observaciones del Asistente
- * - meter CSS
+ * Post-proceso del HTML que devuelve el modelo (GPT/Grok/Claude).
+ *
+ * Filosofía: el modelo es el autor del informe y de las Observaciones.
+ * El post-proceso NO reescribe lo que el modelo redactó bien; solo:
+ *   1) Sanitiza HTML que no debe llegar al visor (<style>, fences, <html>...).
+ *   2) Quita la conclusión si no correspondía.
+ *   3) Renumera los flags para que queden 1,2,3... en orden de aparición.
+ *   4) Verifica la correspondencia flag <-> observación y rellena SOLO lo que falte.
  */
 
 function gpt_postprocess_html(string $html, bool $incluir_conclusion, array $ctxPaciente = []): string
 {
-    // 1) quitar conclusión si no venía en dictado
+    // 1) Sanitizar: sacar lo que nunca debe llegar al visor del veterinario.
+    $html = gpt_sanitizar_html($html);
+
+    // 2) Quitar conclusión si no venía en el dictado.
     if (!$incluir_conclusion) {
         $html = preg_replace('#<p>\s*<strong>\s*CONCLUSI(Ó|O)N:\s*</strong>\s*<br>\s*.*?</p>#is', '', $html);
     }
 
-    // 2) renumerar flags
+    // 2.5) Marcar los XX sueltos (medidas no dictadas que quedaron en la plantilla).
+    $html = gpt_marcar_xx_faltantes($html);
+
+    // 3) Renumerar flags en orden de aparición (corrige saltos del modelo).
+    $html = gpt_renumerar_flags($html);
+
+    // 4) Verificar correspondencia flag <-> observación; rellenar solo lo faltante.
+    $html = gpt_reparar_observaciones($html);
+
+    return $html;
+}
+
+/**
+ * Elimina del HTML cualquier cosa que sea andamiaje o ruido y no parte del informe:
+ * bloques <style>, fences markdown ```), y etiquetas de documento <html>/<head>/<body>.
+ * El color de los flags vive en el CSS del sistema, NO en la respuesta.
+ */
+function gpt_sanitizar_html(string $html): string
+{
+    // bloques <style>...</style> completos
+    $html = preg_replace('#<style\b[^>]*>.*?</style>#is', '', $html);
+
+    // fences markdown ``` o ```html
+    $html = preg_replace('#```[a-z]*#i', '', $html);
+
+    // etiquetas de documento que el modelo no debe mandar
+    $html = preg_replace('#</?(?:html|head|body)\b[^>]*>#i', '', $html);
+
+    return trim($html);
+}
+
+/**
+ * Renumera los flags 1,2,3... en orden de aparición y conserva su data-tipo.
+ * Devuelve el HTML con los <sup> normalizados.
+ */
+function gpt_renumerar_flags(string $html): string
+{
     $seq = 0;
-    $html = preg_replace_callback(
-        '#<sup\b[^>]*class=[\'"]flag[\'"][^>]*>(.*?)</sup>#is',
+    return preg_replace_callback(
+        '#<sup\b[^>]*class=[\'"]flag[\'"][^>]*>.*?</sup>#is',
         function ($m) use (&$seq) {
             $seq++;
             $tipo = 'valor_sospechoso';
             if (preg_match('/data-tipo=["\']([^"\']+)["\']/i', $m[0], $mt)) {
                 $tipo = $mt[1];
             }
-            return "<sup class='flag' data-flag=\"{$seq}\" data-tipo=\"{$tipo}\">({$seq})</sup>";
+            return "<sup class=\"flag\" data-flag=\"{$seq}\" data-tipo=\"{$tipo}\">({$seq})</sup>";
         },
         $html
     );
-
-    // 3) generar/mezclar Observaciones
-    $lexicos = ['termino_confuso' => ['abusados']]; // puedes seguir agregando acá
-    if (stripos($html, 'class="flag"') !== false || stripos($html, "class='flag'") !== false) {
-        $html = gpt_build_observaciones_asistente($html, $ctxPaciente, $lexicos);
-    }
-
-    // 4) inyectar CSS
-    if (preg_match('/class=["\']flag["\']/i', $html)) {
-        $flagCss = <<<HTML
-<style>
-.flag{font-weight:600;}
-.flag[data-tipo="valor_sospechoso"]{color:#E67E22;}
-.flag[data-tipo="incongruencia"]{color:#C0392B;}
-.flag[data-tipo="termino_confuso"]{color:#8E44AD;}
-.flag[data-tipo="falta_unidad"]{color:#D35400;}
-</style>
-HTML;
-        if (!preg_match('#<style[^>]*>\s*\.flag#is', $html)) {
-            $html = $flagCss . $html;
-        }
-    }
-
-    return $html;
 }
 
-function gpt_parse_observaciones_ia(string $html): array {
-    $result = ['incongruencia' => [], 'termino_confuso' => [], 'falta_unidad' => [], 'valor_sospechoso' => []];
-
-    if (preg_match('#<p>\s*<strong>\s*Observaciones del Asistente:\s*</strong>\s*<br>\s*(.*?)\s*</p>#is', $html, $m)) {
-        $block = $m[1];
-        $lines = preg_split('#<br>\s*#i', $block);
-        foreach ($lines as $line) {
-            $plain = trim(strip_tags($line));
-            if ($plain === '') continue;
-
-            $tipo = null;
-            foreach (array_keys($result) as $t) {
-                if (preg_match('/\b' . preg_quote($t, '/') . '\b/i', $plain)) {
-                    $tipo = strtolower($t);
-                    break;
-                }
-            }
-            if (!$tipo) continue;
-            $plain = preg_replace('/^\(\d+\)\s*/', '', $plain);
-            $result[$tipo][] = $plain;
-        }
-    }
-    return $result;
-}
-
-function gpt_build_observaciones_asistente(string $html, array $ctx = [], array $lex = []): string
+/**
+ * Inspecciona la correspondencia entre flags del informe y líneas del bloque
+ * "Observaciones del Asistente". NO reescribe las observaciones del modelo.
+ * Acciones:
+ *   - Si hay flags pero no hay bloque de observaciones: lo crea con placeholders.
+ *   - Si un flag (N) no tiene su línea: agrega una línea placeholder para (N).
+ *   - Si el bloque tiene líneas (N) cuyo flag ya no existe: las elimina.
+ *   - Si no hay flags: elimina el bloque de observaciones si quedó alguno.
+ */
+function gpt_reparar_observaciones(string $html): string
 {
-    $obsIAByType = gpt_parse_observaciones_ia($html);
+    // Flags presentes en el informe: [N => tipo]
+    $flags = [];
+    if (preg_match_all('#<sup\b[^>]*data-flag=["\'](\d+)["\'][^>]*>#i', $html, $mf, PREG_SET_ORDER)) {
+        foreach ($mf as $f) {
+            $n = (int)$f[1];
+            $tipo = 'valor_sospechoso';
+            if (preg_match('/data-tipo=["\']([^"\']+)["\']/i', $f[0], $mt)) {
+                $tipo = strtolower($mt[1]);
+            }
+            $flags[$n] = $tipo;
+        }
+    }
+    ksort($flags);
 
-    // quitar bloque previo
-    $html = preg_replace('#<p>\s*<strong>\s*Observaciones del Asistente:\s*</strong>.*?</p>#is', '', $html);
-
-    // sin flags -> nada
-    if (stripos($html, 'class="flag"') === false && stripos($html, "class='flag'") === false) {
-        return $html;
+    // Extraer bloque de observaciones del modelo (si existe).
+    $obsBlock = '';
+    if (preg_match('#<p>\s*<strong>\s*Observaciones del Asistente:\s*</strong>(.*?)</p>#is', $html, $mb)) {
+        $obsBlock = $mb[1];
     }
 
-    $hasCtx = (
-        trim((string)($ctx['especie'] ?? '')) !== '' ||
-        trim((string)($ctx['raza'] ?? ''))    !== '' ||
-        trim((string)($ctx['edad'] ?? ''))    !== ''
+    // Sin flags: no debe haber bloque. Si quedó, se elimina.
+    if (empty($flags)) {
+        return gpt_quitar_bloque_observaciones($html);
+    }
+
+    // Mapear qué números ya tienen línea en el bloque del modelo.
+    $lineasModelo = [];   // N => "texto html de la línea (sin el (N) inicial)"
+    if ($obsBlock !== '') {
+        $partes = preg_split('#<br\s*/?>#i', $obsBlock);
+        foreach ($partes as $linea) {
+            $plain = trim($linea);
+            if ($plain === '') continue;
+            if (preg_match('/^\s*\((\d+)\)\s*(.*)$/s', strip_tags($plain), $ml)) {
+                $lineasModelo[(int)$ml[1]] = trim($plain);
+            }
+        }
+    }
+
+    // Construir el bloque final: para cada flag, usar la línea del modelo si existe,
+    // o un placeholder mínimo si falta. Se descartan líneas de flags inexistentes.
+    $lineasFinales = [];
+    foreach ($flags as $n => $tipo) {
+        if (isset($lineasModelo[$n])) {
+            $lineasFinales[] = $lineasModelo[$n];
+        } else {
+            $lineasFinales[] = gpt_placeholder_observacion($n, $tipo);
+        }
+    }
+
+    // Quitar el bloque viejo y reinsertar el reconstruido al final.
+    $html = gpt_quitar_bloque_observaciones($html);
+
+    $obs = "<p><strong>Observaciones del Asistente:</strong><br>\n"
+         . implode("<br>\n", $lineasFinales)
+         . "<br>\n</p>";
+
+    return trim($html) . "\n" . $obs;
+}
+
+/**
+ * Elimina el bloque "Observaciones del Asistente" del HTML, si existe.
+ */
+function gpt_quitar_bloque_observaciones(string $html): string
+{
+    return preg_replace(
+        '#<p>\s*<strong>\s*Observaciones del Asistente:\s*</strong>.*?</p>#is',
+        '',
+        $html
     );
+}
 
-    if (!preg_match_all('#<sup\b[^>]*class=[\'"]flag[\'"][^>]*>#i', $html, $m, PREG_OFFSET_CAPTURE)) {
-        return $html;
-    }
-
-    $len   = strlen($html);
-    $items = [];
-
-    foreach ($m[0] as $match) {
-        $supTag = $match[0];
-        $pos    = (int)$match[1];
-
-        $n = null; $tipo = 'valor_sospechoso';
-        if (preg_match('/data-flag=["\'](\d+)["\']/i', $supTag, $mn)) {
-            $n = (int)$mn[1];
-        }
-        if (preg_match('/data-tipo=["\']([^"\']+)["\']/i', $supTag, $mt)) {
-            $tipo = strtolower($mt[1]);
-        }
-        if (!$n) continue;
-
-        $pStart = strrpos(substr($html, 0, $pos), '<p');
-        if ($pStart === false) { $pStart = max(0, $pos - 300); }
-        $pEnd = strpos($html, '</p>', $pos);
-        if ($pEnd === false) { $pEnd = min($len, $pos + 300); }
-        $para = substr($html, $pStart, $pEnd - $pStart);
-
-        $organo = '';
-        $beforeFlag = substr($para, 0, $pos - $pStart);
-        if (preg_match_all('#<strong>([^<]+)</strong>#i', $beforeFlag, $ms, PREG_OFFSET_CAPTURE)) {
-            $last = trim(end($ms[1])[0]);
-            if (preg_match('/^(derecha|izquierda)$/i', $last) && count($ms[1]) >= 2) {
-                $prev = trim($ms[1][count($ms[1]) - 2][0]);
-                $organo = $prev . ' ' . $last;
-            } else {
-                $organo = $last;
-            }
-        }
-
-        $winStart = max(0, ($pos - $pStart) - 120);
-        $flagRel  = ($pos - $pStart) - $winStart;
-        $win      = substr($para, $winStart, 240);
-
-        $kw = '';
-        if (preg_match('/(aumentad\w*|engros\w*|disminuid\w*|relaci(?:ón|&oacute;n)|abusados|↑|↓)/iu', $win, $mk)) {
-            $kw = $mk[1];
-        }
-
-        $numu = '';
-        if (preg_match_all('/\d+(?:[.,]\d+)?\s*(?:cm|mm|mt)/iu', $win, $mmu, PREG_OFFSET_CAPTURE)) {
-            $best = null; $bestDist = 1e9;
-            foreach ($mmu[0] as $cand) {
-                $start = $cand[1];
-                $dist  = abs($start - $flagRel);
-                if ($dist < $bestDist) { $bestDist = $dist; $best = $cand[0]; }
-            }
-            if ($best !== null) { $numu = $best; }
-        }
-        if ($numu === '' && $tipo === 'falta_unidad') {
-            if (preg_match_all('/(?>\d+(?:[.,]\d+)?)(?!\s*(?:cm|mm|mt))/iu', $win, $mnu, PREG_OFFSET_CAPTURE)) {
-                $best = null; $bestDist = 1e9;
-                foreach ($mnu[0] as $cand) {
-                    $start = $cand[1];
-                    $dist  = abs($start - $flagRel);
-                    if ($dist < $bestDist) { $bestDist = $dist; $best = $cand[0]; }
-                }
-                if ($best !== null) { $numu = $best; }
-            }
-        }
-
-        $items[] = ['n'=>$n,'tipo'=>$tipo,'organo'=>$organo,'kw'=>$kw,'numu'=>$numu];
-    }
-
-    $lines = [];
-    $lexConf = array_map('mb_strtolower', $lex['termino_confuso'] ?? []);
-
-    $iaQueue = [
-        'incongruencia'   => $obsIAByType['incongruencia']   ?? [],
-        'termino_confuso' => $obsIAByType['termino_confuso'] ?? [],
+/**
+ * Texto mínimo cuando el modelo dejó un flag sin su observación.
+ * No inventa hallazgos: solo señala que ese punto quedó marcado y debe revisarse.
+ */
+function gpt_placeholder_observacion(int $n, string $tipo): string
+{
+    $glos = [
+        'valor_sospechoso' => 'valor marcado como inusual; revisar en el informe.',
+        'falta_unidad'     => 'medida sin unidad clara (cm/mm); confirmar la unidad.',
+        'termino_confuso'  => 'término marcado como posible error de dictado; confirmar.',
+        'incongruencia'    => 'posible contradicción en el informe; revisar.',
+        'medida_ilegible'  => 'el dictado traía una medida que no se pudo descifrar; revisar el audio original.',
+        'valor_faltante'   => 'el dictado no mencionó esta medida; completar si corresponde.',
     ];
-    $shiftIA = function(string $tipo) use (&$iaQueue) {
-        if (empty($iaQueue[$tipo])) return null;
-        return array_shift($iaQueue[$tipo]);
-    };
+    $txt = $glos[$tipo] ?? 'punto marcado para revisión.';
+    return "({$n}) {$tipo} → {$txt}";
+}
 
-    usort($items, fn($a,$b)=>$a['n']<=>$b['n']);
-
-    foreach ($items as $it) {
-        $n    = $it['n'];
-        $tipo = $it['tipo'];
-        $ctxo = $it['organo'] ? ($it['organo'] . ': ') : '';
-        $kw   = $it['kw'];
-        $numu = $it['numu'];
-
-        switch ($tipo) {
-            case 'falta_unidad':
-                $ntxt = $numu ? " «{$numu}»" : "";
-                $lines[] = "($n) falta_unidad → {$ctxo}medida sin unidad (cm/mm/mt){$ntxt}. Agrega la unidad correspondiente.";
-                break;
-
-            case 'valor_sospechoso':
-                if ($numu) {
-                    $lines[] = "($n) valor_sospechoso → {$ctxo}magnitud/indicador inusual ({$numu}). Revisar.";
-                } else {
-                    $lines[] = "($n) valor_sospechoso → {$ctxo}hallazgo marcado. Revisar en contexto clínico.";
-                }
-                break;
-
-            case 'termino_confuso':
-                if (in_array(mb_strtolower($kw), $lexConf, true)) {
-                    $lines[] = "($n) termino_confuso → {$ctxo}término potencialmente confuso «{$kw}». Confirma significado.";
-                } else {
-                    $ia = $shiftIA('termino_confuso');
-                    if ($ia) {
-                        $lines[] = "($n) termino_confuso → {$ctxo}" . preg_replace('/^[a-z_]+\s*→\s*/i','',$ia);
-                    } else {
-                        $kwtxt = $kw ? "«{$kw}»" : "término ambiguo";
-                        $lines[] = "($n) termino_confuso → {$ctxo}{$kwtxt}. Confirma significado exacto.";
-                    }
-                }
-                break;
-
-            case 'incongruencia':
-                if (!$hasCtx) break;
-                $ia = $shiftIA('incongruencia');
-                if ($ia) {
-                    $lines[] = "($n) incongruencia → {$ctxo}" . preg_replace('/^[a-z_]+\s*→\s*/i','',$ia);
-                } else {
-                    $kwtxt = $kw ? "«{$kw}»" : "hallazgos discordantes";
-                    $add   = $numu ? " ({$numu})" : "";
-                    $lines[] = "($n) incongruencia → {$ctxo}coexisten descriptores potencialmente discordantes {$kwtxt}{$add}. Revisar.";
-                }
-                break;
-
-            default:
-                $lines[] = "($n) {$tipo} → {$ctxo}revisar hallazgo" . ($numu ? " ({$numu})" : "") . ".";
-                break;
-        }
-    }
-
-    if (!empty($lines)) {
-        $obs = "<p><strong>Observaciones del Asistente:</strong><br>\n" .
-               implode("<br>\n", $lines) .
-               "<br>\n</p>";
-        $html .= $obs;
-    }
-
-    return $html;
+/**
+ * Marca con flag los "XX" que quedaron sueltos en el informe (medidas de la
+ * plantilla que el dictado no mencionó). NO toca los XX que ya están dentro de
+ * un <sup class="flag"> (esos son medida_ilegible y ya los marcó el modelo).
+ *
+ * Debe ejecutarse ANTES de renumerar flags y de reparar observaciones, para que
+ * esos pasos posteriores numeren y generen la observación de estos flags nuevos.
+ */
+function gpt_marcar_xx_faltantes(string $html): string
+{
+    return preg_replace_callback(
+        '/\bXX\b(?!\s*<sup\b[^>]*class=["\']flag)/',
+        function () {
+            // Envuelve el XX en <mark> para resaltarlo en amarillo y le pega el flag.
+            // El <mark> viaja con el contenido hasta el PDF: si un XX se cuela, salta a la vista.
+            return '<mark class="xx-faltante">XX</mark>'
+                 . '<sup class="flag" data-flag="0" data-tipo="valor_faltante">(0)</sup>';
+        },
+        $html
+    );
 }

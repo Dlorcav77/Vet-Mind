@@ -149,6 +149,92 @@ const PageBreak = Node.create({
   }
 });
 
+const FlagMark = Node.create({
+  name: 'flagMark',
+
+  group: 'inline',
+
+  inline: true,
+
+  atom: true,        // se trata como una unidad; el usuario no edita su interior
+
+  selectable: true,
+
+  parseHTML() {
+    return [
+      {
+        tag: 'sup.flag'
+      }
+    ];
+  },
+
+  addAttributes() {
+    return {
+      dataFlag: {
+        default: null,
+        parseHTML: el => el.getAttribute('data-flag'),
+        renderHTML: attrs => attrs.dataFlag ? { 'data-flag': attrs.dataFlag } : {}
+      },
+      dataTipo: {
+        default: null,
+        parseHTML: el => el.getAttribute('data-tipo'),
+        renderHTML: attrs => attrs.dataTipo ? { 'data-tipo': attrs.dataTipo } : {}
+      },
+      label: {
+        default: '',
+        parseHTML: el => el.textContent || '',
+        renderHTML: () => ({})
+      }
+    };
+  },
+
+  renderHTML({ node, HTMLAttributes }) {
+    return [
+      'sup',
+      mergeAttributes(HTMLAttributes, { class: 'flag' }),
+      node.attrs.label || ''
+    ];
+  }
+});
+
+const XxFaltanteMark = Node.create({
+  name: 'xxFaltante',
+
+  group: 'inline',
+
+  inline: true,
+
+  atom: true,
+
+  selectable: true,
+
+  parseHTML() {
+    return [
+      {
+        tag: 'mark.xx-faltante'
+      }
+    ];
+  },
+
+  addAttributes() {
+    return {
+      label: {
+        default: 'XX',
+        parseHTML: el => el.textContent || 'XX',
+        renderHTML: () => ({})
+      }
+    };
+  },
+
+  renderHTML({ node }) {
+    return [
+      'mark',
+      { class: 'xx-faltante' },
+      node.attrs.label || 'XX'
+    ];
+  }
+});
+
 (function () {
   if (window.VetmindTiptap) {
     return;
@@ -807,7 +893,9 @@ const PageBreak = Node.create({
         TableRow,
         TableHeader,
         TableCell,
-        PageBreak
+        PageBreak,
+        FlagMark,
+        XxFaltanteMark
       ],
       content: initialContent || '<p></p>',
       editorProps: {

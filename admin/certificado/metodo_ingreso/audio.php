@@ -1,5 +1,9 @@
 <?php
 // admin/certificado/metodo_ingreso/audio.php
+/**
+ *
+ * @var string $isManualInitial
+ */
 ?>
 <div id="bloque-audio" class="col-12" style="<?= $isManualInitial ? 'display:none;' : '' ?>">
     <input type="hidden" name="audio_tmp" id="audio_tmp" value="">

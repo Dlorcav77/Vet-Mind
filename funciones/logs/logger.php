@@ -121,17 +121,50 @@ function sha256_short(string $text): string {
  * Precios entendidos como USD por 1M tokens.
  */
 function gpt_estimate_cost_usd(string $model, int $prompt_tokens, int $completion_tokens): float {
+    /*
+     * USD por 1M tokens.
+     * Última revisión manual: 2026-06-02.
+     */
+
     $pricing = [
-        // Ajusta si cambian precios. Si desconocidos, deja 0.
-        'gpt-5-nano'   => ['in' => 0.05, 'out' => 0.40], // ref
-        'gpt-5-mini'   => ['in' => 0.25, 'out' => 2.00], // ref
-        'gpt-5'        => ['in' => 1.25, 'out' => 10.0], // ref
-        'gpt-4o'       => ['in' => 2.50, 'out' => 10.0], // ref
-        'gpt-4o-mini'  => ['in' => 0.15, 'out' => 0.60], // ref
+        // ─────────────────────────────
+        // OpenAI
+        // ─────────────────────────────
+        'gpt-5.5'        => ['in' => 5.00,  'out' => 30.00],
+        'gpt-5.4'        => ['in' => 2.50,  'out' => 15.00],
+        'gpt-5.4-mini'   => ['in' => 0.75,  'out' => 4.50],
+        'gpt-5'          => ['in' => 1.25,  'out' => 10.00],
+        'gpt-5-mini'     => ['in' => 0.25,  'out' => 2.00],
+        'gpt-5-nano'     => ['in' => 0.05,  'out' => 0.40],
+        'gpt-4o'         => ['in' => 2.50,  'out' => 10.00],
+        'gpt-4o-mini'    => ['in' => 0.15,  'out' => 0.60],
+
+        // ─────────────────────────────
+        // Anthropic / Claude
+        // ─────────────────────────────
+        'claude-sonnet-4-6' => ['in' => 3.00, 'out' => 15.00],
+        'claude-sonnet-4-5' => ['in' => 3.00, 'out' => 15.00],
+        'claude-haiku-4-5'  => ['in' => 1.00, 'out' => 5.00],
+        'claude-opus-4-8'   => ['in' => 5.00, 'out' => 25.00],
+        'claude-opus-4-7'   => ['in' => 5.00, 'out' => 25.00],
+        'claude-opus-4-6'   => ['in' => 5.00, 'out' => 25.00],
+
+        // ─────────────────────────────
+        // xAI / Grok
+        // ─────────────────────────────
+        'grok-4.3'       => ['in' => 1.25, 'out' => 2.50],
+        'grok-build-0.1' => ['in' => 1.00, 'out' => 2.00],
     ];
-    if (!isset($pricing[$model])) return 0.0;
+
+    if (!isset($pricing[$model])) {
+        return 0.0;
+    }
+
     $in  = $pricing[$model]['in'];
     $out = $pricing[$model]['out'];
-    $cost = ($prompt_tokens / 1_000_000) * $in + ($completion_tokens / 1_000_000) * $out;
+
+    $cost = ($prompt_tokens / 1_000_000) * $in
+          + ($completion_tokens / 1_000_000) * $out;
+
     return round($cost, 6);
 }

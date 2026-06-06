@@ -1,7 +1,9 @@
 <?php
-// funciones/GPT/proceso_gpt.php
+// funciones/GPT/proceso_claude.php
 declare(strict_types=1);
-const GPT_SNAPSHOT = 1;
+if (!defined('GPT_SNAPSHOT')) {
+    define('GPT_SNAPSHOT', 1);
+}
 
 // rutas base
 $ROOT_DIR = dirname(__DIR__, 2);   // /
@@ -16,31 +18,6 @@ require_once($FUNC_DIR . "/logs/logger.php");
 require_once($GPT_DIR . "/lib/gpt_prompt.php");
 require_once($GPT_DIR . "/lib/gpt_postprocess.php");
 
-/////////////////////////////////////////////////////////////////
-/////////////////////////////////////////////////////////////////
-// Motor manual para pruebas.
-// Valores:
-// - ''       => usa GPT normal en este mismo archivo
-// - 'gpt'    => usa GPT normal en este mismo archivo
-// - 'claude' => deriva a funciones/GPT/proceso_claude.php
-// - 'grok'   => deriva a funciones/GPT/proceso_grok.php
-$motor = 'grok';
-
-// Normalizar por seguridad
-$motor = strtolower(trim($motor));
-
-if ($motor === 'claude') {
-    require_once($GPT_DIR . '/proceso_claude.php');
-    exit;
-}
-
-if ($motor === 'grok') {
-    require_once($GPT_DIR . '/proceso_grok.php');
-    exit;
-}
-/////////////////////////////////////////////////////////////////
-/////////////////////////////////////////////////////////////////
-
 date_default_timezone_set('America/Santiago');
 
 header('Content-Type: application/json; charset=utf-8');
@@ -52,7 +29,8 @@ define('MAX_PROMPT_BYTES_SOFT', 102400);   // 100 KB
 define('MAX_PROMPT_BYTES_HARD', 307200);   // 300 KB
 define('MAX_OUTPUT_TOKENS',     1500);
 
-define('GPT_MODEL', 'gpt-4o');
+define('CLAUDE_MODEL', 'claude-sonnet-4-6');
+
 
 // 1. validar entrada mínima
 $texto_dictado = trim((string)($_POST['texto'] ?? ''));
@@ -92,9 +70,9 @@ if ($prompt_bytes > MAX_PROMPT_BYTES_HARD) {
 }
 
 // 5. API key
-$api_key = $OPENAI_API_KEY ?? '';
+$api_key = $ANTHROPIC_API_KEY ?? '';
 if (!$api_key) {
-    echo json_encode(['status' => 'error', 'message' => 'API Key de OpenAI no configurada.']);
+    echo json_encode(['status' => 'error', 'message' => 'API Key de Anthropic no configurada.']);
     exit;
 }
 
@@ -107,8 +85,8 @@ $user_tag = 'anon_' . substr(hash('sha256', ($ip ?: '-') . '|' . ($ua ?: '-')), 
 
 app_log('request', [
     'rid'          => $rid,
-    'provider'     => 'gpt',
-    'model'        => GPT_MODEL,
+    'provider'     => 'claude',
+    'model'        => CLAUDE_MODEL,
     'plantilla_id' => $plantilla_id,
     'prompt_bytes' => $prompt_bytes,
     'client_ip'    => $ip,
@@ -123,38 +101,36 @@ app_log_body('prompt', [
 
 // 7. llamada a OpenAI
 $payload = [
-    'model'     => GPT_MODEL,
-    'messages'  => [
-        ['role' => 'system', 'content' => $system],
-        ['role' => 'user',   'content' => $prompt],
+    'model'      => CLAUDE_MODEL,
+    'max_tokens' => MAX_OUTPUT_TOKENS,
+    'system'     => $system,
+    'messages'   => [
+        ['role' => 'user', 'content' => $prompt],
     ],
-    'user'                  => $user_tag,
-    'max_completion_tokens' => MAX_OUTPUT_TOKENS,
+    'temperature' => 0.1,
 ];
 
-if (!in_array(GPT_MODEL, ['gpt-5.5'], true)) {
-    $payload['temperature'] = 0.1;
-}
 $jsonPayload = json_encode($payload, JSON_UNESCAPED_UNICODE);
 
 $t0 = microtime(true);
-$attempts   = 0;
-$maxAttempts= 3;
-$delays     = [0, 2, 5];
-$response   = '';
-$curl_err   = '';
-$http_code  = 0;
+$attempts    = 0;
+$maxAttempts = 3;
+$delays      = [0, 2, 5];
+$response    = '';
+$curl_err    = '';
+$http_code   = 0;
 
 do {
     if ($attempts > 0) {
         sleep($delays[$attempts]);
     }
 
-    $ch = curl_init('https://api.openai.com/v1/chat/completions');
+    $ch = curl_init('https://api.anthropic.com/v1/messages');
     curl_setopt($ch, CURLOPT_HTTPHEADER, [
         'Content-Type: application/json',
         'Accept: application/json',
-        'Authorization: Bearer ' . $api_key
+        'x-api-key: ' . $api_key,
+        'anthropic-version: 2023-06-01',
     ]);
     curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
     curl_setopt($ch, CURLOPT_POST, true);
@@ -167,7 +143,7 @@ do {
     $http_code = (int) curl_getinfo($ch, CURLINFO_HTTP_CODE);
     curl_close($ch);
 
-    $isRetryableHttp = in_array($http_code, [429,500,502,503,504], true);
+    $isRetryableHttp = in_array($http_code, [429, 500, 502, 503, 504], true);
     if ($curl_err === '' && !$isRetryableHttp) {
         break;
     }
@@ -191,17 +167,24 @@ if ($curl_err !== '') {
 
 $result = json_decode((string)$response, true);
 if ($result === null) {
-    echo json_encode(['status' => 'error', 'message' => 'Respuesta inválida de OpenAI (JSON).', 'rid' => $rid]);
+    echo json_encode(['status' => 'error', 'message' => 'Respuesta inválida de Anthropic (JSON).', 'rid' => $rid]);
     exit;
 }
 
 if ($http_code !== 200) {
-    $err_detail = $result['error']['message'] ?? ('HTTP '.$http_code);
-    echo json_encode(['status' => 'error', 'message' => 'Error API OpenAI: '.$err_detail, 'rid' => $rid]);
+    $err_detail = $result['error']['message'] ?? ('HTTP ' . $http_code);
+    echo json_encode(['status' => 'error', 'message' => 'Error API Anthropic: ' . $err_detail, 'rid' => $rid]);
     exit;
 }
 
-$content = (string)($result['choices'][0]['message']['content'] ?? '');
+// Anthropic devuelve: content[0]['type'] = 'text', content[0]['text'] = '...'
+$content = '';
+foreach ($result['content'] ?? [] as $block) {
+    if (($block['type'] ?? '') === 'text') {
+        $content .= $block['text'];
+    }
+}
+$content = trim($content);
 
 // 8. postprocesar con nuestro helper
 $ctxPaciente = [
@@ -212,11 +195,12 @@ $ctxPaciente = [
 $content = gpt_postprocess_html($content, $incluir_conclusion, $ctxPaciente);
 
 // 9. métricas
-$usage = $result['usage'] ?? [];
-$prompt_tokens     = (int)($usage['prompt_tokens']     ?? ($usage['input_tokens']  ?? 0));
-$completion_tokens = (int)($usage['completion_tokens'] ?? ($usage['output_tokens'] ?? 0));
-$total_tokens      = (int)($usage['total_tokens']      ?? ($prompt_tokens + $completion_tokens));
-$cost_usd = gpt_estimate_cost_usd(GPT_MODEL, $prompt_tokens, $completion_tokens);
+// Anthropic usa input_tokens / output_tokens
+$usage             = $result['usage'] ?? [];
+$prompt_tokens     = (int)($usage['input_tokens']  ?? 0);
+$completion_tokens = (int)($usage['output_tokens'] ?? 0);
+$total_tokens      = $prompt_tokens + $completion_tokens;
+$cost_usd          = gpt_estimate_cost_usd('claude-sonnet-4-6', $prompt_tokens, $completion_tokens);
 
 app_log('response', [
     'rid'               => $rid,
@@ -240,8 +224,8 @@ if (GPT_SNAPSHOT === 1) {
     $snapshot = [
         'rid'           => $rid,
         'datetime'      => date('c'),
-        'provider'      => 'gpt',
-        'model'         => GPT_MODEL,
+        'provider'      => 'Claude',
+        'model'         => CLAUDE_MODEL,
         'input'         => $input,
         'system'        => $system,
         'prompt'        => $prompt,

@@ -3,25 +3,57 @@ function obtenerDatosPaciente() {
     const esManual = $('#toggle_manual').prop('checked');
     const datos = {};
 
+    const leerValor = function (selector) {
+        const $el = $(selector);
+
+        if (!$el.length) {
+            return '';
+        }
+
+        return ($el.val() || '').trim();
+    };
+
+    const agregarSiExiste = function (key, value) {
+        const val = (value || '').toString().trim();
+
+        if (val !== '') {
+            datos[key] = val;
+        }
+    };
+
     if (esManual) {
-        $('input[name^="manual_"]').each(function () {
+        $('input[name^="manual_"], select[name^="manual_"], textarea[name^="manual_"]').each(function () {
             const nombre = this.name.replace('manual_', '');
-            datos[nombre] = ($(this).val() || '').trim();
+            agregarSiExiste(nombre, $(this).val());
         });
 
-        const sexoVal = ($('#manual_sexo').val() || '').trim();
-        if (sexoVal) datos['sexo'] = sexoVal;
+        agregarSiExiste('raza', leerValor('#manual_raza'));
+        agregarSiExiste('sexo', leerValor('#manual_sexo'));
+        agregarSiExiste('paciente', leerValor('#manual_paciente'));
+        agregarSiExiste('especie', leerValor('#manual_especie'));
+        agregarSiExiste('fecha_nacimiento', leerValor('#manual_fecha_nacimiento'));
+        agregarSiExiste('propietario', leerValor('#manual_propietario'));
+        agregarSiExiste('codigo_paciente', leerValor('#manual_codigo_paciente'));
+        agregarSiExiste('n_chip', leerValor('#manual_n_chip'));
     } else {
-        datos['paciente'] = ($('#paciente_seleccionado').val() || '').trim();
-        datos['especie'] = ($('#paciente_seleccionado').data('especie') || '').trim();
-        datos['raza'] = ($('#paciente_seleccionado').data('raza') || '').trim();
-        datos['fecha_nacimiento'] = ($('#paciente_seleccionado').data('fecha_nacimiento') || '').trim();
-        datos['sexo'] = ($('#paciente_seleccionado').data('sexo') || '').trim();
+        const $paciente = $('#paciente_seleccionado');
+
+        agregarSiExiste('paciente', $paciente.val());
+        agregarSiExiste('especie', $paciente.data('especie'));
+        agregarSiExiste('raza', $paciente.data('raza'));
+        agregarSiExiste('edad', $paciente.data('edad'));
+        agregarSiExiste('fecha_nacimiento', $paciente.data('fecha_nacimiento'));
+        agregarSiExiste('sexo', $paciente.data('sexo'));
     }
 
     const tipo_examen = ($('select[name="plantilla_informe_id"] option:selected').text() || '').trim();
-    datos['tipo_estudio'] = tipo_examen;
-    datos['motivo_examen'] = ($('#motivo_examen').val() || '').trim();
+
+    agregarSiExiste('tipo_estudio', tipo_examen);
+    agregarSiExiste('motivo', leerValor('#motivo_examen'));
+    agregarSiExiste('medico_solicitante', leerValor('#medico_solicitante'));
+    agregarSiExiste('recinto', leerValor('#recinto'));
+    agregarSiExiste('N_ficha', leerValor('#manual_N_ficha'));
+    agregarSiExiste('m_tratante', leerValor('#manual_m_tratante'));
 
     if (!tipo_examen || tipo_examen === 'Seleccione una plantilla') {
         return null;
@@ -270,6 +302,7 @@ $('#aceptarIA').on('click', function () {
     textoIA = textoIA
         .replace(/<span[^>]*style=['"]?color:(orange|blue);?['"]?[^>]*>(.*?)<\/span>/gi, '$2')
         .replace(/(?:<[^>]+>)?Observaciones del Asistente:?<\/?.*?>?(?:<br\s*\/?>)?[\s\S]*$/i, '')
+        .replace(/<sup\b[^>]*class=['"]flag['"][^>]*>.*?<\/sup>/gi, '')
         .replace(/\s*\(\d+\)/g, '')
         .replace(/CONCLUSION:\s*((?:- .*?\.)(?:\s*- .*?\.)*)/i, function(match, contenido) {
             const lineas = contenido
