@@ -25,11 +25,9 @@ function gpt_postprocess_html(string $html, bool $incluir_conclusion, array $ctx
     // 2.5) Marcar los XX sueltos (medidas no dictadas que quedaron en la plantilla).
     $html = gpt_marcar_xx_faltantes($html);
 
-    // 3) Renumerar flags en orden de aparición (corrige saltos del modelo).
-    $html = gpt_renumerar_flags($html);
-
-    // 4) Verificar correspondencia flag <-> observación; rellenar solo lo faltante.
-    $html = gpt_reparar_observaciones($html);
+    // 3+4) Renumerar flags y reconstruir observaciones de forma COORDINADA,
+    //       emparejando cada flag con la observación del modelo por su número viejo.
+    $html = gpt_renumerar_y_reparar($html);
 
     return $html;
 }
@@ -51,6 +49,98 @@ function gpt_sanitizar_html(string $html): string
     $html = preg_replace('#</?(?:html|head|body)\b[^>]*>#i', '', $html);
 
     return trim($html);
+}
+
+/**
+ * Renumera los flags del cuerpo Y reconstruye las observaciones de forma coordinada.
+ *
+ * Clave del arreglo: empareja cada flag con la observación del modelo usando el
+ * NÚMERO VIEJO (el que el modelo puso), ANTES de renumerar. Así, aunque el modelo
+ * haya numerado el cuerpo distinto a las observaciones, cada flag conserva su texto.
+ *
+ * Orden de la operación:
+ *   1. Captura las observaciones del modelo indexadas por su número viejo.
+ *   2. Recorre los flags del cuerpo EN ORDEN DE APARICIÓN. A cada uno le asigna
+ *      un número nuevo (1,2,3...) y guarda: número nuevo, tipo, y número viejo.
+ *   3. Reescribe los <sup> del cuerpo con el número nuevo.
+ *   4. Reconstruye el bloque de observaciones: para cada flag (en su orden nuevo),
+ *      usa la observación del modelo que tenía ese número viejo; si no existe,
+ *      genera un placeholder según el tipo.
+ */
+function gpt_renumerar_y_reparar(string $html): string
+{
+    // --- 1) Capturar observaciones del modelo, indexadas por número viejo ---
+    $obsModelo = [];   // numViejo => "texto de la observación (con su (N) viejo)"
+    if (preg_match('#<p>\s*<strong>\s*Observaciones del Asistente:\s*</strong>(.*?)</p>#is', $html, $mb)) {
+        $partes = preg_split('#<br\s*/?>#i', $mb[1]);
+        foreach ($partes as $linea) {
+            $plain = trim($linea);
+            if ($plain === '') continue;
+            if (preg_match('/^\s*\((\d+)\)\s*(.*)$/s', strip_tags($plain), $ml)) {
+                $obsModelo[(int)$ml[1]] = trim($plain);
+            }
+        }
+    }
+
+    // --- 2 y 3) Recorrer flags del cuerpo en orden, renumerar y mapear ---
+    $seq = 0;
+    $mapa = [];   // lista ordenada de [nuevo, tipo, viejo]
+
+    // Primero quitamos el bloque de observaciones para no renumerar dentro de él.
+    $htmlSinObs = gpt_quitar_bloque_observaciones($html);
+
+    $htmlSinObs = preg_replace_callback(
+        '#<sup\b[^>]*class=[\'"]flag[\'"][^>]*>.*?</sup>#is',
+        function ($m) use (&$seq, &$mapa) {
+            $seq++;
+
+            $tipo = 'valor_sospechoso';
+            if (preg_match('/data-tipo=["\']([^"\']+)["\']/i', $m[0], $mt)) {
+                $tipo = strtolower($mt[1]);
+            }
+
+            $viejo = 0;
+            if (preg_match('/data-flag=["\'](\d+)["\']/i', $m[0], $mv)) {
+                $viejo = (int)$mv[1];
+            }
+
+            $mapa[] = ['nuevo' => $seq, 'tipo' => $tipo, 'viejo' => $viejo];
+
+            return "<sup class=\"flag\" data-flag=\"{$seq}\" data-tipo=\"{$tipo}\">({$seq})</sup>";
+        },
+        $htmlSinObs
+    );
+
+    // Sin flags: no debe quedar bloque de observaciones.
+    if (empty($mapa)) {
+        return trim($htmlSinObs);
+    }
+
+    // --- 4) Reconstruir observaciones, emparejando por número viejo ---
+    $lineasFinales = [];
+    foreach ($mapa as $item) {
+        $nuevo = $item['nuevo'];
+        $tipo  = $item['tipo'];
+        $viejo = $item['viejo'];
+
+        // ¿El modelo escribió una observación para el número viejo de este flag?
+        // (los flags de XX que mete el código tienen viejo=0 y nunca tienen obs del modelo)
+        if ($viejo > 0 && isset($obsModelo[$viejo])) {
+            // Reusar el texto del modelo, pero con el número NUEVO al inicio.
+            $textoViejo = $obsModelo[$viejo];
+            // Quitar el "(viejo)" del inicio y poner "(nuevo)".
+            $textoSin = preg_replace('/^\s*\(\d+\)\s*/', '', strip_tags($textoViejo));
+            $lineasFinales[] = "({$nuevo}) " . trim($textoSin);
+        } else {
+            $lineasFinales[] = gpt_placeholder_observacion($nuevo, $tipo);
+        }
+    }
+
+    $obs = "<p><strong>Observaciones del Asistente:</strong><br>\n"
+         . implode("<br>\n", $lineasFinales)
+         . "<br>\n</p>";
+
+    return trim($htmlSinObs) . "\n" . $obs;
 }
 
 /**
