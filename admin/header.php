@@ -27,5 +27,5 @@
   <!-- Favicon -->
   <link rel="shortcut icon" href="../assets/img/photos/logo0.1.png" />
 
-  <title>CertiVet </title>
+  <title>VetMind</title>
 
