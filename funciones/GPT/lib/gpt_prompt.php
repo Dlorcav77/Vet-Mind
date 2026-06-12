@@ -33,6 +33,27 @@ function gpt_html_a_texto_clinico(string $html): string
 }
 
 /**
+ * Separa los bloques de la plantilla en líneas distintas antes de enviarla al modelo.
+ * No toca el contenido ni los estilos: solo inserta un salto de línea después de
+ * cada </p> y </div> para que el modelo distinga mejor las secciones del informe.
+ * Sirve para cualquier plantilla (no asume títulos ni órganos).
+ */
+function gpt_normalizar_plantilla_para_prompt(string $html): string
+{
+    if (trim($html) === '') {
+        return $html;
+    }
+
+    // Insertar salto de línea después de cada cierre de bloque, si no lo tiene ya.
+    $html = preg_replace('#</(p|div|ul|li)>(?!\n)#i', "</$1>\n", $html);
+
+    // Compactar 3+ saltos seguidos a 2 como máximo.
+    $html = preg_replace("/\n{3,}/", "\n\n", $html);
+
+    return trim($html);
+}
+
+/**
  * Carga ejemplos desde la BD si hay plantilla_id.
  *
  * Por ahora esta función queda disponible, pero NO se usa en gpt_build_prompt().
@@ -108,9 +129,13 @@ SALIDA HTML OBLIGATORIA
 
 USO DE PLANTILLA BASE
 - La PLANTILLA BASE es el formato inicial.
-- Si una sección de la plantilla ya existe y el DICTADO entrega información para esa misma sección, actualiza esa sección con el contenido clínico del DICTADO.
-- Si la plantilla trae texto normal, pero el DICTADO entrega una alteración para esa zona u órgano, reemplaza o ajusta el texto normal usando el hallazgo del DICTADO.
-- Si el DICTADO no menciona una zona u órgano, conserva el texto base salvo que claramente no aplique.
+- REGLA PRINCIPAL DE REDACCIÓN: para cada órgano, SIEMPRE parte de la frase completa de la PLANTILLA BASE y solo modifica los atributos puntuales que el DICTADO indique distintos. NO reescribas el órgano desde cero con solo lo que dice el DICTADO.
+- PRIORIDAD ABSOLUTA DEL HALLAZGO ANORMAL: si el DICTADO describe un órgano como alterado o anormal (por ejemplo "aumentado de tamaño", "bordes redondeados", "ecogenicidad disminuida", presencia de masa, etc.), ese hallazgo SIEMPRE reemplaza al estado normal de la PLANTILLA BASE para ese atributo. NUNCA conserves el estado normal de la plantilla si el DICTADO dice que ese atributo está alterado.
+- Esta prioridad se aplica AUNQUE el nombre del órgano venga mal transcrito en el DICTADO (por ejemplo "Vaso" por "Bazo"): igual debes trasladar el hallazgo anormal al órgano correcto. Ejemplo: si el DICTADO dice "Vaso aumentado de tamaño, bordes redondeados", el Bazo debe quedar "aumentado de tamaño... bordes redondeados", NO "tamaño conservado, bordes aguzados".
+- Conserva SIEMPRE los atributos de la plantilla que el DICTADO no contradiga, aunque el DICTADO sea breve. Por ejemplo, si la plantilla dice "Bazo tamaño conservado, bordes aguzados, parénquima homogéneo, capsula esplénica conservada, Vasculatura conservada" y el DICTADO solo dice "bazo conservado", el resultado debe mantener la frase completa de la plantilla, no acortarla a "Bazo conservado".
+- Si el DICTADO entrega una alteración o un valor distinto para un atributo, reemplaza SOLO ese atributo dentro de la frase de la plantilla, dejando el resto igual.
+- Si el DICTADO menciona un órgano pero NO entrega su medida (por ejemplo dice "riñón izquierdo" y describe atributos pero no dicta el tamaño), CONSERVA el "XX cm" de la plantilla en su lugar. NUNCA elimines la medida ni el órgano: el XX debe quedar para que se marque como dato faltante.
+- Si el DICTADO no menciona una zona u órgano, conserva el texto base completo de la plantilla salvo que claramente no aplique.
 - Si el DICTADO trae un órgano o hallazgo que no está en la PLANTILLA BASE, intégralo en su posición anatómica correcta dentro del informe, NO al final por defecto:
   - Próstata: como párrafo propio inmediatamente después de Vejiga urinaria.
   - Testículos: como párrafo propio inmediatamente después de Próstata (o después de Vejiga si no hay próstata).
@@ -119,6 +144,11 @@ USO DE PLANTILLA BASE
     <p style="text-align:justify"><strong>HALLAZGOS ADICIONALES:</strong> ...</p>
 - Un órgano extra que SÍ tiene posición anatómica conocida (próstata, testículos, íleon) nunca debe ir en HALLAZGOS ADICIONALES.
 - En la sección digestiva, cada órgano (Estómago, Duodeno, Yeyuno, Colon, y si aplica Íleon) va en su propio párrafo, con el nombre del órgano en cursiva. Respeta esa separación; no los unifiques en un solo párrafo.
+- Las reglas de flags y de no adivinar aplican TAMBIÉN dentro de HALLAZGOS ADICIONALES y en cualquier órgano extra, igual que en el resto del informe. No trates esa sección como excepción.
+- NUNCA reemplaces una palabra del DICTADO por otra que tú creas correcta, ni siquiera si la palabra dictada no tiene sentido clínico. Si una palabra no tiene sentido en el contexto (por ejemplo "anécdotas" donde clínicamente correspondería otra cosa), CONSÉRVALA tal como vino y márcala con flag termino_confuso, explicando la duda en Observaciones. No adivines la palabra correcta.
+- Si un órgano o estructura aparece descrito de forma anatómicamente incongruente (por ejemplo "cuerpo uterino" mencionado dos veces, o con una lateralidad que ese órgano no tiene), conserva lo dictado y márcalo con flag incongruencia para que el humano lo revise.
+- ÓRGANO REPETIDO CON MISMA LATERALIDAD: si el DICTADO nombra el mismo órgano con el mismo lado explícito DOS veces (por ejemplo "Riñón derecho ... 5.6 cm" y más adelante otra vez "Riñón derecho ... 5.8 cm"), con medidas o atributos distintos, y SIN una frase de corrección entre ellos ("no", "perdón", "me equivoqué", "mejor dicho"): NO descartes ninguno de los dos. Deja en el informe el ÚLTIMO que se dictó y marca ese órgano con flag incongruencia. En Observaciones anota ambas versiones, por ejemplo: "el órgano se dictó dos veces con el mismo lado: primero [valores A], luego [valores B]; revisar si uno corresponde al lado contrario". NO decidas tú cuál es el correcto ni cambies la lateralidad: solo conserva la información y avisa.
+- Esto NO aplica cuando el mismo órgano se menciona en partes legítimamente distintas (por ejemplo "Páncreas rama derecha" y "Páncreas rama izquierda", que son dos zonas del mismo órgano y son correctas), ni cuando hay una corrección explícita (eso ya se resuelve tomando el último valor).
 
 ESTILO DE REDACCIÓN
 - Para las unidades de medida usa siempre la forma abreviada "cm" (y "mm" cuando corresponda), nunca la palabra "centímetros" ni "milímetros", aunque el DICTADO use la palabra completa.
@@ -134,6 +164,7 @@ TRANSCRIPCIÓN CLÍNICA
 - Distingue entre un número LEGIBLE y un número ILEGIBLE:
   - LEGIBLE: se entiende qué número es, aunque parezca raro o clínicamente improbable. Escríbelo tal cual viene. Si es muy improbable, márcalo con flag valor_sospechoso, pero el número SÍ va escrito.
   - ILEGIBLE: no se puede determinar qué número es (balbuceo, varios números pegados sin saber cuál corresponde, frase cortada). En ese caso NO escribas el texto roto: pon "XX" en lugar de la medida y márcalo con flag medida_ilegible.
+- Si el DICTADO se corrige a sí mismo sobre un mismo dato (por ejemplo "0.79... no, eso estaba en 0.57", "perdón, mejor dicho...", "no, era..."), usa SIEMPRE el último valor o la última versión que entrega el ecografista, no la primera. La corrección reemplaza al dato corregido.
 - El criterio para usar XX es "¿se entiende qué número es?", NO "¿el número es normal?". La rareza de un valor no justifica reemplazarlo por XX; solo la ilegibilidad lo justifica.
 - Si una palabra o frase (no numérica) parece error de dictado, conserva el término original, márcalo con flag termino_confuso y explica la duda en Observaciones del Asistente.
 - No muevas hallazgos, medidas ni descripciones entre órganos, zonas anatómicas o lateralidades.
@@ -259,8 +290,8 @@ SYS;
     $sexo           = gpt_limpiar_acentos(trim((string)($input['sexo'] ?? '')));
     $tipo_estudio   = gpt_limpiar_acentos(trim((string)($input['tipo_estudio'] ?? '')));
     $motivo         = gpt_limpiar_acentos(trim((string)($input['motivo'] ?? '')));
-    $plantilla_base = (string)($input['plantilla_base'] ?? '');
-
+    $plantilla_base = gpt_normalizar_plantilla_para_prompt((string)($input['plantilla_base'] ?? ''));
+    
     // ── PROMPT de usuario ──
     $prompt = "
 REDACCION DE INFORME ECOGRAFICO VETERINARIO

@@ -183,7 +183,7 @@ if (!function_exists('certificado_get_form_data')) {
 
         $campos_permitidos_catalogo = [];
         $resCamposPermitidos = $mysqli->query("
-            SELECT id, campo, etiqueta
+            SELECT id, campo, etiqueta, ambito, campo_interno
             FROM campos_permitidos
             WHERE activo = 1
             ORDER BY id ASC
@@ -216,6 +216,50 @@ if (!function_exists('certificado_get_form_data')) {
 
             while ($rowCampoVisible = $resCamposVisibles->fetch_assoc()) {
                 $campos_visibles_actuales[] = $rowCampoVisible['campo'];
+            }
+        }
+
+        $recinto_default = '';
+        if ($configuracion_informe_id_actual > 0) {
+            $stmtRecintoDefault = $mysqli->prepare("
+                SELECT recinto_default
+                FROM configuracion_informes
+                WHERE id = ? AND veterinario_id = ?
+                LIMIT 1
+            ");
+
+            if ($stmtRecintoDefault) {
+                $stmtRecintoDefault->bind_param("ii", $configuracion_informe_id_actual, $usuario_id);
+                $stmtRecintoDefault->execute();
+                $rowRecintoDefault = $stmtRecintoDefault->get_result()->fetch_assoc();
+
+                if (is_array($rowRecintoDefault) && $rowRecintoDefault['recinto_default'] !== null) {
+                    $recinto_default = (string)$rowRecintoDefault['recinto_default'];
+                }
+            }
+        }
+
+        $recinto_visible_plantilla = in_array('recinto', $campos_visibles_actuales, true);
+        $recinto_pide_siempre = (!$recinto_visible_plantilla && trim($recinto_default) === '');
+
+        if ($recinto_pide_siempre && !$recinto_visible_plantilla) {
+            $campos_visibles_actuales[] = 'recinto';
+        }
+
+        $clinicas_recinto = [];
+        $stmtClinicas = $mysqli->prepare("
+            SELECT nombre_clinica
+            FROM clinicas
+            WHERE veterinario_id = ?
+            ORDER BY nombre_clinica ASC
+        ");
+
+        if ($stmtClinicas) {
+            $stmtClinicas->bind_param("i", $usuario_id);
+            $stmtClinicas->execute();
+            $resClinicas = $stmtClinicas->get_result();
+            while ($rowClinica = $resClinicas->fetch_assoc()) {
+                $clinicas_recinto[] = $rowClinica['nombre_clinica'];
             }
         }
 
@@ -260,6 +304,8 @@ if (!function_exists('certificado_get_form_data')) {
             'borrador_scope_key'              => $scopeKey,
             'modo_ingreso_contenido_inicial'  => $modo_ingreso_contenido_inicial,
             'toggle_manual_inicial'           => $toggle_manual_inicial,
+            'recinto_default'                 => $recinto_default,
+            'clinicas_recinto'                => $clinicas_recinto,
         ];
     }
 }

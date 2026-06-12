@@ -74,83 +74,72 @@ if (!function_exists('valorManualCertificado')) {
 <link rel="stylesheet" href="certificado/tipo_examen/css/tipo_examen.css?v=3">
 <div class="col-12" id="bloque_tipo_examen">
     <div class="vm-campos-generales mb-1" id="fila_campos_generales">
-        <div
-            class="vm-campo-general mb-3"
-            id="wrap_motivo_examen"
-            data-campo-general="antecedentes"
-            style="<?= in_array('antecedentes', $campos_visibles_actuales ?? [], true) ? '' : 'display:none;' ?>"
-        >
-            <label for="motivo_examen" class="form-label fw-bold">Motivo</label>
-            <input
-                type="text"
-                class="form-control"
-                name="motivo_examen"
-                id="motivo_examen"
-                value="<?= htmlspecialchars($fila['motivo'] ?? '') ?>"
-            >
-        </div>
+        <?php foreach ($campos_permitidos_catalogo ?? [] as $campoInforme): ?>
+            <?php
+                if (($campoInforme['ambito'] ?? '') !== 'informe') {
+                    continue;
+                }
 
-        <div
-            class="vm-campo-general mb-3"
-            id="wrap_medico_solicitante"
-            data-campo-general="m_solicitante"
-            style="<?= in_array('m_solicitante', $campos_visibles_actuales ?? [], true) ? '' : 'display:none;' ?>"
-        >
-            <label for="medico_solicitante" class="form-label fw-bold">Médico Solicitante</label>
-            <input
-                type="text"
-                class="form-control"
-                name="medico_solicitante"
-                id="medico_solicitante"
-                value="<?= htmlspecialchars($fila['medico_solicitante'] ?? '') ?>"
-            >
-        </div>
-        <div
-            class="vm-campo-general mb-3"
-            id="wrap_numero_ficha"
-            data-campo-general="N_ficha"
-            style="<?= in_array('N_ficha', $campos_visibles_actuales ?? [], true) ? '' : 'display:none;' ?>"
-        >
-            <label for="manual_N_ficha" class="form-label fw-bold">Numero de ficha</label>
-            <input
-                type="text"
-                class="form-control"
-                name="manual_N_ficha"
-                id="manual_N_ficha"
-                value="<?= htmlspecialchars(valorManualCertificado($manual_data_certificado, 'N_ficha')) ?>"
-            >
-        </div>
+                $campoKey = $campoInforme['campo'];
+                $campoInterno = (isset($campoInforme['campo_interno']) && $campoInforme['campo_interno'] !== '' && $campoInforme['campo_interno'] !== null)
+                    ? $campoInforme['campo_interno']
+                    : $campoKey;
 
-        <div
-            class="vm-campo-general mb-3"
-            id="wrap_medico_tratante"
-            data-campo-general="m_tratante"
-            style="<?= in_array('m_tratante', $campos_visibles_actuales ?? [], true) ? '' : 'display:none;' ?>"
-        >
-            <label for="manual_m_tratante" class="form-label fw-bold">Médico Tratante</label>
-            <input
-                type="text"
-                class="form-control"
-                name="manual_m_tratante"
-                id="manual_m_tratante"
-                value="<?= htmlspecialchars(valorManualCertificado($manual_data_certificado, 'm_tratante')) ?>"
+                $campoLabel = $campoInforme['etiqueta'];
+
+                $postNamePorInterno = [
+                    'medico_solicitante' => 'medico_solicitante',
+                    'motivo'             => 'motivo_examen',
+                    'recinto'            => 'recinto',
+                ];
+                $valorPorInterno = [
+                    'medico_solicitante' => (string)($fila['medico_solicitante'] ?? ''),
+                    'motivo'             => (string)($fila['motivo'] ?? ''),
+                    'recinto'            => (string)($fila['recinto'] ?? ''),
+                ];
+
+                $inputName = $postNamePorInterno[$campoInterno] ?? $campoInterno;
+                $inputId   = $inputName;
+
+                $valor = $valorPorInterno[$campoInterno] ?? '';
+                if ($valor === '' && isset($manual_data_certificado[$campoKey]) && !is_array($manual_data_certificado[$campoKey])) {
+                    $valor = (string)$manual_data_certificado[$campoKey];
+                }
+
+                $visibleInforme = in_array($campoKey, $campos_visibles_actuales ?? [], true);
+            ?>
+            <div
+                class="vm-campo-general mb-3"
+                id="wrap_<?= htmlspecialchars($campoKey) ?>"
+                data-campo-general="<?= htmlspecialchars($campoKey) ?>"
+                data-interno="<?= htmlspecialchars($campoInterno) ?>"
+                style="<?= $visibleInforme ? '' : 'display:none;' ?>"
             >
-        </div>
-        <div
-            class="vm-campo-general mb-3"
-            id="wrap_recinto"
-            data-campo-general="recinto"
-            style="<?= in_array('recinto', $campos_visibles_actuales ?? [], true) ? '' : 'display:none;' ?>"
-        >
-            <label for="recinto" class="form-label fw-bold">Recinto</label>
-            <input
-                type="text"
-                class="form-control"
-                name="recinto"
-                id="recinto"
-                value="<?= htmlspecialchars($fila['recinto'] ?? '') ?>"
-            >
-        </div>
+                <label for="<?= htmlspecialchars($inputId) ?>" class="form-label fw-bold"><?= htmlspecialchars($campoLabel) ?></label>
+                <?php if ($campoInterno === 'recinto'): ?>
+                    <select
+                        class="form-select"
+                        name="<?= htmlspecialchars($inputName) ?>"
+                        id="<?= htmlspecialchars($inputId) ?>"
+                    >
+                        <option value="">Seleccione recinto...</option>
+                        <?php foreach ($clinicas_recinto ?? [] as $nombreClinica): ?>
+                            <option value="<?= htmlspecialchars($nombreClinica) ?>" <?= $valor === $nombreClinica ? 'selected' : '' ?>>
+                                <?= htmlspecialchars($nombreClinica) ?>
+                            </option>
+                        <?php endforeach; ?>
+                    </select>
+                <?php else: ?>
+                    <input
+                        type="text"
+                        class="form-control"
+                        name="<?= htmlspecialchars($inputName) ?>"
+                        id="<?= htmlspecialchars($inputId) ?>"
+                        value="<?= htmlspecialchars($valor) ?>"
+                    >
+                <?php endif; ?>
+            </div>
+        <?php endforeach; ?>
     </div>
 
     <div class="row g-1 mb-1 align-items-start" id="fila_tipo_e_imagenes_preview">
@@ -220,5 +209,5 @@ if (!function_exists('valorManualCertificado')) {
     </div>
 </div>
 
-<script src="certificado/tipo_examen/js/tipo_examen.js?v=9"></script>
+<script src="certificado/tipo_examen/js/tipo_examen.js?v=10"></script>
 <script src="certificado/tipo_examen/js/imagenes.js?v=2"></script>

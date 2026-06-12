@@ -152,7 +152,7 @@ function procesarTextoConGPT(texto) {
             Swal.close();
 
             if (xhr && xhr.responseText) {
-                console.log("Respuesta cruda:", xhr.responseText);
+                // console.log("Respuesta cruda:", xhr.responseText);
             }
 
             Swal.fire('Error', 'No se pudo conectar al servicio GPT.', 'error');

@@ -4,6 +4,8 @@ require ("../funciones/session/ini_session.php");
 include 'header.php';
 include 'menu.php';
 
+global $usuario_id;
+
 $mysqli = conn();
 
 $sel  ="select nombres from usuarios where id='$usuario_id'";
@@ -127,17 +129,16 @@ $(document).ready(function() {
 
     var lastPage = (typeof FORCE_HOME !== 'undefined' && FORCE_HOME) ? null : localStorage.getItem('lastPage');
 
-    if (lastPage) {
-    $('#content').load(lastPage, function() {
+    var paginaInicial = lastPage || 'inicio/inicio.php';
+
+    $('#content').css('visibility', 'hidden').load(paginaInicial, function() {
         const pageId = $('#content').find('[data-page-id]').attr('data-page-id');
         updateMenuState(pageId);
+
+        setTimeout(function () {
+            $('#content').css('visibility', 'visible');
+        }, 250);
     });
-    } else {
-    $('#content').load('inicio/inicio.php', function() {
-        const pageId = $('#content').find('[data-page-id]').attr('data-page-id');
-        updateMenuState(pageId);
-    });
-    }
 
 
     $(document).on('click', '.sidebar-link, .ajax-link', function(e) {
@@ -148,7 +149,7 @@ $(document).ready(function() {
             url: url,
             method: 'GET',
             success: function(data) {
-                $('#content').html(data);
+                $('#content').css('visibility', 'hidden').html(data);
 
                 localStorage.setItem('lastPage', url);
 
@@ -156,6 +157,10 @@ $(document).ready(function() {
                 updateMenuState(pageId);
 
                 history.pushState({ url: url }, null, window.location.pathname);
+
+                setTimeout(function () {
+                    $('#content').css('visibility', 'visible');
+                }, 250);
             },
             error: function() {
                 alert('Error al cargar el contenido.');

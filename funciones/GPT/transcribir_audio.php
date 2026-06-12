@@ -8,6 +8,26 @@ require_once(dirname(__DIR__, 2) . "/configP.php");
 
 session_start();
 
+/////////////////////////////////////////////////////////////////
+// Motor de transcripción manual para pruebas.
+// Valores:
+// - ''       => usa AssemblyAI en este mismo archivo (comportamiento actual)
+// - 'assembly'=> igual que '' (AssemblyAI)
+// - 'grok'   => deriva a funciones/GPT/transcribir_audio_grok.php
+$motor_stt = 'deepgram';
+// $motor_stt = '';
+
+$motor_stt = strtolower(trim($motor_stt));
+
+if ($motor_stt === 'grok') {
+    require_once(__DIR__ . '/transcribir_audio_grok.php');
+    exit;
+}
+if ($motor_stt === 'deepgram') {
+    require_once(__DIR__ . '/transcribir_audio_deepgram.php');
+    exit;
+}
+
 $ROOT_DIR = dirname(__DIR__, 2);
 
 $logDir = $ROOT_DIR . '/funciones/logs';
@@ -289,7 +309,16 @@ $transcriptionRequest = [
     'audio_url' => $uploadUrl,
     'language_code' => 'es',
     'format_text' => true,
-    'disfluencies' => false
+    'disfluencies' => false,
+    'word_boost' => [
+        'Bazo', 'Yeyuno', 'Íleon', 'Duodeno', 'Páncreas', 'Colon', 'Estómago',
+        'Riñón', 'Vejiga', 'Próstata', 'Hígado', 'Vesícula biliar', 'Linfonódulos',
+        'Adrenal', 'Adrenales', 'Ciego', 'Peritoneo', 'Bilateral',
+        'ecogenicidad', 'ecogénico', 'anecoico', 'hipoecoico', 'hiperecoico',
+        'parénquima', 'cortico medular', 'estratificación', 'esplénico',
+        'mucoso', 'submucosa', 'aguzado', 'reactivo', 'felino', 'puntiforme'
+    ],
+    'boost_param' => 'high'
 ];
 
 $ch = curl_init('https://api.assemblyai.com/v2/transcript');

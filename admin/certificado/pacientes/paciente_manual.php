@@ -1,9 +1,23 @@
 <?php
+/**
+ * @var string $toggleManualInitial
+ * @var string $guardarInitial
+ * @var array $camposCatalogo
+ * @var array $camposGenerales
+ * @var array $camposVisiblesActuales
+ * @var array $sexos_manual
+ */
+
 // admin/certificado/pacientes/paciente_manual.php
 $manualDataInicial = $manualDataInicial ?? [];
 
 function manual_value(array $data, string $key): string {
     return htmlspecialchars((string)($data[$key] ?? ''), ENT_QUOTES, 'UTF-8');
+}
+
+$etiquetaPorCampo = [];
+foreach ($camposCatalogo as $campoCat) {
+    $etiquetaPorCampo[$campoCat['campo']] = $campoCat['etiqueta'];
 }
 ?>
 <div id="paciente-manual" class="my-3 border rounded p-3 bg-light" style="<?= $toggleManualInitial ? '' : 'display:none;' ?>">
@@ -29,20 +43,31 @@ function manual_value(array $data, string $key): string {
     <div class="row">
         <?php foreach ($camposCatalogo as $campo): ?>
             <?php
-                if (in_array($campo['campo'], $camposGenerales, true)) {
+                if (($campo['ambito'] ?? 'paciente') !== 'paciente') {
                     continue;
                 }
 
                 $campoKey = $campo['campo'];
-                $campoLabel = $campo['etiqueta'];
+                $campoInterno = (isset($campo['campo_interno']) && $campo['campo_interno'] !== '' && $campo['campo_interno'] !== null)
+                    ? $campo['campo_interno']
+                    : $campoKey;
+
+                $camposTipoEspecial = ['raza', 'sexo', 'fecha_nacimiento'];
+                $esTipoEspecial = in_array($campoInterno, $camposTipoEspecial, true);
+
+                $campoLabel = $esTipoEspecial
+                    ? ($etiquetaPorCampo[$campoInterno] ?? $campo['etiqueta'])
+                    : $campo['etiqueta'];
+
                 $visibleInicial = in_array($campoKey, $camposVisiblesActuales, true);
-                $esObligatorioManual = in_array($campoKey, ['paciente', 'propietario'], true);
-                $inputId = 'manual_' . $campoKey;
-                $valorInicial = (string)($manualDataInicial[$campoKey] ?? '');
+                $esObligatorioManual = in_array($campoInterno, ['paciente', 'propietario'], true);
+                $inputId = 'manual_' . $campoInterno;
+                $valorInicial = (string)($manualDataInicial[$campoInterno] ?? $manualDataInicial[$campoKey] ?? '');
             ?>
             <div
                 class="col-md-4 mb-3 campo-manual-item"
                 data-campo="<?= htmlspecialchars($campoKey) ?>"
+                data-interno="<?= htmlspecialchars($campoInterno) ?>"
                 style="<?= $visibleInicial ? '' : 'display:none;' ?>"
             >
                 <label class="form-label fw-semibold" for="<?= htmlspecialchars($inputId) ?>">
@@ -52,7 +77,7 @@ function manual_value(array $data, string $key): string {
                     <?php endif; ?>
                 </label>
 
-                <?php if ($campoKey === 'raza'): ?>
+                <?php if ($campoInterno === 'raza'): ?>
                     <select
                         id="manual_raza_select"
                         class="select2 form-select"
@@ -69,7 +94,7 @@ function manual_value(array $data, string $key): string {
                         value="<?= manual_value($manualDataInicial, 'raza') ?>"
                     >
 
-                <?php elseif ($campoKey === 'sexo'): ?>
+                <?php elseif ($campoInterno === 'sexo'): ?>
                     <select class="form-select" id="manual_sexo" name="manual_sexo">
                         <option value="">Seleccione...</option>
                         <?php foreach ($sexos_manual as $val => $label): ?>
@@ -79,25 +104,25 @@ function manual_value(array $data, string $key): string {
                         <?php endforeach; ?>
                     </select>
 
-                <?php elseif ($campoKey === 'fecha_nacimiento'): ?>
+                <?php elseif ($campoInterno === 'fecha_nacimiento'): ?>
                     <input
                         type="date"
                         class="form-control"
                         name="manual_fecha_nacimiento"
                         id="manual_fecha_nacimiento"
-                        value="<?= manual_value($manualDataInicial, 'fecha_nacimiento') ?>"
+                        value="<?= htmlspecialchars($valorInicial) ?>"
                     >
 
                 <?php else: ?>
                     <input
                         type="text"
                         class="form-control <?= $esObligatorioManual ? 'campo-requerido-manual' : '' ?>"
-                        name="manual_<?= htmlspecialchars($campoKey) ?>"
-                        id="manual_<?= htmlspecialchars($campoKey) ?>"
+                        name="manual_<?= htmlspecialchars($campoInterno) ?>"
+                        id="manual_<?= htmlspecialchars($campoInterno) ?>"
                         data-required-manual="<?= $esObligatorioManual ? '1' : '0' ?>"
                         data-label="<?= htmlspecialchars($campoLabel) ?>"
                         autocomplete="off"
-                        value="<?= manual_value($manualDataInicial, $campoKey) ?>"
+                        value="<?= htmlspecialchars($valorInicial) ?>"
                     >
                     <?php if ($esObligatorioManual): ?>
                         <div class="invalid-feedback-manual" id="feedback_<?= htmlspecialchars($inputId) ?>">

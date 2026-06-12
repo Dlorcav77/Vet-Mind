@@ -94,13 +94,33 @@ while ($row = $res->fetch_assoc()) {
     $campos[] = $row['campo'];
 }
 
-$campos_generales = ['antecedentes', 'm_solicitante', 'recinto'];
-$campos_manuales = array_values(array_diff($campos, $campos_generales));
+$recinto_default = '';
+$stmtRecintoDefault = $mysqli->prepare("
+    SELECT recinto_default
+    FROM configuracion_informes
+    WHERE id = ? AND veterinario_id = ?
+    LIMIT 1
+");
+
+if ($stmtRecintoDefault) {
+    $stmtRecintoDefault->bind_param("ii", $configuracion_informe_id, $usuario_id);
+    $stmtRecintoDefault->execute();
+    $rowRecintoDefault = $stmtRecintoDefault->get_result()->fetch_assoc();
+
+    if (is_array($rowRecintoDefault) && $rowRecintoDefault['recinto_default'] !== null) {
+        $recinto_default = (string)$rowRecintoDefault['recinto_default'];
+    }
+}
+
+$recinto_visible = in_array('recinto', $campos, true);
+$recinto_pide_siempre = (!$recinto_visible && trim($recinto_default) === '');
+
+if ($recinto_pide_siempre) {
+    $campos[] = 'recinto';
+}
 
 echo json_encode([
     'status' => 'success',
-    'campos' => $campos,
-    'campos_manuales' => $campos_manuales,
-    'campos_generales' => $campos_generales
+    'campos' => $campos
 ], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
 exit;

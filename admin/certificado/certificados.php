@@ -37,6 +37,7 @@ $borrador_updated_at             = $formData['borrador_updated_at'];
 $borrador_payload                = $formData['borrador_payload'];
 $borrador_scope_key              = $formData['borrador_scope_key'];
 $modo_ingreso_contenido_inicial  = $formData['modo_ingreso_contenido_inicial'];
+$clinicas_recinto                = $formData['clinicas_recinto'];
 ?>
 <link rel="stylesheet" href="certificado/common/css/certificado.css?v=2">
 <div class="card" id="certificado" data-page-id="certificado">
@@ -98,40 +99,6 @@ $modo_ingreso_contenido_inicial  = $formData['modo_ingreso_contenido_inicial'];
         scopeKey: <?= json_encode($borrador_scope_key, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) ?>
     };
 })();
-</script>
-
-<script>
-document.addEventListener('DOMContentLoaded', function () {
-    const selectPlantilla = document.querySelector('#configuracion_informe_id');
-
-    if (!selectPlantilla) {
-        console.warn('[DEBUG plantilla] No existe #configuracion_informe_id');
-        return;
-    }
-
-    let contadorCambioPlantilla = 0;
-
-    selectPlantilla.addEventListener('change', function () {
-        contadorCambioPlantilla++;
-
-        console.log('[DEBUG plantilla] Cambio detectado:', {
-            contador: contadorCambioPlantilla,
-            valor: this.value,
-            texto: this.options[this.selectedIndex] ? this.options[this.selectedIndex].text : '',
-            hora: new Date().toISOString()
-        });
-
-        setTimeout(function () {
-            console.log('[DEBUG plantilla] Estado 1 segundo después:', {
-                readyState: document.readyState,
-                modalesAbiertos: document.querySelectorAll('.modal.show').length,
-                backdrops: document.querySelectorAll('.modal-backdrop').length,
-                bodyClass: document.body.className,
-                activeElement: document.activeElement ? document.activeElement.outerHTML.substring(0, 200) : null
-            });
-        }, 1000);
-    });
-});
 </script>
 
 <script src="certificado/common/js/editor.js?v=3"></script>

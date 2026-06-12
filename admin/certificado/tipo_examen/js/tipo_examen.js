@@ -19,7 +19,7 @@ function cargarCamposVisiblesPorConfiguracion(configuracionInformeId) {
         dataType: 'json',
         data: { configuracion_informe_id: configuracionInformeId },
         success: function (res) {
-            console.log('get_campos_visibles response:', res);
+            // console.log('get_campos_visibles response:', res);
 
             if (res && res.status === 'success') {
                 if (typeof aplicarCamposVisiblesFormulario === 'function') {
@@ -289,7 +289,7 @@ $(function () {
                 dataType: 'json',
                 data: { plantilla_informe_id: tipo },
                 success: function (res) {
-                    console.log('getPlantillaPorTipo response:', res);
+                    // console.log('getPlantillaPorTipo response:', res);
 
                     if (res && res.status === 'success') {
                         const contenidoPlantilla = (res.contenido || '').trim();
@@ -349,6 +349,14 @@ $(function () {
                 }
             });
         });
+    
+        // Al cargar (recarga / borrador): si ya hay un tipo de examen elegido, mostrar su plantilla
+    (function () {
+        const $selTipo = $('#plantilla_informe_id');
+        if ($selTipo.length && ($selTipo.val() || '').trim() !== '') {
+            $selTipo.trigger('change.tipoPlantilla');
+        }
+    })();
 
     $('#configuracion_informe_id')
         .off('change.certCamposVisibles')

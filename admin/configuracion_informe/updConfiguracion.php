@@ -39,6 +39,7 @@ $titulo_informe       = trim($_POST['titulo_informe'] ?? 'INFORME ECOGRÁFICO');
 $mostrar_firma_imagen = isset($_POST['mostrar_firma_imagen']) ? 1 : 0;
 $subtitulo            = trim($_POST['subtitulo'] ?? '');
 $subtitulo_align      = $_POST['subtitulo_align'] ?? 'center';
+$recinto_default      = trim($_POST['recinto_default'] ?? '');
 $layout_config_post = $_POST['layout_config'] ?? [];
 $layout_config_json = prepararLayoutConfigJson($layout_config_post);
 
@@ -81,12 +82,13 @@ if ($action === 'modificar' && !empty($id)) {
         lugar_fecha = ?, fecha_align = ?, imagenes_por_fila = ?, titulo_informe = ?, 
         firma_imagen_url = ?, mostrar_firma_imagen = ?, subtitulo = ?, subtitulo_align = ?,
         layout_config_json = ?,
+        recinto_default = ?,
         updated_at = NOW()
         WHERE id = ? AND veterinario_id = ?";
 
     $stmt = $mysqli->prepare($sql);
     $stmt->bind_param(
-        "sissssssissssssssisssississsii",
+        "sissssssissssssssisssississssii",
         $nombre_plantilla,
         $es_predeterminada,
         $layout_tipo,
@@ -98,6 +100,7 @@ if ($action === 'modificar' && !empty($id)) {
         $mostrar_fecha, $formato_fecha, $lugar_fecha, $fecha_align,
         $imagenes_por_fila, $titulo_informe, $firma_imagen_subida, $mostrar_firma_imagen,
         $subtitulo, $subtitulo_align, $layout_config_json,
+        $recinto_default,
         $id, $usuario_id
     );
 
@@ -140,18 +143,19 @@ if ($action === 'ingresar') {
         color_primario, color_secundario, firma_nombre, firma_titulo, firma_subtitulo, firma_align,
         footer_texto, footer_align, mostrar_fecha, formato_fecha, lugar_fecha, fecha_align, 
         imagenes_por_fila, titulo_informe, firma_imagen_url, mostrar_firma_imagen, subtitulo, subtitulo_align, layout_config_json,
+        recinto_default,
         created_at, updated_at)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), NOW())";
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), NOW())";
 
     $stmt = $mysqli->prepare($sql);
     $stmt->bind_param(
-        "isissssssissssssssisssississs",
+        "isissssssissssssssisssississss",
         $usuario_id, $nombre_plantilla, $es_predeterminada, $layout_tipo,
         $logo_subido, $logo_position, $logo_size, $marca_agua_subida, $marca_agua_size, $mostrar_marca_agua,
         $color_primario, $color_secundario, $firma_nombre, $firma_titulo, $firma_subtitulo, $firma_align,
         $footer_texto, $footer_align, $mostrar_fecha, $formato_fecha, $lugar_fecha, $fecha_align,
         $imagenes_por_fila, $titulo_informe, $firma_imagen_subida, $mostrar_firma_imagen,
-        $subtitulo, $subtitulo_align, $layout_config_json
+        $subtitulo, $subtitulo_align, $layout_config_json, $recinto_default
     );
 
     if ($stmt->execute()) {
