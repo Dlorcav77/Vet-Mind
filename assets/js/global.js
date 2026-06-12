@@ -95,60 +95,14 @@ $(document).on('ajaxComplete', function () {
 
 
 
-// Destruye todas las instancias de CKEditor
-function destroyAllCKEditors() {
-    for (let instancia in CKEDITOR.instances) {
-        if (CKEDITOR.instances.hasOwnProperty(instancia)) {
-            CKEDITOR.instances[instancia].destroy(true);
-        }
-    }
-}
+// CKEditor eliminado: editor ahora es Tiptap.
+// Funciones conservadas como no-op para no romper llamadas externas.
+function destroyAllCKEditors() {}
 
-// Inicializa CKEditor si no existe y el textarea está visible
-function inicializarEditorContenido() {
-    $('[data-editor="ckeditor"]').each(function () {
-        let id = $(this).attr('id');
-        let $el = $(this);
+function inicializarEditorContenido() {}
 
-        if (!id || !$el.length || !$el.is(':visible')) return;
-
-        // 🧹 Asegura limpieza de instancia previa
-        if (CKEDITOR.instances[id]) {
-            console.log(`⛔ Destruyendo instancia previa: ${id}`);
-            CKEDITOR.instances[id].destroy(true);
-        }
-
-        // Solo si todavía no existe, creamos
-        if (!CKEDITOR.instances[id] && document.getElementById(id)) {
-            CKEDITOR.replace(id, {
-                height: 300,
-                allowedContent: true,
-                extraAllowedContent: 'span{*}(*)'
-            });
-            // console.log(`✅ CKEditor creado para: ${id}`);
-            // console.log("Instancias actuales:", CKEDITOR.instances);
-        }
-    });
-}
-
-
-
-// Se ejecuta cuando cargas contenido por AJAX
+// Carga contenido por AJAX (sin CKEditor)
 function cargarConEditor(href) {
-    destroyAllCKEditors();
-
-    // 🧹 Limpia el contenido anterior antes de cargar uno nuevo
-    $('#content').html(''); // o .empty()
-
-    $('#content').load(href, function () {
-        setTimeout(() => {
-            inicializarEditorContenido();
-        }, 300);
-    });
-}
-
-
-
-if ($('#contenido_html').length && !CKEDITOR.instances['contenido_html']) {
-    inicializarEditorContenido();
+    $('#content').html('');
+    $('#content').load(href);
 }

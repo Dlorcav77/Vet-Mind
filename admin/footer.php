@@ -56,6 +56,6 @@
 <script src="../assets/js/global.js"></script>
 
 <!-- CKEditor -->
-<script src="../assets/ckeditor/ckeditor.js"></script>
+<!-- <script src="../assets/ckeditor/ckeditor.js"></script> -->
 
 

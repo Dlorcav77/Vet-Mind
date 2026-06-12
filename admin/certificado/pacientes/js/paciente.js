@@ -11,6 +11,36 @@ function limpiarCampoContenedor($wrap) {
   });
 }
 
+function sincronizarHabilitacionPorInterno() {
+  // Para cada campo_interno, habilitar solo los inputs del item visible; deshabilitar el resto
+  const vistosVisibles = {};
+
+  $('.campo-manual-item, [data-campo-general]').each(function () {
+    const $item = $(this);
+    const interno = String($item.data('interno') || '').trim();
+    if (!interno) return;
+    if ($item.is(':visible')) {
+      vistosVisibles[interno] = true;
+    }
+  });
+
+  $('.campo-manual-item, [data-campo-general]').each(function () {
+    const $item = $(this);
+    const interno = String($item.data('interno') || '').trim();
+    if (!interno) return;
+
+    const esVisible = $item.is(':visible');
+    const hayVisibleParaInterno = !!vistosVisibles[interno];
+
+    // Si este item está visible -> habilitar sus inputs.
+    // Si está oculto y existe otro visible con el mismo interno -> deshabilitar (no se envía).
+    // Si está oculto y NO hay ninguno visible -> deshabilitar igual (oculto no debe enviarse).
+    const habilitar = esVisible && (!hayVisibleParaInterno || true);
+
+    $item.find('input, select, textarea').prop('disabled', !esVisible);
+  });
+}
+
 function aplicarCamposVisiblesFormulario(camposVisibles) {
   window.CERT_CAMPOS_VISIBLES = Array.isArray(camposVisibles) ? camposVisibles : [];
 
@@ -39,6 +69,9 @@ function aplicarCamposVisiblesFormulario(camposVisibles) {
       $item.stop(true, true).hide();
     }
   });
+
+  // Tras mostrar/ocultar, sincronizar qué inputs se envían
+  setTimeout(sincronizarHabilitacionPorInterno, 160);
 }
 
 function getCamposManualesVisibles() {

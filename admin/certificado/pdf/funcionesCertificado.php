@@ -128,11 +128,16 @@ function buildInformeHtml($veterinarioId, $configuracionInformeId, $pacienteId, 
     $fecha_dt = new DateTime($fecha);
     $fecha_emision_simple = $fecha_dt->format('d-m-Y');
 
-    $paciente['antecedentes']    = $motivo;
+    // Campos de informe (columnas reales del certificado)
+    $paciente['antecedentes']    = $motivo;             // campo_interno: motivo
     $paciente['recinto']         = $recinto;
-    $paciente['m_solicitante']   = $medico_solicitante;
-    $paciente['N_ficha']         = trim((string)($manual['N_ficha'] ?? ''));
-    $paciente['m_tratante']      = trim((string)($manual['m_tratante'] ?? ''));
+    $paciente['m_solicitante']   = $medico_solicitante; // campo_interno: medico_solicitante
+    $paciente['m_tratante']      = $medico_solicitante; // alias del mismo dato
+
+    // Alias de paciente: N_ficha muestra el codigo_paciente
+    $paciente['N_ficha']         = trim((string)($paciente['codigo_paciente'] ?? ''));
+
+    // Derivados (los calcula el sistema, no se piden en el formulario)
     $paciente['estudio']         = $nombreEstudio;
     $paciente['fecha_emision']   = $fecha_emision_simple;
 

@@ -71,6 +71,23 @@ while ($row = $res->fetch_assoc()) {
     $campos_permitidos[$row['id']] = $row['etiqueta'];
 }
 
+// Cargar clínicas del veterinario para el select de recinto por defecto
+$clinicas_recinto = [];
+$stmt_clinicas = $mysqli->prepare("
+    SELECT nombre_clinica
+    FROM clinicas
+    WHERE veterinario_id = ?
+    ORDER BY nombre_clinica ASC
+");
+$stmt_clinicas->bind_param("i", $_SESSION['usuario_id']);
+$stmt_clinicas->execute();
+$res_clinicas = $stmt_clinicas->get_result();
+while ($row_clinica = $res_clinicas->fetch_assoc()) {
+    $clinicas_recinto[] = $row_clinica['nombre_clinica'];
+}
+
+$recinto_default_actual = (string)($fila['recinto_default'] ?? '');
+
 // Cargar campos configurados solo si es modificar
 $campos_configurados = [];
 if ($action === 'modificar') {
@@ -242,6 +259,23 @@ $clinica_config = array_merge(
           ></button>
         </div>
       </div>
+      <div class="config-toolbar-field config-toolbar-recinto">
+        <label for="recinto_default" class="form-label mb-1">Recinto</label>
+        <select
+          name="recinto_default"
+          id="recinto_default"
+          class="form-select select2"
+          form="configuracion_informe_form"
+        >
+          <option value="">Sin recinto fijo</option>
+          <?php foreach ($clinicas_recinto as $nombreClinica): ?>
+            <option value="<?= htmlspecialchars($nombreClinica) ?>" <?= $recinto_default_actual === $nombreClinica ? 'selected' : '' ?>>
+              <?= htmlspecialchars($nombreClinica) ?>
+            </option>
+          <?php endforeach; ?>
+        </select>
+      </div>
+
       <div class="config-toolbar-field config-toolbar-default">
         <label class="form-label mb-1 d-block">Por Defecto</label>
         <div class="form-check form-switch mb-1">

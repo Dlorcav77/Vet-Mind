@@ -403,13 +403,33 @@ $fecha_examen            = $_POST['fecha_examen'] ?? date('Y-m-d');
 $descripcion             = trim($_POST['contenido_html'] ?? '');
 $medico_solicitante      = trim($_POST['medico_solicitante'] ?? '');
 $motivo                  = trim($_POST['motivo_examen'] ?? '');
-$recinto                 = trim($_POST['recinto'] ?? '');
 $plantilla_informe_id    = intval($_POST['plantilla_informe_id'] ?? 0);
 $configuracion_informe_id = intval($_POST['configuracion_informe_id'] ?? 0);
 $modo_manual             = isset($_POST['toggle_manual']) && $_POST['toggle_manual'] == '1';
 $borrador_id             = (int)($_POST['borrador_id'] ?? 0);
 $borrador_scope_key      = trim((string)($_POST['borrador_scope_key'] ?? (($action === 'modificar' && $id > 0) ? 'modificar:' . $id : 'nuevo')));
 $audio_tmp               = trim((string)($_POST['audio_tmp'] ?? ''));
+
+$recinto                 = trim($_POST['recinto'] ?? '');
+
+if ($recinto === '' && $configuracion_informe_id > 0) {
+    $stmtRecintoDef = $mysqli->prepare("
+        SELECT recinto_default
+        FROM configuracion_informes
+        WHERE id = ? AND veterinario_id = ?
+        LIMIT 1
+    ");
+
+    if ($stmtRecintoDef) {
+        $stmtRecintoDef->bind_param("ii", $configuracion_informe_id, $veterinario);
+        $stmtRecintoDef->execute();
+        $rowRecintoDef = $stmtRecintoDef->get_result()->fetch_assoc();
+
+        if (is_array($rowRecintoDef) && trim((string)($rowRecintoDef['recinto_default'] ?? '')) !== '') {
+            $recinto = trim((string)$rowRecintoDef['recinto_default']);
+        }
+    }
+}
 
 if ($veterinario <= 0) {
     echo json_encode([
@@ -597,6 +617,9 @@ if ($modo_manual && $guardarMascota && !empty($manual)) {
             $paciente_id = (int)$stmt->insert_id;
         }
     }
+
+    // Mascota guardada en su tabla: el dato vive en `pacientes`, no duplicar en manual_data
+    $manual_data = null;
 } elseif ($modo_manual && !empty($manual)) {
     $paciente_id = null;
     $manual_data = json_encode($manual, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
