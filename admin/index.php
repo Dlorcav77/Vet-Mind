@@ -4,6 +4,8 @@ require ("../funciones/session/ini_session.php");
 include 'header.php';
 include 'menu.php';
 
+global $usuario_id;
+
 $mysqli = conn();
 
 $sel  ="select nombres from usuarios where id='$usuario_id'";
