@@ -62,21 +62,18 @@ function obtenerDatosPaciente() {
     return datos;
 }
 
-function aplicarContenidoInforme(html) {
-    const contenido = (html || '').trim();
-    if (window.VetmindTiptap && typeof window.VetmindTiptap.setMainEditorHTML === 'function') {
-        window.VetmindTiptap.setMainEditorHTML(contenido);
-        if (typeof window.VetmindTiptap.syncMainEditorToTextarea === 'function') {
-            window.VetmindTiptap.syncMainEditorToTextarea();
-        }
-        return;
+function obtenerContenidoInformeActual() {
+    if (window.VetmindTiptap && typeof window.VetmindTiptap.syncMainEditorToTextarea === 'function') {
+        window.VetmindTiptap.syncMainEditorToTextarea();
     }
-    $('#contenido_html').val(contenido);
+    if (window.VetmindTiptap && typeof window.VetmindTiptap.getMainEditorHTML === 'function') {
+        return (window.VetmindTiptap.getMainEditorHTML() || '').trim();
+    }
+    return ($('#contenido_html').val() || '').trim();
 }
 
 function aplicarContenidoInforme(html) {
     const contenido = (html || '').trim();
-
     if (window.VetmindTiptap && typeof window.VetmindTiptap.setMainEditorHTML === 'function') {
         window.VetmindTiptap.setMainEditorHTML(contenido);
         if (typeof window.VetmindTiptap.syncMainEditorToTextarea === 'function') {
@@ -84,12 +81,6 @@ function aplicarContenidoInforme(html) {
         }
         return;
     }
-
-    if (typeof CKEDITOR !== 'undefined' && CKEDITOR.instances['contenido_html']) {
-        CKEDITOR.instances['contenido_html'].setData(contenido);
-        return;
-    }
-
     $('#contenido_html').val(contenido);
 }
 
