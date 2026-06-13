@@ -1,4 +1,4 @@
-function destroyAllCKEditorsSafe() {
+function destroyTiptapEditors() {
     if (window.VetmindTiptap && typeof window.VetmindTiptap.destroyModalEditor === 'function') {
         window.VetmindTiptap.destroyModalEditor();
     }

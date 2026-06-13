@@ -216,8 +216,8 @@ function confirmDelete(id, tipo) {
               const jsonResponse = response;
 
               if (jsonResponse.status === 'success') {
-                  if (typeof destroyAllCKEditorsSafe === 'function') {
-                      destroyAllCKEditorsSafe();
+                  if (typeof destroyTiptapEditors === 'function') {
+                      destroyTiptapEditors();
                   }
 
                   Swal.fire('Eliminado', jsonResponse.message, 'success').then(() => {

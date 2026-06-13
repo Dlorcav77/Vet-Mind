@@ -514,8 +514,8 @@ function updateDraftStatus(text, cls) {
                             window.VetmindTiptap.destroyMainEditor();
                         }
 
-                        if (typeof destroyAllCKEditorsSafe === 'function') {
-                            destroyAllCKEditorsSafe();
+                        if (typeof destroyTiptapEditors === 'function') {
+                            destroyTiptapEditors();
                         }
 
                         $('#content').empty().load(href);
@@ -635,8 +635,8 @@ $('#btnGuardarCertificado').off('click.guardarCertificado').on('click.guardarCer
                     window.VetmindTiptap.destroyMainEditor();
                 }
 
-                if (typeof destroyAllCKEditorsSafe === 'function') {
-                    destroyAllCKEditorsSafe();
+                if (typeof destroyTiptapEditors === 'function') {
+                    destroyTiptapEditors();
                 }
 
                 $('#content').empty().load('certificado/lisCertificados.php');

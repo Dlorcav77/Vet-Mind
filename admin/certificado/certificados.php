@@ -101,7 +101,7 @@ $clinicas_recinto                = $formData['clinicas_recinto'];
 })();
 </script>
 
-<script src="certificado/common/js/editor.js?v=3"></script>
-<script src="certificado/metodo_ingreso/js/ia.js?v=11"></script>
+<script src="certificado/common/js/editor.js?v=4"></script>
+<script src="certificado/metodo_ingreso/js/ia.js?v=12"></script>
 <script src="certificado/preview/js/preview.js?v=4"></script>
-<script src="certificado/guardar/js/guardar.js?v=17"></script>
+<script src="certificado/guardar/js/guardar.js?v=18"></script>

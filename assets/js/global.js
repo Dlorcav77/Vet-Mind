@@ -91,14 +91,6 @@ $(document).on('ajaxComplete', function () {
     initDropdowns();
 });
 
-
-
-
-
-// CKEditor eliminado: editor ahora es Tiptap.
-// Funciones conservadas como no-op para no romper llamadas externas.
-function destroyAllCKEditors() {}
-
 function inicializarEditorContenido() {}
 
 // Carga contenido por AJAX (sin CKEditor)
