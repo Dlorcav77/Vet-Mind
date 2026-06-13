@@ -62,6 +62,15 @@ if ($accionBorrador === 'descartar') {
     exit;
 }
 
+if ($actionFormulario === 'modificar') {
+    echo json_encode([
+        'status' => 'success',
+        'message' => 'Borrador omitido en modificar.',
+        'borrador_id' => 0
+    ], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+    exit;
+}
+
 $manual = [];
 foreach ($_POST as $k => $v) {
     if (strpos($k, 'manual_') === 0) {

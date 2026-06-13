@@ -1,7 +1,7 @@
 //admin/certificado/guardar/js/guardar.js
 $(function () {
-    const AUTOSAVE_MS = 20000;
-    // const AUTOSAVE_MS = 5000;
+    // const AUTOSAVE_MS = 20000;
+    const AUTOSAVE_MS = 5000;
     const AUTOSAVE_HABILITADO = !(window.ES_MODIFICAR === true);
 
     let draftTimer = null;
@@ -11,6 +11,7 @@ $(function () {
     let pendingDraftSave = false;
     let draftInitializing = true;
     let draftWatcherTimer = null;
+    let draftHideTextTimer = null;
 
     function syncConfiguracionInformeId() {
         $('#configuracion_informe_id_hidden').val($('#configuracion_informe_id').val() || '');
@@ -153,7 +154,7 @@ $(function () {
         if (hayDraft) {
             updateDraftStatus('Guardado en borrador', 'text-success');
         } else {
-            updateDraftStatus('Sin cambios guardados', 'text-muted');
+            updateDraftStatus('', 'text-muted');
         }
     }
 
@@ -163,7 +164,7 @@ $(function () {
         draftDirty = false;
     }
 
-    function updateDraftStatus(text, cls) {
+function updateDraftStatus(text, cls) {
         const $badge = $('#draftBadgeStatus');
         const $badgeText = $('#draftBadgeText');
         const $trash = $('#btnDescartarBorradorHeader');
@@ -183,6 +184,17 @@ $(function () {
             .addClass(estadoClase);
 
         $badgeText.text(text);
+
+        if (draftHideTextTimer) {
+            clearTimeout(draftHideTextTimer);
+            draftHideTextTimer = null;
+        }
+
+        if (cls === 'text-success' && text) {
+            draftHideTextTimer = setTimeout(function () {
+                $badgeText.text('');
+            }, 3000);
+        }
 
         if ($trash.length) {
             const mostrarTrash =
@@ -339,14 +351,40 @@ $(function () {
         return;
     }
 
-    setTimeout(function () {
-        setInitialDraftSnapshot();
-        draftInitializing = false;
-    }, 1200);
+(function initDraftSnapshot() {
+        let prevHash = null;
+        let stableCount = 0;
+        const startTime = Date.now();
+        const MAX_WAIT = 5000;
+        const STEP = 300;
 
-    setTimeout(function () {
-        setInitialDraftSnapshot();
-    }, 2200);
+        function tick() {
+            const data = collectDraftData();
+            const hash = JSON.stringify(data);
+
+            if (hash === prevHash) {
+                stableCount++;
+            } else {
+                stableCount = 0;
+                prevHash = hash;
+            }
+
+            const settled = stableCount >= 2;
+            const timedOut = (Date.now() - startTime) >= MAX_WAIT;
+
+            if (settled || timedOut) {
+                lastDraftHash = hash;
+                draftDirty = false;
+                draftInitializing = false;
+                restaurarEstadoDraftSinGuardar();
+                return;
+            }
+
+            setTimeout(tick, STEP);
+        }
+
+        tick();
+    })();
 
     $('#configuracion_informe_id')
         .off('change.syncConfigHidden')
@@ -436,7 +474,7 @@ $(function () {
     if (window.CERT_BORRADOR && window.CERT_BORRADOR.hasDraft) {
         updateDraftStatus('Guardado en borrador', 'text-success');
     } else {
-        updateDraftStatus('Sin cambios guardados', 'text-muted');
+        updateDraftStatus('', 'text-muted');
     }
 
     $('#btnDescartarBorradorHeader').off('click.descartarBorrador').on('click.descartarBorrador', function (e) {

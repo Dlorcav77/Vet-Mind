@@ -51,7 +51,7 @@ $clinicas_recinto                = $formData['clinicas_recinto'];
                         <span class="draft-dot"></span>
 
                         <span id="draftBadgeText">
-                            <?= !empty($hay_borrador) ? 'Borrador recuperado' : 'Sin cambios guardados' ?>
+                            <?= !empty($hay_borrador) ? 'Borrador recuperado' : '' ?>
                         </span>
 
                         <button
@@ -104,4 +104,4 @@ $clinicas_recinto                = $formData['clinicas_recinto'];
 <script src="certificado/common/js/editor.js?v=3"></script>
 <script src="certificado/metodo_ingreso/js/ia.js?v=11"></script>
 <script src="certificado/preview/js/preview.js?v=4"></script>
-<script src="certificado/guardar/js/guardar.js?v=15"></script>
+<script src="certificado/guardar/js/guardar.js?v=17"></script>

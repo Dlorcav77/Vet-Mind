@@ -234,18 +234,4 @@ function confirmDelete(id, tipo) {
       });
     });
 }
-
-if (!window.ajaxLinkEventRegistered) {
-    $(document).on('click', '.ajax-link', function (e) {
-        e.preventDefault();
-
-        if (typeof destroyAllCKEditorsSafe === 'function') {
-            destroyAllCKEditorsSafe();
-        }
-
-        cargarConEditor($(this).attr('href'));
-    });
-
-    window.ajaxLinkEventRegistered = true;
-}
 </script>
