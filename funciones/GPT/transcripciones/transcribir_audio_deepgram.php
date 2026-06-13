@@ -1,20 +1,18 @@
 <?php
-// funciones/GPT/transcribir_audio_grok.php
-// Variante de transcripción usando Grok STT (xAI) en vez de AssemblyAI.
-// Se invoca desde transcribir_audio.php cuando $motor_stt === 'grok'.
-// Reusa la sesión, configP y $ROOT_DIR ya definidos NO: este archivo se incluye
-// ANTES de definir $ROOT_DIR, así que define lo suyo igual que el original.
+// funciones/GPT/transcribir_audio_deepgram.php
+// Variante de transcripción usando Deepgram Nova-3 (español).
+// Se invoca desde transcribir_audio.php cuando $motor_stt === 'deepgram'.
 
 header('Content-Type: application/json; charset=utf-8');
 date_default_timezone_set('America/Santiago');
 
-require_once(dirname(__DIR__, 2) . "/configP.php");
+require_once(dirname(__DIR__, 3) . "/configP.php");
 
 if (session_status() !== PHP_SESSION_ACTIVE) {
     session_start();
 }
 
-$ROOT_DIR = dirname(__DIR__, 2);
+$ROOT_DIR = dirname(__DIR__, 3);
 
 $logDir = $ROOT_DIR . '/funciones/logs';
 if (!is_dir($logDir)) {
@@ -24,23 +22,17 @@ if (!is_dir($logDir)) {
 $userId = isset($_SESSION['usuario_id']) ? (int)$_SESSION['usuario_id'] : 0;
 if ($userId <= 0) {
     http_response_code(401);
-    echo json_encode([
-        'status' => 'error',
-        'message' => 'Sesión no válida.'
-    ], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+    echo json_encode(['status'=>'error','message'=>'Sesión no válida.'], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
     exit;
 }
 
-$xaiApiKey = $XAI_API_KEY ?? '';
-if (!$xaiApiKey) {
-    echo json_encode([
-        'status' => 'error',
-        'message' => 'API Key de xAI (Grok) no configurada.'
-    ], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+$deepgramApiKey = $DEEPGRAM_API_KEY ?? '';
+if (!$deepgramApiKey) {
+    echo json_encode(['status'=>'error','message'=>'API Key de Deepgram no configurada.'], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
     exit;
 }
 
-function normalizarRutaAudioTmpGrok($ruta, $userId)
+function normalizarRutaAudioTmpDg($ruta, $userId)
 {
     $ruta = trim((string)$ruta);
     if ($ruta === '') return null;
@@ -57,9 +49,9 @@ function normalizarRutaAudioTmpGrok($ruta, $userId)
     return $prefix . $nombreArchivo;
 }
 
-function resolverAudioTmpFisicoGrok($rootDir, $rutaAudioTmp, $userId)
+function resolverAudioTmpFisicoDg($rootDir, $rutaAudioTmp, $userId)
 {
-    $rutaNormalizada = normalizarRutaAudioTmpGrok($rutaAudioTmp, $userId);
+    $rutaNormalizada = normalizarRutaAudioTmpDg($rutaAudioTmp, $userId);
     if ($rutaNormalizada === null) return '';
     $baseTmp = realpath($rootDir . '/uploads/tmp/audio');
     if ($baseTmp === false) return '';
@@ -69,12 +61,11 @@ function resolverAudioTmpFisicoGrok($rootDir, $rutaAudioTmp, $userId)
     return $audioReal;
 }
 
-function guardarAudioSubidoParaTranscripcionGrok($rootDir, $userId)
+function guardarAudioSubidoParaTranscripcionDg($rootDir, $userId)
 {
     if (!isset($_FILES['audio']) || $_FILES['audio']['error'] !== UPLOAD_ERR_OK) {
         return ['status'=>'error','message'=>'No se recibió ningún archivo de audio válido.','path'=>'','audio_tmp'=>''];
     }
-
     $maxBytes = 25 * 1024 * 1024;
     $tmpFile = $_FILES['audio']['tmp_name'];
     $size = (int)($_FILES['audio']['size'] ?? 0);
@@ -83,39 +74,31 @@ function guardarAudioSubidoParaTranscripcionGrok($rootDir, $userId)
         @unlink($tmpFile);
         return ['status'=>'error','message'=>'Archivo demasiado grande (máx 25 MB).','path'=>'','audio_tmp'=>''];
     }
-
     $originalExt = strtolower(pathinfo($_FILES['audio']['name'] ?? 'audio.webm', PATHINFO_EXTENSION));
     if ($originalExt === '') $originalExt = 'webm';
     $extPermitidas = ['wav','webm','mp3','m4a','ogg','3gp','3g2'];
     if (!in_array($originalExt, $extPermitidas, true)) $originalExt = 'webm';
-
     $baseTmp = $rootDir . '/uploads/tmp/audio';
     if (!is_dir($baseTmp)) {
         if (!mkdir($baseTmp, 0775, true) && !is_dir($baseTmp)) {
             return ['status'=>'error','message'=>'No se pudo crear la carpeta temporal de audio.','path'=>'','audio_tmp'=>''];
         }
     }
-
     $now = new DateTime('now', new DateTimeZone('America/Santiago'));
     $day = $now->format('d');
     $hmsms = $now->format('Hisv');
-
     $nombreOriginalTemporal = 'tmp_audio_original_' . (int)$userId . '_' . $day . '_' . $hmsms . '_' . bin2hex(random_bytes(4)) . '.' . $originalExt;
     $rutaOriginalTemporal = $baseTmp . '/' . $nombreOriginalTemporal;
-
     $nombreConvertido = 'tmp_audio_' . (int)$userId . '_' . $day . '_' . $hmsms . '_' . bin2hex(random_bytes(4)) . '.wav';
     $rutaConvertida = $baseTmp . '/' . $nombreConvertido;
-
     if (!move_uploaded_file($tmpFile, $rutaOriginalTemporal)) {
         return ['status'=>'error','message'=>'No se pudo guardar el archivo de audio temporal.','path'=>'','audio_tmp'=>''];
     }
-
     $ffmpegPath = trim(shell_exec('command -v ffmpeg 2>/dev/null') ?? '');
     if ($ffmpegPath === '') {
         @unlink($rutaOriginalTemporal);
         return ['status'=>'error','message'=>'FFmpeg no está instalado o no está en $PATH.','path'=>'','audio_tmp'=>''];
     }
-
     $cmd = escapeshellarg($ffmpegPath) . " -nostdin -hide_banner -loglevel error -y " .
         "-i " . escapeshellarg($rutaOriginalTemporal) . " " .
         "-vn -sn -dn -map a:0 " .
@@ -123,21 +106,45 @@ function guardarAudioSubidoParaTranscripcionGrok($rootDir, $userId)
         escapeshellarg($rutaConvertida) . " 2>&1";
     exec($cmd, $output, $returnVar);
     @unlink($rutaOriginalTemporal);
-
     if ($returnVar !== 0) {
         @unlink($rutaConvertida);
         return ['status'=>'error','message'=>'Error al convertir el audio subido a WAV.','path'=>'','audio_tmp'=>''];
     }
-
     @chmod($rutaConvertida, 0644);
     return ['status'=>'success','message'=>'Audio subido temporalmente.','path'=>$rutaConvertida,'audio_tmp'=>'uploads/tmp/audio/' . $nombreConvertido];
 }
 
+/**
+ * Reconstruye decimales y frases que Deepgram parte mal al transcribir.
+ * Solo toca patrones seguros y consistentes observados en las pruebas.
+ */
+function gpt_deepgram_arreglar_decimales(string $texto): string
+{
+    // --- Frase "uréter no visible" que Deepgram parte en "ure eterno/terno visible" ---
+    // Deepgram funde "uréter no" en "ure eterno" o "ure terno", perdiendo el "no".
+    // Lo reconstruimos a "uréter no visible".
+    $texto = preg_replace('/\bure\s+eterno\s+visible\b/iu', 'uréter no visible', $texto);
+    $texto = preg_replace('/\bure\s+terno\s+visible\b/iu', 'uréter no visible', $texto);
+    // Variante por si aparece junto ("ureterno visible")
+    $texto = preg_replace('/\bureterno\s+visible\b/iu', 'uréter no visible', $texto);
+
+    // --- Decimales partidos ---
+    // Caso "0 coma 0 9" -> "0.09"
+    $texto = preg_replace('/\b0\s+coma\s+0\s+(\d)\b/u', '0.0$1', $texto);
+    // Caso "0 coma 28" -> "0.28"
+    $texto = preg_replace('/\b0\s+coma\s+(\d{1,2})\b/u', '0.$1', $texto);
+    // Caso "0 28" -> "0.28"
+    $texto = preg_replace('/\b0\s+(\d{2})\b/u', '0.$1', $texto);
+    // Caso "0 9" -> "0.9"
+    $texto = preg_replace('/\b0\s+(\d)\b(?!\d)/u', '0.$1', $texto);
+
+    return $texto;
+}
 $audioPath = '';
 $audioTmpRespuesta = '';
 
 if (isset($_FILES['audio'])) {
-    $resultadoUpload = guardarAudioSubidoParaTranscripcionGrok($ROOT_DIR, $userId);
+    $resultadoUpload = guardarAudioSubidoParaTranscripcionDg($ROOT_DIR, $userId);
     if (($resultadoUpload['status'] ?? '') !== 'success') {
         echo json_encode(['status'=>'error','message'=>$resultadoUpload['message'] ?? 'No se pudo preparar el audio.'], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
         exit;
@@ -146,13 +153,13 @@ if (isset($_FILES['audio'])) {
     $audioTmpRespuesta = $resultadoUpload['audio_tmp'] ?? '';
 } elseif (!empty($_POST['audio_tmp'])) {
     $audioTmpRespuesta = trim((string)$_POST['audio_tmp']);
-    $audioPath = resolverAudioTmpFisicoGrok($ROOT_DIR, $audioTmpRespuesta, $userId);
+    $audioPath = resolverAudioTmpFisicoDg($ROOT_DIR, $audioTmpRespuesta, $userId);
 } elseif (!empty($_POST['audio_url'])) {
     $audioTmpRespuesta = trim((string)$_POST['audio_url']);
-    $audioPath = resolverAudioTmpFisicoGrok($ROOT_DIR, $audioTmpRespuesta, $userId);
+    $audioPath = resolverAudioTmpFisicoDg($ROOT_DIR, $audioTmpRespuesta, $userId);
 } elseif (!empty($_POST['audio_filename'])) {
     $audioTmpRespuesta = 'uploads/tmp/audio/' . basename((string)$_POST['audio_filename']);
-    $audioPath = resolverAudioTmpFisicoGrok($ROOT_DIR, $audioTmpRespuesta, $userId);
+    $audioPath = resolverAudioTmpFisicoDg($ROOT_DIR, $audioTmpRespuesta, $userId);
 }
 
 if (!$audioPath || !file_exists($audioPath)) {
@@ -161,35 +168,42 @@ if (!$audioPath || !file_exists($audioPath)) {
 }
 
 /* ==============================
-   Transcripción con Grok STT (xAI)
-   Endpoint: POST https://api.x.ai/v1/stt  (multipart/form-data)
-   La respuesta trae el transcript en el campo "text".
+   Transcripción con Deepgram Nova-3 (español)
+   Endpoint: POST https://api.deepgram.com/v1/listen
+   El audio va directo en el body (binario). Parámetros en la URL.
+   La respuesta trae el transcript en results.channels[0].alternatives[0].transcript
    ============================== */
-$ch = curl_init('https://api.x.ai/v1/stt');
+$keyterms = [
+    'Bazo','Yeyuno','Íleon','Duodeno','Páncreas','Colon','Estómago',
+    'Riñón','Vejiga','Próstata','Hígado','Vesícula biliar','Linfonódulos',
+    'Adrenal','Ciego','Peritoneo','ecogenicidad','anecoico','hipoecoico',
+    'hiperecoico','parénquima','estratificación','esplénico','felino',
+    'aguzados','bordes aguzados','engrosado','engrosada','mucoso',
+    'ovario','cuerpo uterino','corticomedular','vasculatura','homogéneo',
+    'lóbulo','reactivo','distendida','redondeados'
+];
+
+$params = [
+    'model=nova-3',
+    'language=es',
+    'smart_format=true',
+    'punctuate=true',
+];
+foreach ($keyterms as $kt) {
+    $params[] = 'keyterm=' . rawurlencode($kt);
+}
+$url = 'https://api.deepgram.com/v1/listen?' . implode('&', $params);
+
+$audioBytes = file_get_contents($audioPath);
+
+$ch = curl_init($url);
 curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
 curl_setopt($ch, CURLOPT_POST, true);
 curl_setopt($ch, CURLOPT_HTTPHEADER, [
-    'Authorization: Bearer ' . $xaiApiKey,
+    'Authorization: Token ' . $deepgramApiKey,
+    'Content-Type: audio/wav',
 ]);
-$postFields = [
-    'file'     => new CURLFile($audioPath, 'audio/wav', basename($audioPath)),
-    'model'    => 'grok-stt',
-    'language' => 'es-MX',
-    'format'   => 'true',
-];
-
-// Términos veterinarios para sesgar la transcripción (los que Grok erró antes).
-$keyterms = [
-    'Bazo', 'Yeyuno', 'Íleon', 'Duodeno', 'Páncreas', 'Colon',
-    'Riñón', 'Adrenal', 'ecogenicidad', 'anecoico', 'hipoecoico',
-    'parénquima', 'cortico medular', 'estratificación', 'linfonódulos',
-    'esplénico', 'vesícula biliar', 'peritoneo', 'ciego', 'felino',
-];
-foreach ($keyterms as $kt) {
-    $postFields['keyterm[]'] = $kt; // se repite el parámetro por cada término
-}
-
-curl_setopt($ch, CURLOPT_POSTFIELDS, $postFields);
+curl_setopt($ch, CURLOPT_POSTFIELDS, $audioBytes);
 curl_setopt($ch, CURLOPT_CONNECTTIMEOUT, 15);
 curl_setopt($ch, CURLOPT_TIMEOUT, 180);
 
@@ -200,20 +214,27 @@ curl_close($ch);
 
 if ($curlErr !== '' || $httpCode >= 400) {
     file_put_contents(
-        $logDir . '/grok_stt_error.log',
+        $logDir . '/deepgram_error.log',
         date('c') . " | user:$userId | http:$httpCode | err:$curlErr | resp:" . substr((string)$resp, 0, 2000) . "\n",
         FILE_APPEND
     );
-    echo json_encode(['status'=>'error','message'=>'Error al transcribir con Grok STT.'], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+    echo json_encode(['status'=>'error','message'=>'Error al transcribir con Deepgram.'], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
     exit;
 }
 
 $data = json_decode((string)$resp, true);
-$text = is_array($data) ? trim((string)($data['text'] ?? '')) : '';
+$text = '';
+if (is_array($data)) {
+    $text = trim((string)($data['results']['channels'][0]['alternatives'][0]['transcript'] ?? ''));
+}
+
+// Blindaje de números: Deepgram a veces parte los decimales ("0 28" en vez de "0.28").
+// Reconstruimos el formato decimal SOLO en patrones seguros, para no tocar números reales.
+$text = gpt_deepgram_arreglar_decimales($text);
 
 if ($text === '') {
     file_put_contents(
-        $logDir . '/grok_stt_error.log',
+        $logDir . '/deepgram_error.log',
         date('c') . " | user:$userId | texto vacío | resp:" . substr((string)$resp, 0, 2000) . "\n",
         FILE_APPEND
     );

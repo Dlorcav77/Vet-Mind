@@ -1,53 +1,19 @@
 <?php
-// funciones/GPT/transcribir_audio.php
+// funciones/GPT/transcribir_audio_openai_4o.php
+// Variante de transcripción usando OpenAI gpt-4o-transcribe.
+// Se invoca desde transcribir_audio.php cuando $motor_stt === 'openai_4o'.
+// Flujo: recibir/subir audio -> convertir a WAV -> /v1/audio/transcriptions.
 
 header('Content-Type: application/json; charset=utf-8');
 date_default_timezone_set('America/Santiago');
 
-require_once(dirname(__DIR__, 2) . "/configP.php");
+require_once(dirname(__DIR__, 3) . "/configP.php");
 
-session_start();
-
-/////////////////////////////////////////////////////////////////
-// Motor de transcripción manual para pruebas.
-// Valores:
-// - ''       => usa AssemblyAI en este mismo archivo (comportamiento actual)
-// - 'assembly'=> igual que '' (AssemblyAI)
-// - 'grok'   => deriva a funciones/GPT/transcribir_audio_grok.php
-// $motor_stt = 'deepgram';
-$motor_stt = 'assembly_v3';
-// $motor_stt = 'openai_4o';
-// $motor_stt = '';
-
-$motor_stt = strtolower(trim($motor_stt));
-
-
-// Banco STT: con test_token salta la sesión (userId ficticio) y fuerza el motor.
-if (isset($_POST['test_token']) && hash_equals('gondolengua', (string)$_POST['test_token'])) {
-    $_SESSION['usuario_id'] = 999999;
-    if (!empty($_POST['motor'])) {
-        $motor_stt = strtolower(trim((string)$_POST['motor']));
-    }
+if (session_status() !== PHP_SESSION_ACTIVE) {
+    session_start();
 }
 
-if ($motor_stt === 'grok') {
-    require_once(__DIR__ . '/transcripciones/transcribir_audio_grok.php');
-    exit;
-}
-if ($motor_stt === 'deepgram') {
-    require_once(__DIR__ . '/transcripciones/transcribir_audio_deepgram.php');
-    exit;
-}
-if ($motor_stt === 'assembly_v3') {
-    require_once(__DIR__ . '/transcripciones/transcribir_audio_assembly_v3.php');
-    exit;
-}
-if ($motor_stt === 'openai_4o') {
-    require_once(__DIR__ . '/transcripciones/transcribir_audio_openai_4o.php');
-    exit;
-}
-
-$ROOT_DIR = dirname(__DIR__, 2);
+$ROOT_DIR = dirname(__DIR__, 3);
 
 $logDir = $ROOT_DIR . '/funciones/logs';
 if (!is_dir($logDir)) {
@@ -64,16 +30,17 @@ if ($userId <= 0) {
     exit;
 }
 
-$assemblyApiKey = $ASSEM_API_KEY ?? '';
-if (!$assemblyApiKey) {
+$openaiApiKey = $OPENAI_API_KEY ?? getenv('OPENAI_API_KEY') ?: '';
+
+if (!$openaiApiKey) {
     echo json_encode([
         'status' => 'error',
-        'message' => 'API Key de AssemblyAI no configurada.'
+        'message' => 'API Key de OpenAI no configurada.'
     ], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
     exit;
 }
 
-function normalizarRutaAudioTmp($ruta, $userId)
+function normalizarRutaAudioTmpOpenAI4o($ruta, $userId)
 {
     $ruta = trim((string)$ruta);
 
@@ -110,9 +77,9 @@ function normalizarRutaAudioTmp($ruta, $userId)
     return $prefix . $nombreArchivo;
 }
 
-function resolverAudioTmpFisico($rootDir, $rutaAudioTmp, $userId)
+function resolverAudioTmpFisicoOpenAI4o($rootDir, $rutaAudioTmp, $userId)
 {
-    $rutaNormalizada = normalizarRutaAudioTmp($rutaAudioTmp, $userId);
+    $rutaNormalizada = normalizarRutaAudioTmpOpenAI4o($rutaAudioTmp, $userId);
 
     if ($rutaNormalizada === null) {
         return '';
@@ -137,7 +104,7 @@ function resolverAudioTmpFisico($rootDir, $rutaAudioTmp, $userId)
     return $audioReal;
 }
 
-function guardarAudioSubidoParaTranscripcion($rootDir, $userId)
+function guardarAudioSubidoParaTranscripcionOpenAI4o($rootDir, $userId)
 {
     if (!isset($_FILES['audio']) || $_FILES['audio']['error'] !== UPLOAD_ERR_OK) {
         return [
@@ -148,7 +115,7 @@ function guardarAudioSubidoParaTranscripcion($rootDir, $userId)
         ];
     }
 
-    define('MAX_AUDIO_BYTES_TRANSCRIBIR', 25 * 1024 * 1024);
+    $maxBytes = 25 * 1024 * 1024;
 
     $tmpFile = $_FILES['audio']['tmp_name'];
     $size = (int)($_FILES['audio']['size'] ?? 0);
@@ -157,7 +124,7 @@ function guardarAudioSubidoParaTranscripcion($rootDir, $userId)
         $size = filesize($tmpFile);
     }
 
-    if ($size > MAX_AUDIO_BYTES_TRANSCRIBIR) {
+    if ($size > $maxBytes) {
         @unlink($tmpFile);
 
         return [
@@ -248,13 +215,11 @@ function guardarAudioSubidoParaTranscripcion($rootDir, $userId)
 
     @chmod($rutaConvertida, 0644);
 
-    $audioTmp = 'uploads/tmp/audio/' . $nombreConvertido;
-
     return [
         'status' => 'success',
         'message' => 'Audio subido temporalmente.',
         'path' => $rutaConvertida,
-        'audio_tmp' => $audioTmp
+        'audio_tmp' => 'uploads/tmp/audio/' . $nombreConvertido
     ];
 }
 
@@ -262,7 +227,7 @@ $audioPath = '';
 $audioTmpRespuesta = '';
 
 if (isset($_FILES['audio'])) {
-    $resultadoUpload = guardarAudioSubidoParaTranscripcion($ROOT_DIR, $userId);
+    $resultadoUpload = guardarAudioSubidoParaTranscripcionOpenAI4o($ROOT_DIR, $userId);
 
     if (($resultadoUpload['status'] ?? '') !== 'success') {
         echo json_encode([
@@ -276,13 +241,13 @@ if (isset($_FILES['audio'])) {
     $audioTmpRespuesta = $resultadoUpload['audio_tmp'] ?? '';
 } elseif (!empty($_POST['audio_tmp'])) {
     $audioTmpRespuesta = trim((string)$_POST['audio_tmp']);
-    $audioPath = resolverAudioTmpFisico($ROOT_DIR, $audioTmpRespuesta, $userId);
+    $audioPath = resolverAudioTmpFisicoOpenAI4o($ROOT_DIR, $audioTmpRespuesta, $userId);
 } elseif (!empty($_POST['audio_url'])) {
     $audioTmpRespuesta = trim((string)$_POST['audio_url']);
-    $audioPath = resolverAudioTmpFisico($ROOT_DIR, $audioTmpRespuesta, $userId);
+    $audioPath = resolverAudioTmpFisicoOpenAI4o($ROOT_DIR, $audioTmpRespuesta, $userId);
 } elseif (!empty($_POST['audio_filename'])) {
     $audioTmpRespuesta = 'uploads/tmp/audio/' . basename((string)$_POST['audio_filename']);
-    $audioPath = resolverAudioTmpFisico($ROOT_DIR, $audioTmpRespuesta, $userId);
+    $audioPath = resolverAudioTmpFisicoOpenAI4o($ROOT_DIR, $audioTmpRespuesta, $userId);
 }
 
 if (!$audioPath || !file_exists($audioPath)) {
@@ -293,126 +258,61 @@ if (!$audioPath || !file_exists($audioPath)) {
     exit;
 }
 
-/* ==============================
-   2) subir a Assembly
-   ============================== */
-$curlCmd = "curl -s --request POST " .
-           "--url https://api.assemblyai.com/v2/upload " .
-           "--header " . escapeshellarg("authorization: $assemblyApiKey") . " " .
-           "--header 'content-type: application/octet-stream' " .
-           "--data-binary @" . escapeshellarg($audioPath);
+$promptTexto = 'Transcribe en español. Es un dictado clínico veterinario, principalmente ecográfico. ' .
+    'Respeta términos médicos y veterinarios como bazo, yeyuno, íleon, duodeno, páncreas, colon, estómago, riñón, vejiga, próstata, hígado, vesícula biliar, linfonódulos, adrenal, ecogenicidad, anecoico, hipoecoico, hiperecoico, parénquima, corticomedular, estratificación, esplénico, mucoso, submucosa, felino, canino.';
 
-$uploadResponse = shell_exec($curlCmd);
-$uploadData = json_decode($uploadResponse, true);
+$ch = curl_init('https://api.openai.com/v1/audio/transcriptions');
 
-if (!is_array($uploadData) || !isset($uploadData['upload_url'])) {
-    file_put_contents(
-        $logDir . '/assembly_upload_error.log',
-        date('c') . " | user:$userId | resp:" . substr((string)$uploadResponse, 0, 2000) . "\n",
-        FILE_APPEND
-    );
-
-    echo json_encode([
-        'status' => 'error',
-        'message' => 'Error al subir audio a AssemblyAI.'
-    ], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
-    exit;
-}
-
-$uploadUrl = $uploadData['upload_url'];
-
-/* ==============================
-   3) pedir transcripción
-   ============================== */
-$transcriptionRequest = [
-    'audio_url' => $uploadUrl,
-    'language_code' => 'es',
-    'format_text' => true,
-    'disfluencies' => false,
-    'word_boost' => [
-        'Bazo', 'Yeyuno', 'Íleon', 'Duodeno', 'Páncreas', 'Colon', 'Estómago',
-        'Riñón', 'Vejiga', 'Próstata', 'Hígado', 'Vesícula biliar', 'Linfonódulos',
-        'Adrenal', 'Adrenales', 'Ciego', 'Peritoneo', 'Bilateral',
-        'ecogenicidad', 'ecogénico', 'anecoico', 'hipoecoico', 'hiperecoico',
-        'parénquima', 'cortico medular', 'estratificación', 'esplénico',
-        'mucoso', 'submucosa', 'aguzado', 'reactivo', 'felino', 'puntiforme'
-    ],
-    'boost_param' => 'high'
+$postFields = [
+    'model' => 'gpt-4o-transcribe',
+    'file' => new CURLFile($audioPath, 'audio/wav', basename($audioPath)),
+    'language' => 'es',
+    'response_format' => 'json',
+    'prompt' => $promptTexto,
 ];
 
-$ch = curl_init('https://api.assemblyai.com/v2/transcript');
-curl_setopt($ch, CURLOPT_HTTPHEADER, [
-    'authorization: ' . $assemblyApiKey,
-    'content-type: application/json'
-]);
 curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
 curl_setopt($ch, CURLOPT_POST, true);
-curl_setopt($ch, CURLOPT_POSTFIELDS, json_encode($transcriptionRequest));
-curl_setopt($ch, CURLOPT_CONNECTTIMEOUT, 10);
-curl_setopt($ch, CURLOPT_TIMEOUT, 30);
+curl_setopt($ch, CURLOPT_HTTPHEADER, [
+    'Authorization: Bearer ' . $openaiApiKey,
+]);
+curl_setopt($ch, CURLOPT_POSTFIELDS, $postFields);
+curl_setopt($ch, CURLOPT_CONNECTTIMEOUT, 15);
+curl_setopt($ch, CURLOPT_TIMEOUT, 180);
 
-$transcriptionResponse = curl_exec($ch);
+$response = curl_exec($ch);
 $httpCode = (int)curl_getinfo($ch, CURLINFO_HTTP_CODE);
+$curlErr = curl_errno($ch) ? curl_error($ch) : '';
 curl_close($ch);
 
-$transcriptionData = json_decode($transcriptionResponse, true);
+$data = json_decode((string)$response, true);
 
-if ($httpCode >= 400 || !isset($transcriptionData['id'])) {
+if ($curlErr !== '' || $httpCode >= 400 || !is_array($data)) {
     file_put_contents(
-        $logDir . '/assembly_transcript_error.log',
-        date('c') . " | user:$userId | http:$httpCode | resp:" . substr((string)$transcriptionResponse, 0, 2000) . "\n",
+        $logDir . '/openai_4o_transcribe_error.log',
+        date('c') . " | user:$userId | http:$httpCode | err:$curlErr | resp:" . substr((string)$response, 0, 2000) . "\n",
         FILE_APPEND
     );
 
     echo json_encode([
         'status' => 'error',
-        'message' => 'Error al iniciar transcripción en AssemblyAI.'
+        'message' => 'Error al transcribir audio con OpenAI.'
     ], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
     exit;
 }
 
-$transcriptionId = $transcriptionData['id'];
-$text = '';
-$delays = [2, 3, 5, 8, 8, 8, 8];
+$text = trim((string)($data['text'] ?? ''));
 
-foreach ($delays as $wait) {
-    $ch = curl_init("https://api.assemblyai.com/v2/transcript/$transcriptionId");
-    curl_setopt($ch, CURLOPT_HTTPHEADER, ['authorization: ' . $assemblyApiKey]);
-    curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
-    curl_setopt($ch, CURLOPT_CONNECTTIMEOUT, 10);
-    curl_setopt($ch, CURLOPT_TIMEOUT, 15);
+if ($text === '') {
+    file_put_contents(
+        $logDir . '/openai_4o_transcribe_empty.log',
+        date('c') . " | user:$userId | http:$httpCode | resp:" . substr((string)$response, 0, 2000) . "\n",
+        FILE_APPEND
+    );
 
-    $statusResponse = curl_exec($ch);
-    $httpCode = (int)curl_getinfo($ch, CURLINFO_HTTP_CODE);
-    curl_close($ch);
-
-    $statusData = json_decode($statusResponse, true);
-
-    if ($httpCode >= 400 || !isset($statusData['status'])) {
-        sleep($wait);
-        continue;
-    }
-
-    if ($statusData['status'] === 'completed') {
-        $text = trim((string)$statusData['text']);
-        break;
-    }
-
-    if ($statusData['status'] === 'failed') {
-        echo json_encode([
-            'status' => 'error',
-            'message' => 'La transcripción falló en AssemblyAI.'
-        ], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
-        exit;
-    }
-
-    sleep($wait);
-}
-
-if (!$text) {
     echo json_encode([
         'status' => 'error',
-        'message' => 'Texto transcrito vacío o timeout.'
+        'message' => 'Texto transcrito vacío.'
     ], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
     exit;
 }

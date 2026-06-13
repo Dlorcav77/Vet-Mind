@@ -536,7 +536,7 @@ $filas_campos_clinica = agruparCamposPdfClinicaPorOrden($campos);
         .contenido {
             position: relative;
             z-index: 2;
-            padding: 30px 48px 92px 48px;
+            padding: 30px 48px 2px 48px;
         }
 
         .titulo-seccion {
