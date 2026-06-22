@@ -192,33 +192,29 @@ if ($uploadErr !== '' || $uploadHttp >= 400 || !is_array($uploadData) || !isset(
 
 $uploadUrl = $uploadData['upload_url'];
 
-/* ==============================
-   2) Pedir transcripción con Universal-3 Pro
-   speech_models en orden de prioridad (U3 Pro -> Universal-2 fallback).
-   Sin prompt: U3 Pro aplica su prompt interno ya optimizado.
-   ============================== */
 
-// $keyterms = [
-//     'Bazo','Yeyuno','Íleon','Duodeno','Páncreas','Colon','Estómago',
-//     'Riñón','Vejiga','Próstata','Hígado','Vesícula biliar','Linfonódulos',
-//     'Adrenal','Ciego','Peritoneo','ecogenicidad','anecoico','hipoecoico',
-//     'hiperecoico','parénquima','estratificación','esplénico','felino',
-//     'aguzados','bordes aguzados','engrosado','engrosada','mucoso',
-//     'ovario','cuerpo uterino','corticomedular','vasculatura','homogéneo',
-//     'lóbulo','reactivo','distendida','redondeados'
-// ];
-
-// $promptTexto = 'Transcribe verbatim in Spanish. This is a veterinary ultrasound report dictation. '
-//     . 'Use proper Spanish orthography with accent marks. '
-//     . 'Context: ' . implode(', ', $keyterms) . '.';
 
 $transcriptionRequest = [
     'audio_url' => $uploadUrl,
     'speech_models' => ['universal-3-pro', 'universal-2'],
     'language_code' => 'es',
     'format_text' => true,
-    // 'prompt' => $promptTexto,
 ];
+
+// Keyterms opcionales: solo si la llamada pide usar_keyterms=1.
+// AssemblyAI U3 los recibe vía 'prompt' (lista de contexto). Lista en lib/stt_keyterms.php.
+if (!empty($_POST['usar_keyterms']) && (string)$_POST['usar_keyterms'] === '1') {
+    $kwFile = dirname(__DIR__) . '/lib/stt_keyterms.php';
+    if (is_file($kwFile)) {
+        $keyterms = require($kwFile);
+        if (is_array($keyterms) && !empty($keyterms)) {
+            $transcriptionRequest['prompt'] =
+                'Transcribe verbatim in Spanish. This is a veterinary ultrasound report dictation. '
+              . 'Use proper Spanish orthography with accent marks. '
+              . 'Context terms: ' . implode(', ', $keyterms) . '.';
+        }
+    }
+}
 
 $ch = curl_init('https://api.assemblyai.com/v2/transcript');
 curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);

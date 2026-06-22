@@ -30,12 +30,12 @@ $motor = 'grok';
 $motor = strtolower(trim($motor));
 
 if ($motor === 'claude') {
-    require_once($GPT_DIR . '/proceso_claude.php');
+    require_once($GPT_DIR . '/proceso_ia/proceso_claude.php');
     exit;
 }
 
 if ($motor === 'grok') {
-    require_once($GPT_DIR . '/proceso_grok.php');
+    require_once($GPT_DIR . '/proceso_ia/proceso_grok.php');
     exit;
 }
 /////////////////////////////////////////////////////////////////

@@ -102,6 +102,6 @@ $clinicas_recinto                = $formData['clinicas_recinto'];
 </script>
 
 <script src="certificado/common/js/editor.js?v=4"></script>
-<script src="certificado/metodo_ingreso/js/ia.js?v=13"></script>
+<script src="certificado/metodo_ingreso/js/ia.js?v=16"></script>
 <script src="certificado/preview/js/preview.js?v=4"></script>
 <script src="certificado/guardar/js/guardar.js?v=20"></script>

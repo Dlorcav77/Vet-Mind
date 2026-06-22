@@ -12,6 +12,7 @@
             </div>
 
             <div class="modal-body">
+                <div id="revisor-panel" style="display:none;margin-bottom:14px;border:1px solid #e2e8f0;border-radius:10px;overflow:hidden;font-size:13px"></div>
                 <div id="editorIA_wrapper" class="vm-tiptap-wrapper">
                     <div id="editorIA_toolbar" class="vm-tiptap-toolbar" style="display:none;">
                         <button type="button" class="btn btn-sm btn-outline-secondary" data-command="paragraph" data-editor-target="editorIA" title="Párrafo">Párrafo</button>

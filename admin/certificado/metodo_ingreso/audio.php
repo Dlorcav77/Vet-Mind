@@ -51,7 +51,7 @@
                         class="form-control"
                         name="archivo_audio"
                         id="archivo_audio"
-                        accept="audio/mpeg,audio/mp3,audio/wav,audio/webm,audio/*">
+                        accept="audio/mpeg,audio/mp3,audio/mp4,audio/wav,audio/webm,audio/*">
                     <button type="button" class="btn btn-outline-danger" id="btnClearUpload" style="display:none;">
                         Quitar
                     </button>

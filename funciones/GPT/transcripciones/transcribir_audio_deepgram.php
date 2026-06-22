@@ -125,8 +125,11 @@ function gpt_deepgram_arreglar_decimales(string $texto): string
     // Lo reconstruimos a "uréter no visible".
     $texto = preg_replace('/\bure\s+eterno\s+visible\b/iu', 'uréter no visible', $texto);
     $texto = preg_replace('/\bure\s+terno\s+visible\b/iu', 'uréter no visible', $texto);
-    // Variante por si aparece junto ("ureterno visible")
+// Variantes donde Deepgram funde "uréter no" perdiendo el "no":
+    // "ureterno", "uretano", "ureternovisible" (todo pegado) -> reconstruir con el "no".
     $texto = preg_replace('/\bureterno\s+visible\b/iu', 'uréter no visible', $texto);
+    $texto = preg_replace('/\buretano\s+visible\b/iu', 'uréter no visible', $texto);
+    $texto = preg_replace('/\bureternovisible\b/iu', 'uréter no visible', $texto);
 
     // --- Decimales partidos ---
     // Caso "0 coma 0 9" -> "0.09"
@@ -173,15 +176,15 @@ if (!$audioPath || !file_exists($audioPath)) {
    El audio va directo en el body (binario). Parámetros en la URL.
    La respuesta trae el transcript en results.channels[0].alternatives[0].transcript
    ============================== */
-$keyterms = [
-    'Bazo','Yeyuno','Íleon','Duodeno','Páncreas','Colon','Estómago',
-    'Riñón','Vejiga','Próstata','Hígado','Vesícula biliar','Linfonódulos',
-    'Adrenal','Ciego','Peritoneo','ecogenicidad','anecoico','hipoecoico',
-    'hiperecoico','parénquima','estratificación','esplénico','felino',
-    'aguzados','bordes aguzados','engrosado','engrosada','mucoso',
-    'ovario','cuerpo uterino','corticomedular','vasculatura','homogéneo',
-    'lóbulo','reactivo','distendida','redondeados'
-];
+// $keyterms = [
+//     'Bazo','Yeyuno','Duodeno','Páncreas','Colon','Estómago',
+//     'Riñón','Vejiga','Próstata','Hígado','Vesícula biliar','Linfonódulos',
+//     'Adrenal','Ciego','Peritoneo','ecogenicidad','anecoico','hipoecoico',
+//     'hiperecoico','parénquima','estratificación','esplénico','felino',
+//     'aguzados','bordes aguzados','engrosado','engrosada','mucoso',
+//     'ovario','cuerpo uterino','corticomedular','vasculatura','homogéneo',
+//     'lóbulo','reactivo','distendida','redondeados','Íleon'
+// ];
 
 $params = [
     'model=nova-3',
@@ -189,9 +192,21 @@ $params = [
     'smart_format=true',
     'punctuate=true',
 ];
-foreach ($keyterms as $kt) {
-    $params[] = 'keyterm=' . rawurlencode($kt);
+
+// Keyterms opcionales: solo si la llamada pide usar_keyterms=1.
+// Lista compartida; ajústala en lib/stt_keyterms.php.
+if (!empty($_POST['usar_keyterms']) && (string)$_POST['usar_keyterms'] === '1') {
+    $kwFile = dirname(__DIR__) . '/lib/stt_keyterms.php';
+    if (is_file($kwFile)) {
+        $keyterms = require($kwFile);
+        if (is_array($keyterms)) {
+            foreach ($keyterms as $kt) {
+                $params[] = 'keyterm=' . rawurlencode($kt);
+            }
+        }
+    }
 }
+
 $url = 'https://api.deepgram.com/v1/listen?' . implode('&', $params);
 
 $audioBytes = file_get_contents($audioPath);

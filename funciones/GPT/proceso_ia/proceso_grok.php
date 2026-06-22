@@ -7,9 +7,9 @@ if (!defined('GPT_SNAPSHOT')) {
 }
 
 // rutas base
-$ROOT_DIR = dirname(__DIR__, 2);   // /
-$FUNC_DIR = dirname(__DIR__);      // /funciones
-$GPT_DIR  = __DIR__;               // /funciones/GPT
+$ROOT_DIR = dirname(__DIR__, 3);   // /
+$FUNC_DIR = dirname(__DIR__, 2);      // /funciones
+$GPT_DIR  = dirname(__DIR__, 1);                    // /funciones/GPT
 
 require_once($FUNC_DIR . "/conn/conn.php");
 require_once($ROOT_DIR . "/configP.php");
@@ -58,6 +58,14 @@ $promptData = gpt_build_prompt($mysqli, $input);
 $system             = $promptData['system'];
 $prompt             = $promptData['prompt'];
 $incluir_conclusion = $promptData['incluir_conclusion'];
+
+// MODO PRUEBA (banco): reemplaza SOLO el system si llega override + token valido.
+// Inerte en produccion: una llamada normal no manda estos campos.
+$sysOverride = (string)($_POST['system_override'] ?? '');
+if ($sysOverride !== '' && (string)($_POST['test_token'] ?? '') === 'gondolengua') {
+    $system = $sysOverride;
+}
+
 $plantilla_id       = $input['plantilla_id'];
 
 // 4. chequeo de tamaño

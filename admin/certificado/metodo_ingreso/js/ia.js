@@ -62,6 +62,115 @@ function obtenerDatosPaciente() {
     return datos;
 }
 
+// Llama a la IA revisora y pinta el panel (no editable) arriba del informe.
+// Llama a la IA revisora y pinta el panel (no editable) arriba del informe.
+function ejecutarRevisor(dictado, informeHtml, plantillaBase) {
+    const $panel = $('#revisor-panel');
+    $panel.html('<div style="padding:12px 14px;color:#64748b">Revisando informe…</div>').show();
+
+    return $.post('/funciones/GPT/proceso_ia/proceso_revisor.php', {
+        dictado: dictado,
+        informe: informeHtml,
+        plantilla: plantillaBase
+    }, null, 'json')
+    .done(function (resp) {
+        if (!resp || resp.status !== 'success') {
+            const msg = (resp && resp.message) ? resp.message : 'No se pudo completar la revisión.';
+            $panel.html('<div style="padding:12px 14px;background:#fef2f2;color:#991b1b">⚠ Revisor: ' + $('<div>').text(msg).html() + '</div>');
+            return;
+        }
+        const items = Array.isArray(resp.items) ? resp.items : [];
+        if (items.length === 0) {
+            $panel.html('<div style="padding:12px 14px;background:#ecfdf5;color:#065f46">✓ El revisor no encontró inconsistencias entre el dictado y el informe.</div>');
+            return;
+        }
+        const esc = function (v) { return $('<div>').text(v || '').html(); };
+        let filas = '';
+        items.forEach(function (it, idx) {
+            const sev = (it.severidad || 'media').toLowerCase();
+            const bg = sev === 'alta' ? '#fee2e2;color:#991b1b' : (sev === 'media' ? '#fef3c7;color:#92400e' : '#e2e8f0;color:#475569');
+            const sevBadge = '<span style="display:inline-block;font-size:11px;padding:2px 8px;border-radius:6px;font-weight:600;background:' + bg + '">' + esc(sev) + '</span>';
+
+            // Fila resumen (una línea, clickeable).
+            filas += '<tr class="rev-row" data-idx="' + idx + '" style="cursor:pointer">'
+                + '<td style="padding:8px 10px;border-bottom:1px solid #f1f5f9;vertical-align:top;width:18px;color:#94a3b8"><span class="rev-caret">▸</span></td>'
+                + '<td style="padding:8px 10px;border-bottom:1px solid #f1f5f9;vertical-align:top;white-space:nowrap">' + sevBadge + '</td>'
+                + '<td style="padding:8px 10px;border-bottom:1px solid #f1f5f9;vertical-align:top;white-space:nowrap;font-weight:600;color:#334155">' + esc(it.tipo) + '</td>'
+                + '<td style="padding:8px 10px;border-bottom:1px solid #f1f5f9;vertical-align:top;color:#334155">' + esc(it.zona) + '</td>'
+                + '</tr>';
+
+            // Fila detalle (oculta por defecto): 3 cards.
+            const card = function (titulo, valor, color, bgCard, bdr) {
+                return '<div style="flex:1;min-width:200px;background:' + bgCard + ';border:1px solid ' + bdr + ';border-radius:8px;padding:10px 12px">'
+                    + '<div style="font-size:10px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;color:' + color + ';margin-bottom:4px">' + titulo + '</div>'
+                    + '<div style="font-size:13px;line-height:1.45;color:#334155">' + esc(valor) + '</div>'
+                    + '</div>';
+            };
+            filas += '<tr class="rev-detail" data-idx="' + idx + '" style="display:none">'
+                + '<td></td>'
+                + '<td colspan="3" style="padding:2px 10px 14px;border-bottom:1px solid #f1f5f9">'
+                + '<div style="display:flex;flex-wrap:wrap;gap:10px">'
+                + card('Dictado', it.dictado, '#0369a1', '#f0f9ff', '#bae6fd')
+                + card('Informe', it.informe, '#92400e', '#fffbeb', '#fde68a')
+                + card('Revisar', it.detalle, '#9a3412', '#fff7ed', '#fed7aa')
+                + '</div>'
+                + '</td>'
+                + '</tr>';
+        });
+        $panel.html(
+            '<div style="padding:10px 14px;background:#fff7ed;color:#9a3412;font-weight:600;border-bottom:1px solid #e2e8f0">⚠ El revisor detectó ' + items.length + ' punto(s) a revisar (no se modificó el informe)</div>'
+            + '<div style="overflow:auto"><table style="width:100%;border-collapse:collapse">'
+            + '<tr style="background:#f8fafc;color:#475569">'
+            + '<th style="padding:6px 10px"></th><th style="text-align:left;padding:6px 10px">Sev.</th><th style="text-align:left;padding:6px 10px">Tipo</th><th style="text-align:left;padding:6px 10px">Zona</th>'
+            + '</tr>' + filas + '</table></div>'
+        );
+
+        // Toggle: al clickear una fila resumen, despliega/oculta su detalle.
+        $panel.off('click', '.rev-row').on('click', '.rev-row', function () {
+            const idx = $(this).data('idx');
+            const $detail = $panel.find('.rev-detail[data-idx="' + idx + '"]');
+            const $caret = $(this).find('.rev-caret');
+            const visible = $detail.is(':visible');
+            $detail.toggle(!visible);
+            $caret.text(visible ? '▸' : '▾');
+        });
+    })
+    .fail(function () {
+        $panel.html('<div style="padding:12px 14px;background:#fef2f2;color:#991b1b">⚠ No se pudo conectar al revisor.</div>');
+    });
+}
+
+// Resalta en el informe las palabras que vinieron de una discrepancia entre los 2 motores.
+// Solo color (no número, no observación). El vet ve dónde hubo duda y revisa.
+function resaltarDiscrepancias(html, discrepancias) {
+    if (!Array.isArray(discrepancias) || discrepancias.length === 0) return html;
+
+    // Junta los tokens candidatos de ambos lados (A y B), separa por palabras,
+    // limpia signos y descarta palabras muy cortas o vacías para no pintar ruido.
+    const stop = new Set(['nada','con','de','el','la','en','por','x','y','o','un','una','del']);
+    const candidatos = new Set();
+    discrepancias.forEach(function (d) {
+        [d.a, d.b].forEach(function (lado) {
+            (lado || '').split(/\s+/).forEach(function (w) {
+                const limpia = w.replace(/[.,;:()"]/g, '').trim();
+                const norm = limpia.toLowerCase();
+                if (limpia.length >= 4 && !stop.has(norm)) candidatos.add(limpia);
+            });
+        });
+    });
+    if (candidatos.size === 0) return html;
+
+    // Reemplaza cada candidato por su versión resaltada, evitando tocar dentro de etiquetas.
+    let out = html;
+    candidatos.forEach(function (palabra) {
+        const esc = palabra.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+        // (?![^<]*>) evita reemplazar dentro de atributos/tags HTML.
+        const re = new RegExp('(' + esc + ')(?![^<]*>)', 'gi');
+        out = out.replace(re, '<span class="vm-discrepancia" style="background:#fff3cd;border-bottom:2px solid #f59e0b;padding:0 2px;border-radius:3px">$1</span>');
+    });
+    return out;
+}
+
 function obtenerContenidoInformeActual() {
     if (window.VetmindTiptap && typeof window.VetmindTiptap.syncMainEditorToTextarea === 'function') {
         window.VetmindTiptap.syncMainEditorToTextarea();
@@ -216,7 +325,7 @@ $('#procesarIA').on('click', function () {
         formData.append(key, pacienteData[key]);
     }
 
-    fetch('/funciones/GPT/transcribir_audio.php', {
+    fetch('/funciones/GPT/transcribir_doble.php', {
         method: 'POST',
         body: formData
     })
@@ -232,10 +341,12 @@ $('#procesarIA').on('click', function () {
             $('#bloque-audio').data('audioFilename', resp.audio_tmp.split('/').pop());
         }
 
-        const textoTranscrito = (resp.texto || '').trim();
+        const textoTranscrito = ((resp.texto || '') + (resp.texto_doble || '')).trim();
         if (!textoTranscrito) {
             throw new Error('La transcripción volvió vacía.');
         }
+        window.__ultimoDictadoIA = textoTranscrito;
+        window.__ultimasDiscrepancias = Array.isArray(resp.discrepancias) ? resp.discrepancias : [];
 
         Swal.update({
             title: 'Procesando con Vet-Mind...',
@@ -259,7 +370,12 @@ $('#procesarIA').on('click', function () {
         Swal.close();
 
         if (respGPT.status === 'success') {
-            mostrarModalIA(respGPT.content);
+            const informeResaltado = resaltarDiscrepancias(respGPT.content, window.__ultimasDiscrepancias || []);
+            mostrarModalIA(informeResaltado);
+            // Revisor: usa el informe ORIGINAL (sin el resaltado), para no confundirlo.
+            const dictadoCompleto = (window.__ultimoDictadoIA || '').trim();
+            const plantillaBase = $('#plantillaBase').val();
+            ejecutarRevisor(dictadoCompleto, respGPT.content, plantillaBase);
         } else if (respGPT.status === 'dry_run') {
             const html = respGPT.debug_html || respGPT.content_demo || '<p><strong>DEBUG:</strong> Dry-run activo.</p>';
             mostrarModalDebug(html);
@@ -282,6 +398,7 @@ $('#aceptarIA').on('click', function () {
     audio_manual_setMode('manual');
 
     textoIA = textoIA
+        .replace(/<span[^>]*class=['"]vm-discrepancia['"][^>]*>(.*?)<\/span>/gi, '$1')
         .replace(/<span[^>]*style=['"]?color:(orange|blue);?['"]?[^>]*>(.*?)<\/span>/gi, '$2')
         .replace(/(?:<[^>]+>)?Observaciones del Asistente:?<\/?.*?>?(?:<br\s*\/?>)?[\s\S]*$/i, '')
         .replace(/<sup\b[^>]*class=['"]flag['"][^>]*>.*?<\/sup>/gi, '')

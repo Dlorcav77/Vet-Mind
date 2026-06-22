@@ -258,19 +258,28 @@ if (!$audioPath || !file_exists($audioPath)) {
     exit;
 }
 
-$promptTexto = 'Transcribe en español. Es un dictado clínico veterinario, principalmente ecográfico. ' .
-    'Respeta términos médicos y veterinarios como bazo, yeyuno, íleon, duodeno, páncreas, colon, estómago, riñón, vejiga, próstata, hígado, vesícula biliar, linfonódulos, adrenal, ecogenicidad, anecoico, hipoecoico, hiperecoico, parénquima, corticomedular, estratificación, esplénico, mucoso, submucosa, felino, canino.';
-
-$ch = curl_init('https://api.openai.com/v1/audio/transcriptions');
-
 $postFields = [
     'model' => 'gpt-4o-transcribe',
     'file' => new CURLFile($audioPath, 'audio/wav', basename($audioPath)),
     'language' => 'es',
     'response_format' => 'json',
-    'prompt' => $promptTexto,
 ];
 
+// Keyterms opcionales: solo si la llamada pide usar_keyterms=1.
+// OpenAI los recibe vía 'prompt' (texto de contexto). Lista en lib/stt_keyterms.php.
+if (!empty($_POST['usar_keyterms']) && (string)$_POST['usar_keyterms'] === '1') {
+    $kwFile = dirname(__DIR__) . '/lib/stt_keyterms.php';
+    if (is_file($kwFile)) {
+        $keyterms = require($kwFile);
+        if (is_array($keyterms) && !empty($keyterms)) {
+            $postFields['prompt'] =
+                'Transcribe en español. Es un dictado clínico veterinario, principalmente ecográfico. '
+              . 'Respeta términos médicos y veterinarios como ' . implode(', ', $keyterms) . '.';
+        }
+    }
+}
+
+$ch = curl_init('https://api.openai.com/v1/audio/transcriptions');
 curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
 curl_setopt($ch, CURLOPT_POST, true);
 curl_setopt($ch, CURLOPT_HTTPHEADER, [

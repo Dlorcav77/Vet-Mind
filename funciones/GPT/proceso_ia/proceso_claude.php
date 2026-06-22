@@ -6,9 +6,9 @@ if (!defined('GPT_SNAPSHOT')) {
 }
 
 // rutas base
-$ROOT_DIR = dirname(__DIR__, 2);   // /
-$FUNC_DIR = dirname(__DIR__);      // /funciones
-$GPT_DIR  = __DIR__;               // /funciones/GPT
+$ROOT_DIR = dirname(__DIR__, 3);   // /
+$FUNC_DIR = dirname(__DIR__, 2);      // /funciones
+$GPT_DIR  = dirname(__DIR__, 1);                // /funciones/GPT
 
 require_once($FUNC_DIR . "/conn/conn.php");
 require_once($ROOT_DIR . "/configP.php");

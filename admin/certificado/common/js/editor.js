@@ -27,9 +27,9 @@ function mostrarModalIA(content) {
         if (window.VetmindTiptap && typeof window.VetmindTiptap.destroyModalEditor === 'function') {
             window.VetmindTiptap.destroyModalEditor();
         }
-
         $('#debug-host').empty().hide();
         $('#editorIA_wrapper').show();
+        $('#revisor-panel').empty().hide();
     });
 
     $modal.modal('show');

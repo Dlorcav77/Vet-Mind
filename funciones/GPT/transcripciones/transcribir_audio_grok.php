@@ -178,15 +178,17 @@ $postFields = [
     'format'   => 'true',
 ];
 
-// Términos veterinarios para sesgar la transcripción (los que Grok erró antes).
-$keyterms = [
-    'Bazo', 'Yeyuno', 'Íleon', 'Duodeno', 'Páncreas', 'Colon',
-    'Riñón', 'Adrenal', 'ecogenicidad', 'anecoico', 'hipoecoico',
-    'parénquima', 'cortico medular', 'estratificación', 'linfonódulos',
-    'esplénico', 'vesícula biliar', 'peritoneo', 'ciego', 'felino',
-];
-foreach ($keyterms as $kt) {
-    $postFields['keyterm[]'] = $kt; // se repite el parámetro por cada término
+// Keyterms opcionales: solo si la llamada pide usar_keyterms=1. Lista en lib/stt_keyterms.php.
+if (!empty($_POST['usar_keyterms']) && (string)$_POST['usar_keyterms'] === '1') {
+    $kwFile = dirname(__DIR__) . '/lib/stt_keyterms.php';
+    if (is_file($kwFile)) {
+        $keyterms = require($kwFile);
+        if (is_array($keyterms)) {
+            foreach ($keyterms as $kt) {
+                $postFields['keyterm[]'] = $kt; // se repite el parámetro por cada término
+            }
+        }
+    }
 }
 
 curl_setopt($ch, CURLOPT_POSTFIELDS, $postFields);
