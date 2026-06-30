@@ -125,7 +125,9 @@ function gpt_deepgram_arreglar_decimales(string $texto): string
     // Lo reconstruimos a "uréter no visible".
     $texto = preg_replace('/\bure\s+eterno\s+visible\b/iu', 'uréter no visible', $texto);
     $texto = preg_replace('/\bure\s+terno\s+visible\b/iu', 'uréter no visible', $texto);
-// Variantes donde Deepgram funde "uréter no" perdiendo el "no":
+    // Variante "u eterno visible": Deepgram parte "uréter no" en "u" + "eterno".
+    $texto = preg_replace('/\bu\s+eterno\s+visible\b/iu', 'uréter no visible', $texto);
+    // Variantes donde Deepgram funde "uréter no" perdiendo el "no":
     // "ureterno", "uretano", "ureternovisible" (todo pegado) -> reconstruir con el "no".
     $texto = preg_replace('/\bureterno\s+visible\b/iu', 'uréter no visible', $texto);
     $texto = preg_replace('/\buretano\s+visible\b/iu', 'uréter no visible', $texto);
@@ -143,6 +145,7 @@ function gpt_deepgram_arreglar_decimales(string $texto): string
 
     return $texto;
 }
+
 $audioPath = '';
 $audioTmpRespuesta = '';
 
