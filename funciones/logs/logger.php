@@ -2,6 +2,9 @@
 declare(strict_types=1);
 date_default_timezone_set('America/Santiago');
 
+require_once($_SERVER['DOCUMENT_ROOT'] . "/funciones/conn/conn.php");
+
+
 /**
  * Logger JSON Lines (una línea JSON por evento).
  * - Crea archivos diarios: gpt_app-YYYY-MM-DD.log.jsonl y (opcional) gpt_bodies-*.log.jsonl
@@ -117,54 +120,41 @@ function sha256_short(string $text): string {
 
 /**
  * Estimación de costo (USD) por tokens, por modelo.
- * Rellena/ajusta precios según tu realidad (valores de referencia).
- * Precios entendidos como USD por 1M tokens.
+ * Lee precios desde la tabla ia_pricing (USD por 1M tokens).
  */
 function gpt_estimate_cost_usd(string $model, int $prompt_tokens, int $completion_tokens): float {
-    /*
-     * USD por 1M tokens.
-     * Última revisión manual: 2026-06-02.
-     */
+    static $cache = [];
 
-    $pricing = [
-        // ─────────────────────────────
-        // OpenAI
-        // ─────────────────────────────
-        'gpt-5.5'        => ['in' => 5.00,  'out' => 30.00],
-        'gpt-5.4'        => ['in' => 2.50,  'out' => 15.00],
-        'gpt-5.4-mini'   => ['in' => 0.75,  'out' => 4.50],
-        'gpt-5'          => ['in' => 1.25,  'out' => 10.00],
-        'gpt-5-mini'     => ['in' => 0.25,  'out' => 2.00],
-        'gpt-5-nano'     => ['in' => 0.05,  'out' => 0.40],
-        'gpt-4o'         => ['in' => 2.50,  'out' => 10.00],
-        'gpt-4o-mini'    => ['in' => 0.15,  'out' => 0.60],
+    if (!array_key_exists($model, $cache)) {
+        $cache[$model] = null;
+        $mysqli = conn();
+        if ($stmt = $mysqli->prepare(
+            'SELECT price_in, price_out
+               FROM ia_pricing
+              WHERE model = ? AND activo = 1
+           ORDER BY vigente_desde DESC
+              LIMIT 1'
+        )) {
+            $stmt->bind_param('s', $model);
+            $stmt->execute();
+            $res = $stmt->get_result();
+            if ($row = $res->fetch_assoc()) {
+                $cache[$model] = [
+                    'in'  => (float)$row['price_in'],
+                    'out' => (float)$row['price_out'],
+                ];
+            }
+            $stmt->close();
+        }
+        $mysqli->close();
+    }
 
-        // ─────────────────────────────
-        // Anthropic / Claude
-        // ─────────────────────────────
-        'claude-sonnet-4-6' => ['in' => 3.00, 'out' => 15.00],
-        'claude-sonnet-4-5' => ['in' => 3.00, 'out' => 15.00],
-        'claude-haiku-4-5'  => ['in' => 1.00, 'out' => 5.00],
-        'claude-opus-4-8'   => ['in' => 5.00, 'out' => 25.00],
-        'claude-opus-4-7'   => ['in' => 5.00, 'out' => 25.00],
-        'claude-opus-4-6'   => ['in' => 5.00, 'out' => 25.00],
-
-        // ─────────────────────────────
-        // xAI / Grok
-        // ─────────────────────────────
-        'grok-4.3'       => ['in' => 1.25, 'out' => 2.50],
-        'grok-build-0.1' => ['in' => 1.00, 'out' => 2.00],
-    ];
-
-    if (!isset($pricing[$model])) {
+    if ($cache[$model] === null) {
         return 0.0;
     }
 
-    $in  = $pricing[$model]['in'];
-    $out = $pricing[$model]['out'];
-
-    $cost = ($prompt_tokens / 1_000_000) * $in
-          + ($completion_tokens / 1_000_000) * $out;
+    $cost = ($prompt_tokens / 1_000_000) * $cache[$model]['in']
+          + ($completion_tokens / 1_000_000) * $cache[$model]['out'];
 
     return round($cost, 6);
 }

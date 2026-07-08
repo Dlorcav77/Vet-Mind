@@ -1,17 +1,25 @@
 <?php
-// funciones/GPT/proceso_revisor.php
+// funciones/GPT/proceso_ia/proceso_revisor.php
 // IA revisora (2a pasada). Compara DICTADO vs INFORME y devuelve SOLO una lista
-// de posibles inconsistencias. NO reescribe el informe. Motor: gpt-5-mini.
+// de posibles inconsistencias. NO reescribe el informe. Motor: grok-4.3.
 declare(strict_types=1);
 
 $ROOT_DIR = dirname(__DIR__, 3);   // /
+$FUNC_DIR = dirname(__DIR__, 2);   // /funciones
+$GPT_DIR  = dirname(__DIR__, 1);   // /funciones/GPT
+
+require_once($FUNC_DIR . "/conn/conn.php");
 require_once($ROOT_DIR . "/configP.php");
+require_once($FUNC_DIR . "/logs/logger.php");
+require_once($GPT_DIR . "/lib/ia_store.php");
 
 date_default_timezone_set('America/Santiago');
 header('Content-Type: application/json; charset=utf-8');
 
-const REVISOR_MODEL = 'gpt-5-mini';
-const REVISOR_MAX_TOKENS = 6000; // incluye tokens de razonamiento; holgura para no truncar
+const REVISOR_MODEL = 'grok-4.3';
+const REVISOR_MAX_TOKENS = 6000;
+
+$mysqli = conn();
 
 $dictado = trim((string)($_POST['dictado'] ?? ''));
 $informe = trim((string)($_POST['informe'] ?? ''));
@@ -22,9 +30,9 @@ if ($dictado === '' || $informe === '') {
     exit;
 }
 
-$api_key = $OPENAI_API_KEY ?? '';
+$api_key = $XAI_API_KEY ?? '';
 if (!$api_key) {
-    echo json_encode(['status'=>'error','message'=>'API Key de OpenAI no configurada.']);
+    echo json_encode(['status'=>'error','message'=>'API Key de xAI/Grok no configurada.']);
     exit;
 }
 
@@ -42,6 +50,16 @@ DICTADO no menciono: esos vienen de la PLANTILLA, NO son inventados. NUNCA los r
 
 Tu UNICA tarea es detectar desviaciones REALES del INFORME respecto al DICTADO. NO reescribes. NO inventas.
 
+AUTOCORRECCIONES DEL DICTADO (leer ANTES de comparar medidas):
+El DICTADO es voz transcrita y el ecografista se autocorrige. Cuando sobre un MISMO dato aparecen dos
+valores y entre medio hay una senal de correccion ("perdon", "mejor dicho", "no, es", "su medicion real
+es", "en realidad", "corrijo", o repite el organo al final dando otra medida), vale SIEMPRE el ULTIMO
+valor dictado. El valor anterior queda descartado por el propio ecografista.
+- Ejemplo: "Duodeno 0.31 ... al final: su medicion real es 0.39" -> vale 0.39. El informe con 0.39 es
+  CORRECTO. NO lo marques como cambio_medida. Marcar la primera cifra como discrepancia es FALSO POSITIVO.
+- Antes de reportar cualquier cambio_medida, verifica si mas adelante en el DICTADO ese mismo organo
+  recibe una correccion. Si el informe uso el ultimo valor, NO reportes.
+
 METODO OBLIGATORIO:
 1. Revisa ORGANO POR ORGANO. Para cada organo, compara lo que dice el DICTADO con lo que dice el
    INFORME (apoyandote en la PLANTILLA para saber que es solo relleno normal).
@@ -53,8 +71,14 @@ METODO OBLIGATORIO:
 Casos a reportar:
 1. hallazgo_bajado (EL MAS GRAVE, NUNCA lo omitas): el DICTADO marca un organo o atributo como ALTERADO
    y el INFORME lo dejo NORMAL/CONSERVADO (o conservo el valor normal de la plantilla ignorando el dictado).
+   TRATA COMO ALTERADO cualquiera de estos terminos del DICTADO (y sus variantes de genero/numero):
+   aumentado, aumentada, engrosado, engrosada, disminuido, disminuida, distendido, distendida, dilatado,
+   dilatada, irregular, redondeado, redondeada, alterado, heterogeneo, heterogenea, severamente, levemente
+   (junto a un atributo), o cualquier medida fuera de lo normal. Si el DICTADO usa uno de estos y el
+   INFORME dejo "conservado"/"normal"/"delgada y lisa"/"aguzado", es hallazgo_bajado.
    Esto incluye hallazgos CON o SIN medida numerica:
    - Con medida: dictado "Estomago grosor aumentado 0.38" -> informe "pared conservada 0.38". Alta.
+   - Con sinonimo: dictado "Yeyuno engrosado 0.49" -> informe "grosor pared conservado 0.49". Alta.
    - Cualitativos (sin numero): dictado "linfonodulos yeyunales aumentados de tamano, ecogenicidad
      aumentada, heterogenea" -> informe "no se observan LN reactivos" o "linfonodulos normales". Alta.
      Un organo que el DICTADO describe como aumentado/alterado NUNCA puede quedar como normal/no reactivo.
@@ -64,6 +88,8 @@ Casos a reportar:
    el texto normal de la plantilla (linfonodulos, bazo, higado, adrenales, etc.).
 2. cambio_lateralidad: lado (izquierdo/derecho) distinto entre dictado e informe. Alta.
 3. cambio_medida: numero o unidad distinta entre dictado e informe. NO cuentes los "XX" de la plantilla.
+   ANTES de marcar, aplica la regla de AUTOCORRECCIONES: si el informe uso el ultimo valor dictado tras
+   una correccion, NO es cambio_medida.
    Incluye medidas TRUNCADAS: si el DICTADO da varias dimensiones ("0,85 por 1 cm", "0,5 x 0,58 cm",
    "1 por 1,3 cm") y el INFORME deja solo una ("0,85 cm"), es cambio_medida. Compara dimension por
    dimension; si el informe perdio alguna dimension que el dictado dio, marcalo. Alta.
@@ -80,35 +106,54 @@ Casos a reportar:
    con tipo "organo_sin_dictado", para que el humano confirme si ese organo se evaluo o no.
    NO lo marques si el organo solo trae estado normal de plantilla sin medidas inventadas;
    marcalo cuando tenga un "XX" de medida faltante o cuando convenga confirmar que se evaluo.
+8. mismas_caracteristicas_literal: si el INFORME deja escrita la frase literal "mismas caracteristicas"
+   (o "mismas caracteristicas que el izquierdo/derecho/anterior") en vez de copiar de forma explicita
+   los atributos del organo de referencia, MARCALO. El DICTADO puede decir "mismas caracteristicas",
+   pero el INFORME debe expandirlas: escribir uno por uno los atributos del organo de referencia
+   (bordes, ecogenicidad, forma, lesiones, etc.) aplicando la medida propia de este organo. Si el
+   informe la dejo literal, se pierden los atributos y el hallazgo queda incompleto. Severidad media.
+   En "informe" cita la frase literal encontrada; en "detalle" pide expandir los atributos del organo
+   de referencia. NO lo marques si el informe SI expandio los atributos (aunque el dictado dijera la frase).
+9. organo_omitido (GRAVE, revisar SIEMPRE): recorre el DICTADO e identifica CADA organo que el
+   ecografista menciono (aunque venga mal transcrito: "riñuelo"=riñon, "vaso"=bazo, "dodeno"=duodeno,
+   "geyuno/yeyuno", "ilion/ileum"=ileon, etc., y usa las CORRECCIONES YA RESUELTAS del dictado). Para
+   cada organo dictado, verifica que EXISTA en el INFORME. Si un organo que el DICTADO nombra NO aparece
+   en el INFORME, MARCALO. Ejemplo: el DICTADO dice "yeyuno grosor aumentado 0.49" y el INFORME no tiene
+   parrafo de Yeyuno -> organo_omitido, severidad alta. Presta atencion a organos digestivos que a veces
+   se pierden (Yeyuno, Ileon, Ciego, Duodeno). En "dictado" pon lo que dijo el dictado del organo; en
+   "informe" indica que el organo no aparece; en "detalle" pide agregarlo.
 
 NO reportes (no son problemas):
 - Organos o atributos en estado normal que vienen de la PLANTILLA y el dictado no menciono.
 - Diferencias de redaccion, plurales, mayusculas u orden de palabras.
 - Los marcadores "XX" ni los flags "(N)".
+- Primeras cifras descartadas por una autocorreccion posterior del propio DICTADO.
 
 Severidad: "alta" si cambia el sentido clinico; "media" si es omision parcial; "baja" si es menor.
 
 Responde EXCLUSIVAMENTE con un objeto JSON, sin texto antes ni despues. Formato exacto:
-{"items":[{"severidad":"alta|media|baja","tipo":"hallazgo_bajado|inventado|cambio_lateralidad|cambio_medida|omitido|discrepancia_negacion|organo_sin_dictado","zona":"organo o zona","dictado":"lo que dice el dictado","informe":"lo que dice el informe","detalle":"que revisar"}]}
+{"items":[{"severidad":"alta|media|baja","tipo":"hallazgo_bajado|inventado|cambio_lateralidad|cambio_medida|omitido|discrepancia_negacion|organo_sin_dictado|mismas_caracteristicas_literal|organo_omitido","zona":"organo o zona","dictado":"lo que dice el dictado","informe":"lo que dice el informe","detalle":"que revisar"}]}
 Si no encuentras problemas, responde exactamente {"items":[]}.
 SYS;
 
 $user = "=== DICTADO ===\n{$dictado}\n\n=== PLANTILLA BASE ===\n{$plantilla}\n\n=== INFORME (HTML) ===\n{$informe}";
 
 $payload = [
-    'model'                 => REVISOR_MODEL,
-    'messages'              => [
+    'model'       => REVISOR_MODEL,
+    'messages'    => [
         ['role'=>'system','content'=>$system],
         ['role'=>'user','content'=>$user],
     ],
-    'max_completion_tokens' => REVISOR_MAX_TOKENS,
-    'reasoning_effort'      => 'low',
-    'response_format'       => ['type'=>'json_object'],
+    'max_tokens'       => REVISOR_MAX_TOKENS,
+    'temperature'      => 0.1,
+    'response_format'  => ['type'=>'json_object'],
 ];
 $jsonPayload = json_encode($payload, JSON_UNESCAPED_UNICODE);
 
+$rid = new_request_id();
+
 $t0 = microtime(true);
-$ch = curl_init('https://api.openai.com/v1/chat/completions');
+$ch = curl_init('https://api.x.ai/v1/chat/completions');
 curl_setopt_array($ch, [
     CURLOPT_RETURNTRANSFER => true,
     CURLOPT_POST           => true,
@@ -133,12 +178,12 @@ if ($err !== '') {
 }
 $result = json_decode((string)$resp, true);
 if (!is_array($result)) {
-    echo json_encode(['status'=>'error','message'=>'Respuesta no-JSON de OpenAI.']);
+    echo json_encode(['status'=>'error','message'=>'Respuesta no-JSON de xAI/Grok.']);
     exit;
 }
 if ($http !== 200) {
     $d = $result['error']['message'] ?? ('HTTP '.$http);
-    echo json_encode(['status'=>'error','message'=>'Error API OpenAI: '.$d]);
+    echo json_encode(['status'=>'error','message'=>'Error API xAI/Grok: '.$d]);
     exit;
 }
 
@@ -149,8 +194,38 @@ $finish  = (string)($choice['finish_reason'] ?? '');
 $usage = $result['usage'] ?? [];
 $pt = (int)($usage['prompt_tokens'] ?? 0);
 $ct = (int)($usage['completion_tokens'] ?? 0);
-$cost = round($pt/1_000_000*0.25 + $ct/1_000_000*2.00, 6);
+
+$cost = 0.0;
+if (isset($usage['cost_in_usd_ticks'])) {
+    $cost = round(((float)$usage['cost_in_usd_ticks']) / 10_000_000_000, 6);
+}
+if ($cost <= 0) {
+    $cost = gpt_estimate_cost_usd(REVISOR_MODEL, $pt, $ct);
+}
+$tt = (int)($usage['total_tokens'] ?? ($pt + $ct));
 $usageOut = ['prompt_tokens'=>$pt,'completion_tokens'=>$ct,'cost_usd'=>$cost,'ms'=>$ms];
+
+// guardar request en BD (ia_requests)
+ia_guardar_request($mysqli, [
+    'rid'               => $rid,
+    'tipo'              => 'revision',
+    'plantilla_id'      => null,
+    'provider'          => 'grok',
+    'model'             => REVISOR_MODEL,
+    'input'             => ['dictado'=>$dictado, 'informe'=>$informe, 'plantilla'=>$plantilla],
+    'system'            => $system,
+    'prompt'            => $user,
+    'content_final'     => $content,
+    'prompt_tokens'     => $pt,
+    'completion_tokens' => $ct,
+    'total_tokens'      => $tt,
+    'cost_usd'          => $cost,
+    'datetime_ia'       => date('c'),
+]);
+
+if ($mysqli instanceof mysqli) {
+    @$mysqli->close();
+}
 
 // SEGURIDAD: respuesta cortada o vacia => NO decir "sin problemas". Devolver error.
 if ($finish === 'length' || trim($content) === '') {
@@ -166,7 +241,6 @@ if ($finish === 'length' || trim($content) === '') {
 $clean  = trim(preg_replace('/```[a-z]*|```/i', '', $content));
 $parsed = json_decode($clean, true);
 
-// Si no se pudo parsear o no trae 'items' como array => error (no fingir limpio).
 if (!is_array($parsed) || !isset($parsed['items']) || !is_array($parsed['items'])) {
     echo json_encode([
         'status'  => 'error',
@@ -181,5 +255,6 @@ echo json_encode([
     'status' => 'success',
     'items'  => $parsed['items'],
     'raw'    => $content,
+    'rid'    => $rid,
     'usage'  => $usageOut,
 ], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);

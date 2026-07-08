@@ -1,7 +1,7 @@
 <?php
 // funciones/GPT/proceso_gpt.php
 declare(strict_types=1);
-const GPT_SNAPSHOT = 1;
+const GPT_SNAPSHOT = 0;
 
 // rutas base
 $ROOT_DIR = dirname(__DIR__, 2);   // /
@@ -15,6 +15,7 @@ require_once($FUNC_DIR . "/logs/logger.php");
 // nuestros nuevos helpers
 require_once($GPT_DIR . "/lib/gpt_prompt.php");
 require_once($GPT_DIR . "/lib/gpt_postprocess.php");
+require_once($GPT_DIR . "/lib/ia_store.php");
 
 /////////////////////////////////////////////////////////////////
 /////////////////////////////////////////////////////////////////
@@ -24,7 +25,7 @@ require_once($GPT_DIR . "/lib/gpt_postprocess.php");
 // - 'gpt'    => usa GPT normal en este mismo archivo
 // - 'claude' => deriva a funciones/GPT/proceso_claude.php
 // - 'grok'   => deriva a funciones/GPT/proceso_grok.php
-$motor = 'grok';
+$motor = 'gpt';
 
 // Normalizar por seguridad
 $motor = strtolower(trim($motor));
@@ -50,9 +51,10 @@ $mysqli = conn();
 // límites
 define('MAX_PROMPT_BYTES_SOFT', 102400);   // 100 KB
 define('MAX_PROMPT_BYTES_HARD', 307200);   // 300 KB
-define('MAX_OUTPUT_TOKENS',     1500);
+define('MAX_OUTPUT_TOKENS',     3000);
 
-define('GPT_MODEL', 'gpt-4o');
+define('GPT_MODEL', 'gpt-5.4');
+define('GPT_REASONING_EFFORT', 'low'); // low | medium | high (para probar)
 
 // 1. validar entrada mínima
 $texto_dictado = trim((string)($_POST['texto'] ?? ''));
@@ -130,11 +132,8 @@ $payload = [
     ],
     'user'                  => $user_tag,
     'max_completion_tokens' => MAX_OUTPUT_TOKENS,
+    'reasoning_effort'      => GPT_REASONING_EFFORT,
 ];
-
-if (!in_array(GPT_MODEL, ['gpt-5.5'], true)) {
-    $payload['temperature'] = 0.1;
-}
 $jsonPayload = json_encode($payload, JSON_UNESCAPED_UNICODE);
 
 $t0 = microtime(true);
@@ -228,6 +227,23 @@ app_log('response', [
     'cost_usd'          => $cost_usd
 ], 'INFO');
 
+// guardar request en BD (ia_requests)
+ia_guardar_request($mysqli, [
+    'rid'               => $rid,
+    'tipo'              => 'informe',
+    'plantilla_id'      => $plantilla_id,
+    'provider'          => 'gpt',
+    'model'             => GPT_MODEL,
+    'input'             => $input,
+    'system'            => $system,
+    'prompt'            => $prompt,
+    'content_final'     => $content,
+    'prompt_tokens'     => $prompt_tokens,
+    'completion_tokens' => $completion_tokens,
+    'total_tokens'      => $total_tokens,
+    'cost_usd'          => $cost_usd,
+    'datetime_ia'       => date('c'),
+]);
 
 // ───── NUEVO: SNAPSHOT sencillo ─────
 if (GPT_SNAPSHOT === 1) {

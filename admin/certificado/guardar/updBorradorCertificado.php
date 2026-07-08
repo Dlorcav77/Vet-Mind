@@ -92,6 +92,9 @@ $payload = [
     'contenido_html'            => trim((string)($_POST['contenido_html'] ?? '')),
     'manual_data'               => $manual,
     'plantillaBase'             => trim((string)($_POST['plantillaBase'] ?? '')),
+    'rid_ia'                    => trim((string)($_POST['rid_ia'] ?? '')),
+    'rid_revision'              => trim((string)($_POST['rid_revision'] ?? '')),
+    'audio_tmp'                 => trim((string)($_POST['audio_tmp'] ?? '')),
 ];
 
 $payloadJson = json_encode($payload, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);

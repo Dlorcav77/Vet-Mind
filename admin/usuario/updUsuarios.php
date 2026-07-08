@@ -1,4 +1,5 @@
 <?php
+//admin/usuario/updUsuarios.php
 require_once("../config.php");
 
 $mysqli = conn();

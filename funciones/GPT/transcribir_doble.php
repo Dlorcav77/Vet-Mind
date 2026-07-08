@@ -12,6 +12,8 @@ date_default_timezone_set('America/Santiago');
 $ROOT_DIR = dirname(__DIR__, 2);
 require_once($ROOT_DIR . "/configP.php");
 require_once(__DIR__ . "/lib/stt_validador.php");
+require_once($ROOT_DIR . "/funciones/conn/conn.php");
+require_once(__DIR__ . "/lib/stt_store.php");
 
 session_start();
 
@@ -143,6 +145,8 @@ $okA = is_array($jA) && ($jA['status'] ?? '') === 'success';
 $okB = is_array($jB) && ($jB['status'] ?? '') === 'success';
 $textoA = $okA ? trim((string)$jA['texto']) : '';
 $textoB = $okB ? trim((string)$jB['texto']) : '';
+$durA   = $okA ? (float)($jA['duracion_seg'] ?? 0) : 0.0;
+$durB   = $okB ? (float)($jB['duracion_seg'] ?? 0) : 0.0;
 
 // 5) Motor A es obligatorio. Si falla, devolvemos el detalle para diagnosticar.
 if (!$okA || $textoA === '') {
@@ -172,6 +176,23 @@ $sep  = org_procesar($disc, $ORGANOS_LISTA, $CONCEPTOS_LISTA);
 $bloqueRes  = construir_bloque_resueltas($sep['resueltas']);
 $bloqueDisc = construir_bloque_discrepancias($sep['a_ia']);
 $textoDoble = $bloqueRes . $bloqueDisc;
+
+// Guardar transcripción en BD (ia_transcripciones).
+$mysqliStt = conn();
+stt_guardar_transcripcion($mysqliStt, [
+    'audio_tmp'       => $audioTmp,
+    'motor_a'         => MOTOR_A,
+    'motor_b'         => MOTOR_B,
+    'texto_a'         => $textoA,
+    'texto_b'         => $textoB,
+    'texto_doble'     => $textoDoble,
+    'discrepancias'   => $sep['a_ia'],
+    'duracion_seg_a'  => $durA,
+    'duracion_seg_b'  => $durB,
+]);
+if ($mysqliStt instanceof mysqli) {
+    @$mysqliStt->close();
+}
 
 echo json_encode([
     'status'        => 'success',

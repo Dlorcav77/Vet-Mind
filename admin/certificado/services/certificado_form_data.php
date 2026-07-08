@@ -19,7 +19,10 @@ if (!function_exists('certificado_get_form_data')) {
             'motivo'                    => '',
             'medico_solicitante'        => '',
             'recinto'                   => '',
-            'configuracion_informe_id'  => ''
+            'configuracion_informe_id'  => '',
+            'rid_ia'                    => '',
+            'rid_revision'              => '',
+            'audio_tmp'                 => ''
         ];
 
         $imagenesGuardadas = [];
@@ -172,6 +175,16 @@ if (!function_exists('certificado_get_form_data')) {
                             $payload['manual_data'],
                             JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES
                         );
+                    }
+
+                    if (array_key_exists('rid_ia', $payload)) {
+                        $fila['rid_ia'] = (string)$payload['rid_ia'];
+                    }
+                    if (array_key_exists('rid_revision', $payload)) {
+                        $fila['rid_revision'] = (string)$payload['rid_revision'];
+                    }
+                    if (array_key_exists('audio_tmp', $payload)) {
+                        $fila['audio_tmp'] = (string)$payload['audio_tmp'];
                     }
 
                     $modo_ingreso_contenido_inicial = (!empty($payload['toggle_audio_manual']) && (int)$payload['toggle_audio_manual'] === 1)

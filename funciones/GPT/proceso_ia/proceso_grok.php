@@ -1,9 +1,9 @@
 <?php
-// funciones/GPT/proceso_grok.php
+// funciones/GPT/proceso_ia/proceso_grok.php
 declare(strict_types=1);
 
 if (!defined('GPT_SNAPSHOT')) {
-    define('GPT_SNAPSHOT', 1);
+    define('GPT_SNAPSHOT', 0);
 }
 
 // rutas base
@@ -18,6 +18,7 @@ require_once($FUNC_DIR . "/logs/logger.php");
 // helpers
 require_once($GPT_DIR . "/lib/gpt_prompt.php");
 require_once($GPT_DIR . "/lib/gpt_postprocess.php");
+require_once($GPT_DIR . "/lib/ia_store.php");
 
 date_default_timezone_set('America/Santiago');
 
@@ -248,6 +249,24 @@ app_log('response', [
     'total_tokens'      => $total_tokens,
     'cost_usd'          => $cost_usd,
 ], 'INFO');
+
+// guardar request en BD (ia_requests)
+ia_guardar_request($mysqli, [
+    'rid'               => $rid,
+    'tipo'              => 'informe',
+    'plantilla_id'      => $plantilla_id,
+    'provider'          => 'grok',
+    'model'             => GROK_MODEL,
+    'input'             => $input,
+    'system'            => $system,
+    'prompt'            => $prompt,
+    'content_final'     => $content,
+    'prompt_tokens'     => $prompt_tokens,
+    'completion_tokens' => $completion_tokens,
+    'total_tokens'      => $total_tokens,
+    'cost_usd'          => $cost_usd,
+    'datetime_ia'       => date('c'),
+]);
 
 // snapshot sencillo
 if (GPT_SNAPSHOT === 1) {

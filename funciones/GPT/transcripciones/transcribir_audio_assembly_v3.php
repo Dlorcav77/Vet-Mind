@@ -245,6 +245,7 @@ if ($httpCode >= 400 || !isset($transcriptionData['id'])) {
 
 $transcriptionId = $transcriptionData['id'];
 $text = '';
+$duracion_seg = 0.0;
 $delays = [2, 3, 5, 8, 8, 8, 8];
 
 foreach ($delays as $wait) {
@@ -267,6 +268,7 @@ foreach ($delays as $wait) {
 
     if ($statusData['status'] === 'completed') {
         $text = trim((string)$statusData['text']);
+        $duracion_seg = (float)($statusData['audio_duration'] ?? 0);
         break;
     }
 
@@ -291,6 +293,7 @@ if ($text === '') {
 echo json_encode([
     'status' => 'success',
     'texto' => $text,
+    'duracion_seg' => $duracion_seg,
     'audio_tmp' => $audioTmpRespuesta
 ], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
 exit;

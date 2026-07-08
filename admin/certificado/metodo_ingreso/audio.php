@@ -6,7 +6,7 @@
  */
 ?>
 <div id="bloque-audio" class="col-12" style="<?= $isManualInitial ? 'display:none;' : '' ?>">
-    <input type="hidden" name="audio_tmp" id="audio_tmp" value="">
+    <input type="hidden" name="audio_tmp" id="audio_tmp" value="<?= htmlspecialchars($fila['audio_tmp'] ?? '') ?>">
     <div class="card card-audio-dark border-0 shadow-lg rounded-4 p-1 audio-center-wrap mx-auto">
         <ul class="nav nav-pills audio-tabs-custom mb-0 gap-1" id="audioTab" role="tablist">
             <li class="nav-item" role="presentation">

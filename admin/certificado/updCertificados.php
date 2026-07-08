@@ -4,6 +4,8 @@
 require_once("../config.php");
 require_once("../../vendor/autoload.php");
 require_once(__DIR__ . "/pdf/funcionesCertificado.php");
+require_once(__DIR__ . "/../../funciones/GPT/lib/ia_store.php");
+require_once(__DIR__ . "/../../funciones/GPT/lib/stt_store.php");
 
 use Dompdf\Dompdf;
 
@@ -811,6 +813,18 @@ if ($stmt->execute()) {
     $audioResultado = null;
 
     if ($certId > 0) {
+        $rid_ia = trim((string)($_POST['rid_ia'] ?? ''));
+        if ($rid_ia !== '') {
+            ia_link_certificado($mysqli, $rid_ia, $certId);
+        }
+
+        $rid_revision = trim((string)($_POST['rid_revision'] ?? ''));
+        if ($rid_revision !== '') {
+            ia_link_certificado($mysqli, $rid_revision, $certId);
+        }
+        if ($audio_tmp !== '') {
+            stt_link_certificado($mysqli, $audio_tmp, $certId);
+        }
         if ($borrador_id > 0) {
             $stmtBorrador = $mysqli->prepare("
                 UPDATE certificados_borradores

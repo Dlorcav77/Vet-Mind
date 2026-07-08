@@ -79,6 +79,7 @@ function ejecutarRevisor(dictado, informeHtml, plantillaBase) {
             $panel.html('<div style="padding:12px 14px;background:#fef2f2;color:#991b1b">⚠ Revisor: ' + $('<div>').text(msg).html() + '</div>');
             return;
         }
+        if (resp.rid) { $('#rid_revision').val(resp.rid); }
         const items = Array.isArray(resp.items) ? resp.items : [];
         if (items.length === 0) {
             $panel.html('<div style="padding:12px 14px;background:#ecfdf5;color:#065f46">✓ El revisor no encontró inconsistencias entre el dictado y el informe.</div>');
@@ -228,6 +229,7 @@ function procesarTextoConGPT(texto) {
             Swal.close();
 
             if (response.status === 'success') {
+                if (response.rid) { $('#rid_ia').val(response.rid); }
                 mostrarModalIA(response.content);
                 resolve(response);
             } else if (response.status === 'dry_run') {
@@ -370,6 +372,7 @@ $('#procesarIA').on('click', function () {
         Swal.close();
 
         if (respGPT.status === 'success') {
+            if (respGPT.rid) { $('#rid_ia').val(respGPT.rid); }
             const informeResaltado = resaltarDiscrepancias(respGPT.content, window.__ultimasDiscrepancias || []);
             mostrarModalIA(informeResaltado);
             // Revisor: usa el informe ORIGINAL (sin el resaltado), para no confundirlo.

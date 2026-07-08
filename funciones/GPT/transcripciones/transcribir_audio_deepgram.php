@@ -127,9 +127,12 @@ function gpt_deepgram_arreglar_decimales(string $texto): string
     $texto = preg_replace('/\bure\s+terno\s+visible\b/iu', 'uréter no visible', $texto);
     // Variante "u eterno visible": Deepgram parte "uréter no" en "u" + "eterno".
     $texto = preg_replace('/\bu\s+eterno\s+visible\b/iu', 'uréter no visible', $texto);
-    // Variantes donde Deepgram funde "uréter no" perdiendo el "no":
+    // Variante "ure termo visible": Deepgram transcribe "uréter no" como "ure termo".
+    $texto = preg_replace('/\bure\s+termo\s+visible\b/iu', 'uréter no visible', $texto);
+// Variantes donde Deepgram funde "uréter no" perdiendo el "no":
     // "ureterno", "uretano", "ureternovisible" (todo pegado) -> reconstruir con el "no".
     $texto = preg_replace('/\bureterno\s+visible\b/iu', 'uréter no visible', $texto);
+    $texto = preg_replace('/\buréterno\s+visible\b/iu', 'uréter no visible', $texto);
     $texto = preg_replace('/\buretano\s+visible\b/iu', 'uréter no visible', $texto);
     $texto = preg_replace('/\bureternovisible\b/iu', 'uréter no visible', $texto);
 
@@ -242,8 +245,10 @@ if ($curlErr !== '' || $httpCode >= 400) {
 
 $data = json_decode((string)$resp, true);
 $text = '';
+$duracion_seg = 0.0;
 if (is_array($data)) {
     $text = trim((string)($data['results']['channels'][0]['alternatives'][0]['transcript'] ?? ''));
+    $duracion_seg = (float)($data['metadata']['duration'] ?? 0);
 }
 
 // Blindaje de números: Deepgram a veces parte los decimales ("0 28" en vez de "0.28").
@@ -263,6 +268,7 @@ if ($text === '') {
 echo json_encode([
     'status' => 'success',
     'texto' => $text,
+    'duracion_seg' => $duracion_seg,
     'audio_tmp' => $audioTmpRespuesta
 ], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
 exit;

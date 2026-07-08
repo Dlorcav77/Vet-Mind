@@ -1,4 +1,5 @@
 <?php
+//admin/usuario/lisUsuarios.php
 ###########################################
 require_once("../config.php");
 credenciales('usuario', 'listar');
@@ -81,8 +82,9 @@ $res = $stmt->get_result();
                 $email      = $fila['email'];
                 $telefono   = $fila['telefono'];
                 $estado     = $fila['estado'];
-                // $cargo      = $fila['cargo'] ?? 'Sin ingresar';
-                // $razon_social = $fila['razon_social'] ?? 'Sin ingresar';
+                $cargo      = $fila['cargo'] ?? 'Sin ingresar';
+                $razon_social = $fila['razon_social'] ?? 'Sin ingresar';
+                
                 ?>
                 <tr>
                   <td><?php print "$i"?></td>
