@@ -125,9 +125,9 @@ $logo_sizes_clinica = [
 $logo_config_clinica = $logo_sizes_clinica[$logo_size] ?? $logo_sizes_clinica['large'];
 
 $firma_margin_map = [
-    'left'   => '60px auto 0 0',
-    'center' => '60px auto 0 auto',
-    'right'  => '60px 36px 0 auto'
+    'left'   => '72px auto 0 0',
+    'center' => '72px auto 0 auto',
+    'right'  => '72px 36px 0 auto'
 ];
 
 $firma_img_margin_map = [
@@ -373,6 +373,10 @@ $filas_campos_clinica = agruparCamposPdfClinicaPorOrden($campos);
     <meta charset="utf-8">
     <style>
         @page {
+            margin: 24px 0 0 0;
+        }
+
+        @page :first {
             margin: 0;
         }
 
@@ -662,14 +666,16 @@ $filas_campos_clinica = agruparCamposPdfClinicaPorOrden($campos);
             width: 290px;
             margin: <?= $firma_margin ?>;
             text-align: <?= htmlspecialchars($firma_align) ?>;
-            font-size: 14px;
+            font-size: 16px;
             line-height: 1.35;
             color: #000000;
             page-break-inside: avoid;
         }
 
         .firma-saludo {
-            margin-bottom: 18px;
+            margin-bottom: 24px;
+            font-size: 20px;
+            font-weight: 600;
         }
 
         .firma-img {
@@ -898,7 +904,7 @@ $filas_campos_clinica = agruparCamposPdfClinicaPorOrden($campos);
         </div>
 
         <div class="firma-box">
-            <div class="firma-saludo">Saluda atentamente a usted.</div>
+            <div class="firma-saludo">Atentamente,</div>
 
             <?php if ($firma_src): ?>
                 <img src="<?= $firma_src ?>" alt="Firma" class="firma-img">

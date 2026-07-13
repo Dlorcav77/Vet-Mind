@@ -253,6 +253,7 @@ app_log('response', [
 // guardar request en BD (ia_requests)
 ia_guardar_request($mysqli, [
     'rid'               => $rid,
+    'flujo_id'          => (string)($input['flujo_id'] ?? $_POST['flujo_id'] ?? ''),
     'tipo'              => 'informe',
     'plantilla_id'      => $plantilla_id,
     'provider'          => 'grok',

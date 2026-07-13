@@ -1,4 +1,63 @@
 //admin/certificado/metodo_ingreso/js/ia.js
+function calcularEdadTexto(fechaNacimiento) {
+    if (!fechaNacimiento) {
+        return '';
+    }
+
+    const fecha = new Date(fechaNacimiento + 'T00:00:00');
+    if (isNaN(fecha.getTime())) {
+        return '';
+    }
+
+    const hoy = new Date();
+
+    let anios = hoy.getFullYear() - fecha.getFullYear();
+    let meses = hoy.getMonth() - fecha.getMonth();
+    let dias = hoy.getDate() - fecha.getDate();
+
+    if (dias < 0) {
+        meses--;
+        const mesAnterior = new Date(hoy.getFullYear(), hoy.getMonth(), 0);
+        dias += mesAnterior.getDate();
+    }
+
+    if (meses < 0) {
+        anios--;
+        meses += 12;
+    }
+
+    if (anios > 0) {
+        return meses > 0 ? anios + ' años ' + meses + ' meses' : anios + ' años';
+    }
+
+    if (meses > 0) {
+        return meses + ' meses';
+    }
+
+    return dias + ' días';
+}
+
+function leerSelectTextoOValor(selector) {
+    const $el = $(selector);
+
+    if (!$el.length) {
+        return '';
+    }
+
+    if ($el.is('select')) {
+        const txt = ($el.find('option:selected').text() || '').trim();
+        const val = ($el.val() || '').toString().trim();
+
+        if (txt !== '' && txt.toLowerCase() !== 'seleccione') {
+            return txt;
+        }
+
+        return val;
+    }
+
+    return ($el.val() || '').toString().trim();
+}
+
 function obtenerDatosPaciente() {
     const esManual = $('#toggle_manual').prop('checked');
     const datos = {};
@@ -10,7 +69,7 @@ function obtenerDatosPaciente() {
             return '';
         }
 
-        return ($el.val() || '').trim();
+        return ($el.val() || '').toString().trim();
     };
 
     const agregarSiExiste = function (key, value) {
@@ -27,22 +86,30 @@ function obtenerDatosPaciente() {
             agregarSiExiste(nombre, $(this).val());
         });
 
-        agregarSiExiste('raza', leerValor('#manual_raza'));
-        agregarSiExiste('sexo', leerValor('#manual_sexo'));
+        const fechaNacimientoManual = leerValor('#manual_fecha_nacimiento');
+        const edadManual = calcularEdadTexto(fechaNacimientoManual);
+
+        agregarSiExiste('raza', leerSelectTextoOValor('#manual_raza'));
+        agregarSiExiste('sexo', leerSelectTextoOValor('#manual_sexo'));
         agregarSiExiste('paciente', leerValor('#manual_paciente'));
-        agregarSiExiste('especie', leerValor('#manual_especie'));
-        agregarSiExiste('fecha_nacimiento', leerValor('#manual_fecha_nacimiento'));
+        agregarSiExiste('especie', leerSelectTextoOValor('#manual_especie'));
+        agregarSiExiste('fecha_nacimiento', fechaNacimientoManual);
+        agregarSiExiste('edad', edadManual);
         agregarSiExiste('propietario', leerValor('#manual_propietario'));
         agregarSiExiste('codigo_paciente', leerValor('#manual_codigo_paciente'));
         agregarSiExiste('n_chip', leerValor('#manual_n_chip'));
     } else {
         const $paciente = $('#paciente_seleccionado');
 
+        const fechaNacimiento = ($paciente.data('fecha_nacimiento') || '').toString().trim();
+        const edadData = ($paciente.data('edad') || '').toString().trim();
+        const edadCalculada = edadData !== '' ? edadData : calcularEdadTexto(fechaNacimiento);
+
         agregarSiExiste('paciente', $paciente.val());
         agregarSiExiste('especie', $paciente.data('especie'));
         agregarSiExiste('raza', $paciente.data('raza'));
-        agregarSiExiste('edad', $paciente.data('edad'));
-        agregarSiExiste('fecha_nacimiento', $paciente.data('fecha_nacimiento'));
+        agregarSiExiste('edad', edadCalculada);
+        agregarSiExiste('fecha_nacimiento', fechaNacimiento);
         agregarSiExiste('sexo', $paciente.data('sexo'));
     }
 
@@ -62,13 +129,37 @@ function obtenerDatosPaciente() {
     return datos;
 }
 
+function generarFlujoIdIA() {
+    const ahora = new Date();
+    const yyyy = ahora.getFullYear();
+    const mm = String(ahora.getMonth() + 1).padStart(2, '0');
+    const dd = String(ahora.getDate()).padStart(2, '0');
+    const hh = String(ahora.getHours()).padStart(2, '0');
+    const mi = String(ahora.getMinutes()).padStart(2, '0');
+    const ss = String(ahora.getSeconds()).padStart(2, '0');
+    const rnd = Math.random().toString(16).slice(2, 10);
+
+    return 'ia_' + yyyy + mm + dd + '_' + hh + mi + ss + '_' + rnd;
+}
+
+function obtenerFlujoIdIA(nuevo) {
+    if (nuevo || !window.__flujoIdIA) {
+        window.__flujoIdIA = generarFlujoIdIA();
+    }
+
+    return window.__flujoIdIA;
+}
+
 // Llama a la IA revisora y pinta el panel (no editable) arriba del informe.
 // Llama a la IA revisora y pinta el panel (no editable) arriba del informe.
 function ejecutarRevisor(dictado, informeHtml, plantillaBase) {
     const $panel = $('#revisor-panel');
+    const flujoId = obtenerFlujoIdIA(false);
+
     $panel.html('<div style="padding:12px 14px;color:#64748b">Revisando informe…</div>').show();
 
     return $.post('/funciones/GPT/proceso_ia/proceso_revisor.php', {
+        flujo_id: flujoId,
         dictado: dictado,
         informe: informeHtml,
         plantilla: plantillaBase
@@ -220,7 +311,10 @@ function procesarTextoConGPT(texto) {
         let plantillaId = $('select[name="plantilla_informe_id"]').val();
         let pacienteData = obtenerDatosPaciente();
 
+        const flujoId = obtenerFlujoIdIA(true);
+
         $.post('/funciones/GPT/proceso_gpt.php', {
+            flujo_id: flujoId,
             texto: texto,
             plantilla_base: plantillaBase,
             plantilla_id: plantillaId,
@@ -343,6 +437,12 @@ $('#procesarIA').on('click', function () {
             $('#bloque-audio').data('audioFilename', resp.audio_tmp.split('/').pop());
         }
 
+        if (resp.flujo_id) {
+            window.__flujoIdIA = resp.flujo_id;
+        } else {
+            obtenerFlujoIdIA(true);
+        }
+
         const textoTranscrito = ((resp.texto || '') + (resp.texto_doble || '')).trim();
         if (!textoTranscrito) {
             throw new Error('La transcripción volvió vacía.');
@@ -362,6 +462,7 @@ $('#procesarIA').on('click', function () {
         let plantillaId = $('select[name="plantilla_informe_id"]').val();
 
         return $.post('/funciones/GPT/proceso_gpt.php', {
+            flujo_id: obtenerFlujoIdIA(false),
             texto: textoTranscrito,
             plantilla_base: plantillaBase,
             plantilla_id: plantillaId,

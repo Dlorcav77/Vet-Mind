@@ -1,4 +1,6 @@
 <?php
+//funciones/GPT/lib/stt_store.php
+
 declare(strict_types=1);
 
 /**
@@ -44,6 +46,8 @@ function stt_guardar_transcripcion(mysqli $mysqli, array $d): int
         return 0;
     }
 
+    $flujo_id = trim((string)($d['flujo_id'] ?? ''));
+
     $motor_a = (string)($d['motor_a'] ?? '');
     $motor_b = (string)($d['motor_b'] ?? '');
     $texto_a = (string)($d['texto_a'] ?? '');
@@ -61,12 +65,14 @@ function stt_guardar_transcripcion(mysqli $mysqli, array $d): int
     $cost_b = stt_costo_por_motor($mysqli, $motor_b, $dur_b);
     $cost_total = round($cost_a + $cost_b, 6);
 
-    $created = date('Y-m-d H:i:s'); // PHP en America/Santiago
+    $created = date('Y-m-d H:i:s');
+
+    $flujo_bind = $flujo_id !== '' ? $flujo_id : null;
 
     $sql = 'INSERT INTO ia_transcripciones
-        (audio_tmp, certificado_id, motor_a, motor_b, texto_a, texto_b, texto_doble,
+        (audio_tmp, certificado_id, flujo_id, motor_a, motor_b, texto_a, texto_b, texto_doble,
          discrepancias_json, duracion_seg_a, duracion_seg_b, cost_a, cost_b, cost_total, created_at)
-        VALUES (?, NULL, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)';
+        VALUES (?, NULL, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)';
 
     $stmt = $mysqli->prepare($sql);
     if (!$stmt) {
@@ -74,8 +80,9 @@ function stt_guardar_transcripcion(mysqli $mysqli, array $d): int
     }
 
     $stmt->bind_param(
-        'sssssssddddds',
+        'ssssssssddddds',
         $audio_tmp,
+        $flujo_bind,
         $motor_a,
         $motor_b,
         $texto_a,

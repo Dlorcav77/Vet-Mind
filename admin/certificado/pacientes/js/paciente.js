@@ -162,14 +162,14 @@ function abrirModalBuscarPaciente(triggerEl = null) {
   $('#modalBuscarPaciente').modal('show');
 }
 
-function seleccionarPaciente(id, mascota, tutor, especie, raza, edad, sexo) {
+function seleccionarPaciente(id, mascota, tutor, especie, raza, edad, sexo, fecha_nacimiento) {
   $('#paciente_id').val(id);
   $('#paciente_seleccionado')
     .val(`${mascota}, ${especie}, ${raza} - Tutor: ${tutor}`)
     .data('especie', especie)
     .data('raza', raza)
     .data('edad', edad)
-    .data('fecha_nacimiento', edad)
+    .data('fecha_nacimiento', fecha_nacimiento || '')
     .data('sexo', sexo);
 
   const inputFueraModal = document.getElementById('paciente_seleccionado');

@@ -148,6 +148,8 @@ $textoB = $okB ? trim((string)$jB['texto']) : '';
 $durA   = $okA ? (float)($jA['duracion_seg'] ?? 0) : 0.0;
 $durB   = $okB ? (float)($jB['duracion_seg'] ?? 0) : 0.0;
 
+$flujoId = 'ia_' . date('Ymd_His') . '_' . bin2hex(random_bytes(4));
+
 // 5) Motor A es obligatorio. Si falla, devolvemos el detalle para diagnosticar.
 if (!$okA || $textoA === '') {
     echo json_encode([
@@ -160,11 +162,30 @@ if (!$okA || $textoA === '') {
 
 // 6) Si B falló, devolvemos A solo (sin comparación), con aviso.
 if (!$okB || $textoB === '') {
+    $mysqliStt = conn();
+    stt_guardar_transcripcion($mysqliStt, [
+        'flujo_id'       => $flujoId,
+        'audio_tmp'      => $audioTmp,
+        'motor_a'        => MOTOR_A,
+        'motor_b'        => MOTOR_B,
+        'texto_a'        => $textoA,
+        'texto_b'        => '',
+        'texto_doble'    => '',
+        'discrepancias'  => [],
+        'duracion_seg_a' => $durA,
+        'duracion_seg_b' => 0,
+    ]);
+
+    if ($mysqliStt instanceof mysqli) {
+        @$mysqliStt->close();
+    }
+
     echo json_encode([
         'status'      => 'success',
         'texto'       => $textoA,
         'texto_doble' => '',
         'audio_tmp'   => $audioTmp,
+        'flujo_id'    => $flujoId,
         'aviso'       => 'El segundo motor no respondió; se usó solo el motor A sin comparación.',
     ], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
     exit;
@@ -180,6 +201,7 @@ $textoDoble = $bloqueRes . $bloqueDisc;
 // Guardar transcripción en BD (ia_transcripciones).
 $mysqliStt = conn();
 stt_guardar_transcripcion($mysqliStt, [
+    'flujo_id'        => $flujoId,
     'audio_tmp'       => $audioTmp,
     'motor_a'         => MOTOR_A,
     'motor_b'         => MOTOR_B,
@@ -199,6 +221,7 @@ echo json_encode([
     'texto'         => $textoA,
     'texto_doble'   => $textoDoble,
     'audio_tmp'     => $audioTmp,
+    'flujo_id'      => $flujoId,
     'resueltas'     => $sep['resueltas'],
     'discrepancias' => $sep['a_ia'],
 ], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);

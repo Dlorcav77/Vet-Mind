@@ -1,4 +1,6 @@
 <?php
+//funciones/GPT/lib/ia_store.php
+
 declare(strict_types=1);
 date_default_timezone_set('America/Santiago');
 /**
@@ -10,6 +12,7 @@ function ia_guardar_request(mysqli $mysqli, array $d): int
 {
     $rid          = (string)($d['rid'] ?? '');
     $tipo         = (string)($d['tipo'] ?? 'informe');
+    $flujo_id     = trim((string)($d['flujo_id'] ?? ''));
     $plantilla_id = isset($d['plantilla_id']) ? (int)$d['plantilla_id'] : null;
     $provider     = (string)($d['provider'] ?? '');
     $model        = (string)($d['model'] ?? '');
@@ -35,16 +38,17 @@ function ia_guardar_request(mysqli $mysqli, array $d): int
         }
     }
 
+    $flujo_bind = $flujo_id !== '' ? $flujo_id : null;
     $plantilla_bind = ($plantilla_id !== null && $plantilla_id > 0) ? $plantilla_id : null;
 
-    $created = date('Y-m-d H:i:s'); // PHP ya está en America/Santiago
+    $created = date('Y-m-d H:i:s');
 
     $sql = 'INSERT INTO ia_requests
-        (rid, tipo, certificado_id, plantilla_id, provider, model,
-         input_json, system_text, prompt_text, content_final,
-         system_hash, prompt_hash,
-         prompt_tokens, completion_tokens, total_tokens, cost_usd, datetime_ia, created_at)
-        VALUES (?, ?, NULL, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)';
+        (rid, tipo, certificado_id, flujo_id, plantilla_id, provider, model,
+            input_json, system_text, prompt_text, content_final,
+            system_hash, prompt_hash,
+            prompt_tokens, completion_tokens, total_tokens, cost_usd, datetime_ia, created_at)
+        VALUES (?, ?, NULL, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)';
 
     $stmt = $mysqli->prepare($sql);
     if (!$stmt) {
@@ -52,9 +56,10 @@ function ia_guardar_request(mysqli $mysqli, array $d): int
     }
 
     $stmt->bind_param(
-        'ssissssssssiiidss',
+        'sssissssssssiiidss',
         $rid,
         $tipo,
+        $flujo_bind,
         $plantilla_bind,
         $provider,
         $model,

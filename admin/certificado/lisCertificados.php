@@ -28,7 +28,7 @@ $sel = "SELECT
       LEFT JOIN tutores t ON p.tutor_id = t.id
       LEFT JOIN plantilla_informe pi ON c.tipo_estudio = pi.id
       WHERE c.veterinario_id = ?
-      ORDER BY c.created_at DESC
+      ORDER BY c.fecha_examen DESC
       ";
 
 $stmt = $mysqli->prepare($sel);

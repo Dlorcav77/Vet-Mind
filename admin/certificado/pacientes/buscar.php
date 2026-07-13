@@ -102,7 +102,8 @@ while ($row = $res->fetch_assoc()) {
                     . addslashes($row['especie'] ?? '') . '\', \''
                     . addslashes($row['raza'] ?? '') . '\', \''
                     . addslashes($edad ?? '') . '\', \''
-                    . addslashes($row['sexo'] ?? '') . '\'
+                    . addslashes($row['sexo'] ?? '') . '\', \''
+                    . addslashes($row['fecha_nacimiento'] ?? '') . '\'
                 )">
                 Seleccionar
             </button>

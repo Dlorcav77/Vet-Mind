@@ -205,9 +205,18 @@ if ($cost <= 0) {
 $tt = (int)($usage['total_tokens'] ?? ($pt + $ct));
 $usageOut = ['prompt_tokens'=>$pt,'completion_tokens'=>$ct,'cost_usd'=>$cost,'ms'=>$ms];
 
+$flujoIdRevision = '';
+if (isset($input) && is_array($input)) {
+    $flujoIdRevision = (string)($input['flujo_id'] ?? '');
+}
+if ($flujoIdRevision === '') {
+    $flujoIdRevision = (string)($_POST['flujo_id'] ?? $_GET['flujo_id'] ?? '');
+}
+
 // guardar request en BD (ia_requests)
 ia_guardar_request($mysqli, [
     'rid'               => $rid,
+    'flujo_id'          => $flujoIdRevision,
     'tipo'              => 'revision',
     'plantilla_id'      => null,
     'provider'          => 'grok',
