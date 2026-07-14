@@ -117,7 +117,13 @@ function gpt_build_prompt(mysqli $mysqli, array $input): array
       3. PARTE DE LA PLANTILLA, NO REESCRIBAS NI PIERDAS ÓRGANOS. Para cada órgano arranca de la frase completa de la PLANTILLA y cambia SOLO el atributo que el DICTADO contradiga. No acortes ni reescribas el órgano desde cero. Lo que el DICTADO no menciona, queda como en la PLANTILLA (estado normal). NUNCA elimines ni omitas un órgano que está en la PLANTILLA: el informe final debe contener TODOS los órganos/secciones de la PLANTILLA, más los que el DICTADO agregue. Si un órgano de la PLANTILLA no se dictó, va igual en estado normal.
         - HÍGADO Y BORDES: en la PLANTILLA, los bordes del hígado se describen en el "lóbulo lateral izquierdo" (ej. "lóbulo lateral izquierdo aguzado"). Cuando el DICTADO dice "hígado bordes redondeados" (o cualquier estado de bordes), ese valor REEMPLAZA el del lóbulo lateral izquierdo: escribe "lóbulo lateral izquierdo redondeado", NO dejes "aguzado". NUNCA pongas los dos estados de bordes a la vez (no escribas "lóbulo lateral izquierdo aguzado ... bordes redondeados"): es contradictorio. El estado de bordes del hígado debe quedar UNO solo, el del DICTADO.
         - "SIN LESIONES FOCALES" Y LESIONES DICTADAS: si la PLANTILLA trae "Sin lesiones focales" en un órgano (hígado, bazo, riñón, etc.) y el DICTADO describe en ESE órgano una lesión, estructura, nódulo, masa o imagen focal (con o sin medida), ELIMINA la frase "Sin lesiones focales": es contradictoria con lo dictado. Deja solo la descripción de la(s) lesión(es) dictada(s). NUNCA dejes "Sin lesiones focales" junto a una lesión descrita en el mismo órgano.
-      4. FIDELIDAD SOBRE LIMPIEZA. Mejor un término feo pero visible y marcado, que un dato bonito pero silenciosamente equivocado.
+      4. COHERENCIA HOMOGÉNEO/HETEROGÉNEO (error frecuente; revísalo siempre). "Homogéneo" y "anecoico homogéneo" de la PLANTILLA describen un órgano/contenido SIN hallazgos. Si el DICTADO describe en ese mismo órgano cualquier estructura, lesión, nódulo, masa, cálculo, urolito, sedimento, barro biliar, contenido particulado o imagen focal, ese descriptor de la PLANTILLA es CONTRADICTORIO y DEBE cambiar:
+        - PARÉNQUIMA (bazo, hígado, riñón, páncreas, próstata, etc.): si el DICTADO describe una o más estructuras/lesiones/nódulos/masas en ese órgano, el parénquima pasa a "heterogéneo". NUNCA dejes "parénquima homogéneo" junto a una estructura descrita en el mismo órgano.
+        - CONTENIDO (vesícula biliar, vejiga urinaria, estómago, etc.): si el DICTADO describe barro biliar, sedimento, cálculos, estructuras hiperecoicas, sombra acústica o cualquier material dentro del lumen, ELIMINA "homogéneo" del contenido. Escribe "contenido anecoico" (sin "homogéneo") más la descripción del hallazgo. NUNCA dejes "contenido anecoico homogéneo" junto a barro biliar, sedimento o cálculos en el mismo órgano.
+        - Esto NO requiere que el DICTADO diga la palabra "heterogéneo": la sola presencia del hallazgo obliga el cambio.
+        - Si el DICTADO SÍ dice explícitamente "homogéneo" para ese órgano y a la vez describe un hallazgo focal, conserva ambos y marca flag incongruencia.
+        - No apliques esta regla a órganos donde el DICTADO no describió ningún hallazgo: ahí "homogéneo" de la PLANTILLA se conserva.
+      5. FIDELIDAD SOBRE LIMPIEZA. Mejor un término feo pero visible y marcado, que un dato bonito pero silenciosamente equivocado.
 
       === SALIDA HTML ===
       - Devuelve SOLO el fragmento HTML del informe. Sin <html>, <head>, <body>, sin Markdown, sin fences, sin <style>, sin CSS ni JS.
@@ -187,9 +193,10 @@ function gpt_build_prompt(mysqli $mysqli, array $input): array
 
       === VALIDACIÓN FINAL (antes de responder) ===
       1. Recorre órgano por órgano comparando con el DICTADO: (a) ¿algún atributo que el DICTADO marcó alterado quedó como normal/conservado de la plantilla? (b) ¿algún atributo (bordes, ecogenicidad, forma) quedó con el valor de la PLANTILLA en vez del que dio el DICTADO? (c) ¿el uréter quedó "no visible" cuando el DICTADO decía distendido/visible/con medida? Si encuentras cualquiera, corrígelo (regla de oro 2).      
-      2. ¿Están TODOS los órganos/secciones de la PLANTILLA en el informe (ninguno omitido)? ¿El reproductivo hembra, próstata, testículos o íleon quedaron en su posición anatómica y no en HALLAZGOS ADICIONALES?
-      3. ¿Cada flag del cuerpo tiene su línea en Observaciones con el mismo número y tipo? Si falta alguna, agrégala.
-      4. ¿Conservaste términos dudosos con flag en vez de adivinarlos?
+      2. ¿Quedó "homogéneo" o "anecoico homogéneo" en algún órgano donde el DICTADO describió estructuras, lesiones, cálculos, sedimento o barro biliar? Si sí, corrígelo (regla de oro 4): parénquima → "heterogéneo"; contenido → elimina "homogéneo".
+      3. ¿Están TODOS los órganos/secciones de la PLANTILLA en el informe (ninguno omitido)? ¿El reproductivo hembra, próstata, testículos o íleon quedaron en su posición anatómica y no en HALLAZGOS ADICIONALES?
+      4. ¿Cada flag del cuerpo tiene su línea en Observaciones con el mismo número y tipo? Si falta alguna, agrégala.
+      5. ¿Conservaste términos dudosos con flag en vez de adivinarlos?
       No finalices si alguna de estas falla.
     SYS;
 

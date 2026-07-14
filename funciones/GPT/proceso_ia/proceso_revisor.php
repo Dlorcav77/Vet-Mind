@@ -122,6 +122,23 @@ Casos a reportar:
    parrafo de Yeyuno -> organo_omitido, severidad alta. Presta atencion a organos digestivos que a veces
    se pierden (Yeyuno, Ileon, Ciego, Duodeno). En "dictado" pon lo que dijo el dictado del organo; en
    "informe" indica que el organo no aparece; en "detalle" pide agregarlo.
+10. incoherencia_homogeneo (revisar SIEMPRE): el INFORME describe un organo con estructuras, lesiones,
+    nodulos, masas, calculos, urolitos, sedimento, barro biliar, contenido particulado o imagenes focales,
+    pero al mismo tiempo mantiene el descriptor "homogeneo" de la PLANTILLA. Es contradictorio.
+    - PARENQUIMA (bazo, higado, riñon, pancreas, prostata, etc.): si hay una estructura/lesion descrita en
+      ese organo, el parenquima NO puede quedar "homogeneo"; debe ser "heterogeneo".
+      Ejemplo: informe "Bazo ... parenquima homogeneo ... con visualizacion de una estructura redonda
+      hiperecoica de 0.27 por 0.32 cm" -> incoherencia_homogeneo. Alta.
+    - CONTENIDO (vesicula biliar, vejiga urinaria, estomago, etc.): si hay barro biliar, sedimento, calculos
+      o estructuras hiperecoicas en el lumen, el contenido NO puede quedar "anecoico homogeneo"; debe decir
+      solo "anecoico" mas la descripcion del hallazgo.
+      Ejemplo: informe "Vesicula biliar ... contenido anecoico homogeneo, con barro biliar moderado"
+      -> incoherencia_homogeneo. Alta.
+    - Tambien aplica al reves: si el INFORME mantiene "Pared delgada y lisa" o "sin lesiones focales" junto a
+      un hallazgo descrito en el mismo organo.
+    - NO lo marques si el organo no tiene ningun hallazgo descrito: ahi "homogeneo" de la plantilla es correcto.
+    En "informe" cita la frase contradictoria; en "detalle" indica que cambiar (homogeneo -> heterogeneo, o
+    eliminar "homogeneo" del contenido).
 
 NO reportes (no son problemas):
 - Organos o atributos en estado normal que vienen de la PLANTILLA y el dictado no menciono.
@@ -132,7 +149,7 @@ NO reportes (no son problemas):
 Severidad: "alta" si cambia el sentido clinico; "media" si es omision parcial; "baja" si es menor.
 
 Responde EXCLUSIVAMENTE con un objeto JSON, sin texto antes ni despues. Formato exacto:
-{"items":[{"severidad":"alta|media|baja","tipo":"hallazgo_bajado|inventado|cambio_lateralidad|cambio_medida|omitido|discrepancia_negacion|organo_sin_dictado|mismas_caracteristicas_literal|organo_omitido","zona":"organo o zona","dictado":"lo que dice el dictado","informe":"lo que dice el informe","detalle":"que revisar"}]}
+{"items":[{"severidad":"alta|media|baja","tipo":"hallazgo_bajado|inventado|cambio_lateralidad|cambio_medida|omitido|discrepancia_negacion|organo_sin_dictado|mismas_caracteristicas_literal|organo_omitido|incoherencia_homogeneo","zona":"organo o zona","dictado":"lo que dice el dictado","informe":"lo que dice el informe","detalle":"que revisar"}]}
 Si no encuentras problemas, responde exactamente {"items":[]}.
 SYS;
 

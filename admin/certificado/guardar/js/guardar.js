@@ -346,6 +346,14 @@ function updateDraftStatus(text, cls) {
 
     syncConfiguracionInformeId();
 
+    $(document)
+        .off('click.destroyEditorNav', '.ajax-link')
+        .on('click.destroyEditorNav', '.ajax-link', function () {
+            if (window.VetmindTiptap && typeof window.VetmindTiptap.destroyMainEditor === 'function') {
+                window.VetmindTiptap.destroyMainEditor();
+            }
+        });
+
     if (!AUTOSAVE_HABILITADO) {
         $('#draftBadgeStatus').hide();
         return;

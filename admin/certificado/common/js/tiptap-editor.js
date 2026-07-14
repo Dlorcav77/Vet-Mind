@@ -301,10 +301,10 @@ const XxFaltanteMark = Node.create({
   }
 
   function getCurrentFontSize(editor) {
-    if (!editor) return '14px';
+    if (!editor) return '13px';
 
     const attrs = editor.getAttributes('textStyle') || {};
-    return attrs.fontSize || '14px';
+    return attrs.fontSize || '13px';
   }
 
   function getCurrentLineHeight(editor) {
@@ -517,7 +517,7 @@ const XxFaltanteMark = Node.create({
       return;
     }
 
-    if (!value || value === '14px') {
+    if (!value || value === '13px') {
       editor.chain().focus().unsetFontSize().run();
       return;
     }

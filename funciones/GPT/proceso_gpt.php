@@ -51,7 +51,7 @@ $mysqli = conn();
 // límites
 define('MAX_PROMPT_BYTES_SOFT', 102400);   // 100 KB
 define('MAX_PROMPT_BYTES_HARD', 307200);   // 300 KB
-define('MAX_OUTPUT_TOKENS',     3000);
+define('MAX_OUTPUT_TOKENS',     8000);
 
 define('GPT_MODEL', 'gpt-5.4');
 define('GPT_REASONING_EFFORT', 'low'); // low | medium | high (para probar)
@@ -201,6 +201,20 @@ if ($http_code !== 200) {
 }
 
 $content = (string)($result['choices'][0]['message']['content'] ?? '');
+
+$finish = (string)($result['choices'][0]['finish_reason'] ?? '');
+if ($finish === 'length' || trim($content) === '') {
+    echo json_encode([
+        'status'  => 'error',
+        'message' => 'La IA no entrego un informe completo (finish=' . ($finish ?: 'vacio') . '). Reintenta o sube MAX_OUTPUT_TOKENS.',
+        'rid'     => $rid,
+        'usage'   => [
+            'prompt_tokens'     => (int)($result['usage']['prompt_tokens'] ?? 0),
+            'completion_tokens' => (int)($result['usage']['completion_tokens'] ?? 0),
+        ],
+    ], JSON_UNESCAPED_UNICODE);
+    exit;
+}
 
 // 8. postprocesar con nuestro helper
 $ctxPaciente = [

@@ -13,6 +13,7 @@ global $usuario_id, $acceso_aplicaciones;
 $sel = "SELECT 
         c.id, 
         p.nombre AS paciente, 
+        p.codigo_paciente,
         t.nombre_completo AS propietario, 
         t.email AS email,  
         c.fecha_examen, 
@@ -28,7 +29,7 @@ $sel = "SELECT
       LEFT JOIN tutores t ON p.tutor_id = t.id
       LEFT JOIN plantilla_informe pi ON c.tipo_estudio = pi.id
       WHERE c.veterinario_id = ?
-      ORDER BY c.fecha_examen DESC
+      ORDER BY c.fecha_examen DESC, c.id DESC
       ";
 
 $stmt = $mysqli->prepare($sel);
@@ -38,8 +39,10 @@ $res = $stmt->get_result();
 ?>
 <style>
     .dataTables_wrapper .dt-buttons {
-        float: none;
-        text-align: center;
+        float: left;
+    }
+    .dataTables_wrapper .dataTables_filter {
+        float: right;
     }
     table.dataTable thead th,
     table.dataTable tfoot th {
@@ -49,7 +52,10 @@ $res = $stmt->get_result();
     table.dataTable tbody td {
         font-family: Arial, sans-serif;
         font-size: 12px;
+        padding-top: 4px;
+        padding-bottom: 4px;
     }
+
 </style>
 
 <div id="certificado" data-page-id="certificado">
@@ -125,7 +131,14 @@ $res = $stmt->get_result();
                 ?>
                   <tr>
                     <td><?= $i++ ?></td>
-                    <td><?= htmlspecialchars($paciente) ?></td>
+                    <td>
+                      <div class="d-flex justify-content-between">
+                        <span><?= htmlspecialchars($paciente) ?></span>
+                        <?php if (!empty($fila['codigo_paciente'])): ?>
+                          <small class="text-muted"><?= htmlspecialchars($fila['codigo_paciente']) ?></small>
+                        <?php endif; ?>
+                      </div>
+                    </td>
                     <td><?= htmlspecialchars($propietario) ?></td>
                     <td><?= htmlspecialchars($fila['tipo_examen'] ?? '-') ?></td>
                     <td><?= htmlspecialchars($medicoListado) ?></td>
@@ -133,7 +146,7 @@ $res = $stmt->get_result();
                     <td><?= date('d-m-Y', strtotime($fila['fecha_examen'])) ?></td>
                     <td>
                       <div class="dropdown">
-                        <button class="btn btn-outline-info dropdown-toggle" type="button" data-bs-toggle="dropdown" aria-expanded="false">
+                        <button class="btn btn-sm btn-outline-info dropdown-toggle" type="button" data-bs-toggle="dropdown" aria-expanded="false">
                           <i class="fas fa-ellipsis-v"></i>
                         </button>
 
