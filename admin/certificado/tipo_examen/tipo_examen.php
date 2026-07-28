@@ -210,4 +210,4 @@ if (!function_exists('valorManualCertificado')) {
 </div>
 
 <script src="certificado/tipo_examen/js/tipo_examen.js?v=10"></script>
-<script src="certificado/tipo_examen/js/imagenes.js?v=2"></script>
+<script src="certificado/tipo_examen/js/imagenes.js?v=3"></script>
