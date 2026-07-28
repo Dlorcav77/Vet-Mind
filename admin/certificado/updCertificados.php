@@ -60,6 +60,81 @@ function normalizarListaImagenesCertificado($imagenes)
     return array_values(array_unique($normalizadas));
 }
 
+function comprimirImagenCertificado($rutaArchivo, $maxLado = 1600, $calidad = 82)
+{
+    if (!file_exists($rutaArchivo)) {
+        return $rutaArchivo;
+    }
+
+    $info = @getimagesize($rutaArchivo);
+
+    if ($info === false) {
+        return $rutaArchivo;
+    }
+
+    $ancho = (int)$info[0];
+    $alto = (int)$info[1];
+    $tipo = $info[2];
+
+    if ($ancho <= 0 || $alto <= 0) {
+        return $rutaArchivo;
+    }
+
+    switch ($tipo) {
+        case IMAGETYPE_JPEG:
+            $src = @imagecreatefromjpeg($rutaArchivo);
+            break;
+        case IMAGETYPE_PNG:
+            $src = @imagecreatefrompng($rutaArchivo);
+            break;
+        case IMAGETYPE_WEBP:
+            $src = @imagecreatefromwebp($rutaArchivo);
+            break;
+        default:
+            return $rutaArchivo;
+    }
+
+    if (!$src) {
+        return $rutaArchivo;
+    }
+
+    $ladoMayor = max($ancho, $alto);
+
+    if ($ladoMayor > $maxLado) {
+        $escala = $maxLado / $ladoMayor;
+        $nuevoAncho = max(1, (int)round($ancho * $escala));
+        $nuevoAlto = max(1, (int)round($alto * $escala));
+    } else {
+        $nuevoAncho = $ancho;
+        $nuevoAlto = $alto;
+    }
+
+    $dst = imagecreatetruecolor($nuevoAncho, $nuevoAlto);
+
+    imagefilledrectangle($dst, 0, 0, $nuevoAncho, $nuevoAlto, imagecolorallocate($dst, 255, 255, 255));
+    imagecopyresampled($dst, $src, 0, 0, 0, 0, $nuevoAncho, $nuevoAlto, $ancho, $alto);
+    imagedestroy($src);
+
+    $dir = dirname($rutaArchivo);
+    $base = pathinfo($rutaArchivo, PATHINFO_FILENAME);
+    $rutaJpg = $dir . '/' . $base . '.jpg';
+
+    $ok = @imagejpeg($dst, $rutaJpg, $calidad);
+    imagedestroy($dst);
+
+    if (!$ok) {
+        return $rutaArchivo;
+    }
+
+    if ($rutaJpg !== $rutaArchivo && file_exists($rutaArchivo)) {
+        @unlink($rutaArchivo);
+    }
+
+    @chmod($rutaJpg, 0644);
+
+    return $rutaJpg;
+}
+
 function eliminarImagenCertificadoFisica($ruta)
 {
     $rutaNormalizada = normalizarRutaImagenCertificado($ruta);
@@ -650,7 +725,8 @@ if (!empty($_FILES['imagenes']['name'][0])) {
             $rutaDestino = $imgDir . $nombreArchivo;
 
             if (move_uploaded_file($tmpName, $rutaDestino)) {
-                $rutaImagenNueva = normalizarRutaImagenCertificado("uploads/certificados/img/" . $nombreArchivo);
+                $rutaFinal = comprimirImagenCertificado($rutaDestino);
+                $rutaImagenNueva = normalizarRutaImagenCertificado("uploads/certificados/img/" . basename($rutaFinal));
 
                 if ($rutaImagenNueva !== null) {
                     $imagenes[] = $rutaImagenNueva;

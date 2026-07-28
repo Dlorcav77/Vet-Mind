@@ -123,6 +123,7 @@ function gpt_build_prompt(mysqli $mysqli, array $input): array
         - Esto NO requiere que el DICTADO diga la palabra "heterogéneo": la sola presencia del hallazgo obliga el cambio.
         - Si el DICTADO SÍ dice explícitamente "homogéneo" para ese órgano y a la vez describe un hallazgo focal, conserva ambos y marca flag incongruencia.
         - No apliques esta regla a órganos donde el DICTADO no describió ningún hallazgo: ahí "homogéneo" de la PLANTILLA se conserva.
+        - NO AGREGUES el atributo si no existe. Esta regla solo CORRIGE un "homogéneo" que ya está en la PLANTILLA o en el DICTADO. Si el órgano no trae ese atributo en ninguno de los dos (ej. próstata, uréter, órganos extra), NO inventes "parénquima heterogéneo": describe solo lo que el DICTADO dio, más el hallazgo.
       5. FIDELIDAD SOBRE LIMPIEZA. Mejor un término feo pero visible y marcado, que un dato bonito pero silenciosamente equivocado.
 
       === SALIDA HTML ===

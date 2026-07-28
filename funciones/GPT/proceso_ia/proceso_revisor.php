@@ -139,7 +139,11 @@ Casos a reportar:
     - NO lo marques si el organo no tiene ningun hallazgo descrito: ahi "homogeneo" de la plantilla es correcto.
     En "informe" cita la frase contradictoria; en "detalle" indica que cambiar (homogeneo -> heterogeneo, o
     eliminar "homogeneo" del contenido).
-
+    - CRITICO: el hallazgo y el descriptor "homogeneo" deben estar en EL MISMO organo. NO cruces organos.
+      Barro biliar, calculos o estructuras en la VESICULA BILIAR no afectan al HIGADO. Estructuras en el
+      RIÑON no afectan al BAZO. Antes de marcar, verifica que el hallazgo este descrito dentro del mismo
+      parrafo/organo que el "homogeneo". Si el hallazgo esta en otro organo, NO marques: es falso positivo.
+      
 NO reportes (no son problemas):
 - Organos o atributos en estado normal que vienen de la PLANTILLA y el dictado no menciono.
 - Diferencias de redaccion, plurales, mayusculas u orden de palabras.

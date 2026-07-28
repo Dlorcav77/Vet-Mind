@@ -1,5 +1,10 @@
 <?php
 // admin/certificado/tipo_examen/bloque_imagenes.php
+
+/**
+ * @var string $action
+ * @var string $mostrarImagenesAntiguas
+ */
 ?>
 <style>
 

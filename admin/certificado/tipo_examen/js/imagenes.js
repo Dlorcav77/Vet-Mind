@@ -2,7 +2,7 @@
 var imagenesArray = [];
 var imagenActual = 0;
 var archivosSeleccionados = [];
-var LIMITE_IMAGENES = 24;
+var LIMITE_IMAGENES = 40;
 var modoSoloGuardar = false;
 var nombreTempImagen = null;
 var imagenesAntiguasCargadas = [];
@@ -436,7 +436,7 @@ function inicializarMedicion(canvas, ctx, img, mediciones, getPxPorCm) {
         modoSoloGuardar = true;
         redraw();
 
-        const nuevaImagen = canvas.toDataURL('image/png');
+        const nuevaImagen = canvas.toDataURL('image/jpeg', 0.85);
         modoSoloGuardar = estabaActivo;
         redraw();
 
@@ -449,7 +449,7 @@ function inicializarMedicion(canvas, ctx, img, mediciones, getPxPorCm) {
         const idxAntigua = $imgContainer.data('idx');
         const fileIdx = $imgContainer.data('file-idx');
 
-        let nombreOriginal = 'imagen_editada_' + Date.now() + '.png';
+        let nombreOriginal = 'imagen_editada_' + Date.now() + '.jpg';
 
         if (esAntigua) {
             if (typeof idxAntigua !== 'undefined') {
@@ -462,7 +462,7 @@ function inicializarMedicion(canvas, ctx, img, mediciones, getPxPorCm) {
             updateInputFiles();
         } else {
             if (typeof fileIdx !== 'undefined' && archivosSeleccionados[fileIdx]) {
-                nombreOriginal = archivosSeleccionados[fileIdx].name;
+                nombreOriginal = archivosSeleccionados[fileIdx].name.replace(/\.[^.]+$/, '') + '.jpg';
                 archivosSeleccionados[fileIdx] = dataURLToFile(nuevaImagen, nombreOriginal);
                 updateInputFiles();
             }
