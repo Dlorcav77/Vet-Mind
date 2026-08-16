@@ -1,0 +1,99 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 485 375" role="img" aria-labelledby="title desc">
+  <title id="title">VetMind</title>
+  <desc id="desc">Símbolo de VetMind con huella, cerebro y líneas de circuito en tonos verde petróleo.</desc>
+
+  <defs>
+    <linearGradient id="padGradient" x1="156" y1="205" x2="332" y2="337" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#79aead"/>
+      <stop offset="0.58" stop-color="#76aaa8"/>
+      <stop offset="1" stop-color="#5e9695"/>
+    </linearGradient>
+    <linearGradient id="brainGradient" x1="274" y1="63" x2="274" y2="156" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#8ebfbd"/>
+      <stop offset="1" stop-color="#69a3a1"/>
+    </linearGradient>
+    <linearGradient id="circuitGradient" x1="335" y1="20" x2="455" y2="300" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#79afad"/>
+      <stop offset="1" stop-color="#5d9694"/>
+    </linearGradient>
+    <clipPath id="padClip">
+      <path d="M224 176C240 171 255 179 269 190L330 248C348 266 354 291 344 314C334 337 313 346 286 344L175 345C148 345 129 331 122 309C116 289 124 272 139 253L190 193C200 182 210 178 224 176Z"/>
+    </clipPath>
+  </defs>
+
+  <!-- Circuito exterior izquierdo -->
+  <g fill="none" stroke="#79aaa8" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M99 308C68 272 52 227 53 184C54 165 59 146 68 129" stroke-width="3"/>
+    <path d="M74 118C78 110 83 102 89 95" stroke-width="3" stroke-dasharray="1 7"/>
+    <path d="M94 89C128 53 176 33 225 32C229 32 231 34 231 38V59" stroke-width="3"/>
+    <circle cx="95" cy="89" r="4.5" fill="#79aaa8" stroke="#245f62" stroke-width="1"/>
+  </g>
+
+  <!-- Circuito superior -->
+  <g stroke-linecap="round" stroke-linejoin="round">
+    <path d="M264 52L276 44L289 52Z" fill="#6ca3a1" stroke="#245f62" stroke-width="1.5"/>
+    <path d="M332 52H414C422 52 428 59 428 67V223C428 250 412 268 386 268H378" fill="none" stroke="url(#circuitGradient)" stroke-width="6"/>
+    <circle cx="321" cy="52" r="12.5" fill="#377b7f" stroke="#8ab4b2" stroke-width="1.5"/>
+    <path d="M326 77H376C393 77 403 87 403 103V183" fill="none" stroke="#79aaa8" stroke-width="6"/>
+  </g>
+
+  <!-- Cerebro -->
+  <g fill="none" stroke="url(#brainGradient)" stroke-width="5" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M274 65V151"/>
+    <path d="M271 69C264 62 254 66 253 75C244 74 240 83 244 90C236 94 237 106 243 110C238 119 244 129 252 130C250 139 259 148 270 145"/>
+    <path d="M277 69C284 62 294 66 295 75C304 74 308 83 304 90C312 94 311 106 305 110C310 119 304 129 296 130C298 139 289 148 278 145"/>
+    <path d="M268 80C260 77 255 84 259 91C250 92 249 103 256 107C250 115 256 124 264 123C261 132 267 138 273 139"/>
+    <path d="M280 80C288 77 293 84 289 91C298 92 299 103 292 107C298 115 292 124 284 123C287 132 281 138 275 139"/>
+    <path d="M272 91C266 94 267 103 273 106"/>
+    <path d="M276 91C282 94 281 103 275 106"/>
+  </g>
+  <path d="M260 132C264 142 268 150 274 155C281 150 286 142 289 132C284 136 279 138 274 138C269 138 264 136 260 132Z" fill="#76aaa8" opacity=".72"/>
+
+  <!-- Dedos de la huella -->
+  <g fill="#36787b" stroke="#78aaa8" stroke-width="1.5">
+    <ellipse cx="116" cy="177" rx="33" ry="50" transform="rotate(-15 116 177)"/>
+    <ellipse cx="184" cy="126" rx="35" ry="45" transform="rotate(-14 184 126)"/>
+    <ellipse cx="339" cy="165" rx="34" ry="50" transform="rotate(12 339 165)"/>
+  </g>
+  <path d="M85 135C90 122 102 117 115 128Z" fill="#5f9997" stroke="#245f62" stroke-width="1.5"/>
+  <path d="M149 90C151 77 164 68 179 73" fill="none" stroke="#4f8b8a" stroke-width="6" stroke-linecap="round"/>
+  <path d="M344 119C351 106 365 105 373 117" fill="none" stroke="#4f8b8a" stroke-width="7" stroke-linecap="round"/>
+
+  <!-- Almohadilla principal -->
+  <path d="M224 176C240 171 255 179 269 190L330 248C348 266 354 291 344 314C334 337 313 346 286 344L175 345C148 345 129 331 122 309C116 289 124 272 139 253L190 193C200 182 210 178 224 176Z" fill="url(#padGradient)" stroke="#235f62" stroke-width="3"/>
+  <path d="M139 253L191 193C186 226 195 241 215 258L273 311C288 324 309 333 331 329C321 340 305 345 286 344L175 345C148 345 129 331 122 309C116 289 124 272 139 253Z" fill="#35777a" clip-path="url(#padClip)"/>
+  <path d="M192 193C201 183 211 178 224 176C240 172 254 179 269 190L330 248C348 266 354 291 344 314C334 337 313 346 286 344" fill="none" stroke="#9bc4c1" stroke-width="2" opacity=".8"/>
+
+  <!-- Textura vectorial sutil -->
+  <g clip-path="url(#padClip)" fill="none" stroke="#8eb9b6" stroke-linecap="round" opacity=".78">
+    <path d="M140 275H184"/><path d="M145 283H192"/><path d="M150 291H200"/>
+    <path d="M155 299H208"/><path d="M161 307H215"/><path d="M168 315H222"/>
+  </g>
+
+  <!-- Flechas de movimiento -->
+  <g fill="#2b686c">
+    <path d="M194 219L209 213L199 230L199 223Z"/>
+    <path d="M229 214L242 208L234 223L234 217Z"/>
+    <path d="M265 295L281 287L272 304L272 298Z"/>
+    <path d="M291 283L306 275L297 292L297 286Z"/>
+  </g>
+
+  <!-- Circuito exterior derecho -->
+  <g fill="none" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M445 17V235C445 264 427 283 397 283H378" stroke="url(#circuitGradient)" stroke-width="6"/>
+    <circle cx="445" cy="17" r="5.5" fill="#79aaa8" stroke="#4b8988" stroke-width="1"/>
+    <path d="M378 297H474" stroke="#79aaa8" stroke-width="5"/>
+    <circle cx="474" cy="297" r="5.5" fill="#79aaa8"/>
+    <path d="M345 239L360 219C365 213 373 211 384 212" stroke="#79aaa8" stroke-width="3"/>
+    <path d="M383 212L393 201" stroke="#79aaa8" stroke-width="3"/>
+    <circle cx="397" cy="213" r="11.5" fill="#377b7f" stroke="#79aaa8" stroke-width="1.5"/>
+  </g>
+
+  <!-- Arco inferior -->
+  <g fill="none" stroke="#6da3a1" stroke-linecap="round">
+    <path d="M367 318C338 347 302 361 259 363C247 364 237 363 228 361" stroke-width="3"/>
+    <circle cx="220" cy="360" r="4.5" fill="#6da3a1" stroke="#245f62" stroke-width="1"/>
+    <circle cx="203" cy="354" r="3.5" fill="#6da3a1" stroke="#245f62" stroke-width="1"/>
+  </g>
+</svg>

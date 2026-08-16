@@ -1,22 +1,54 @@
 <footer class="footer mt-auto py-3 bg-light">
   <div class="container-fluid">
-    <div class="row text-muted">
-      <div class="col-6 d-flex text-start">
-        <a class="text-muted me-3" href="" target="_blank">
-          <img src="../assets/img/photos/logo0.0.1.png" alt="Logo" style="width: 140px; height: 30px; border-radius: 10%;">
-        </a>
-        <strong style="margin-top:10px;">Desarrollado por DotSystem</strong>
+    <div class="row align-items-center gy-3 text-muted">
+
+      <div
+        class="col-12 col-lg-6 d-flex flex-wrap align-items-center justify-content-center justify-content-lg-start gap-3 text-center text-lg-start"
+      >
+        <div
+          class="vetmind-brand vetmind-brand--footer"
+          role="img"
+          aria-label="VetMind"
+        >
+          <div
+            class="vetmind-brand__name"
+            aria-hidden="true"
+          >
+            <span
+              class="vetmind-brand__part vetmind-brand__vet"
+            >VET</span><span
+              class="vetmind-brand__part vetmind-brand__mind"
+            >M<span class="vetmind-brand__i"><span class="vetmind-brand__i-letter">I</span><span class="vetmind-brand__heart">♥</span></span>ND</span>
+          </div>
+        </div>
+
+        <strong>
+          Desarrollado por DotSystem
+        </strong>
       </div>
-      <div class="col-6 text-end mt-3">
+
+      <div class="col-12 col-lg-6 text-center text-lg-end">
         <ul class="list-inline mb-0">
           <li class="list-inline-item">
-            <a class="text-muted" href="" target="_blank">diego.lorcaveliz@gmail.com</a>
+            <a
+              class="text-muted"
+              href="mailto:diego.lorcaveliz@gmail.com"
+            >
+              diego.lorcaveliz@gmail.com
+            </a>
           </li>
+
           <li class="list-inline-item">
-            <a class="text-muted" href="" target="_blank">(+56) 9 6766 2515</a>
+            <a
+              class="text-muted"
+              href="tel:+56967662515"
+            >
+              (+56) 9 6766 2515
+            </a>
           </li>
         </ul>
       </div>
+
     </div>
   </div>
 </footer>

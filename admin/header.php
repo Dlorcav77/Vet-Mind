@@ -5,7 +5,11 @@
   <meta http-equiv="X-UA-Compatible" content="IE=edge">
   <meta name="viewport" content="width=device-width, initial-scale=1">
 
-  <link rel="shortcut icon" href="../assets/img/photos/logo0.1.png" />
+  <link
+    rel="icon"
+    type="image/svg+xml"
+    href="../assets/img/branding/logo-vetmind.svg?v=1"
+  >
   <!-- jQuery (si tu sistema necesita $.ajax en head) -->
   <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
 
@@ -23,9 +27,12 @@
   <!-- App CSS personalizado -->
   <link href="../assets/css/app.css" rel="stylesheet">
   <link href="../assets/css/global.css" rel="stylesheet">
+  <link
+    href="../assets/css/branding.css?v=4"
+    rel="stylesheet"
+  >
 
   <!-- Favicon -->
-  <link rel="shortcut icon" href="../assets/img/photos/logo0.1.png" />
 
   <title>VetMind</title>
 

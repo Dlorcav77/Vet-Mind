@@ -1,0 +1,309 @@
+:root {
+    --sidebar-brand-width: 145px;
+    --sidebar-brand-icon-width: 98px;
+    --sidebar-brand-name-size: 24px;
+    --banner-logo-width: 225px;
+    --banner-name-size: 60px;
+}
+
+/*
+ * Marca VetMind reutilizable.
+ *
+ * Variantes:
+ * - vetmind-brand--banner
+ * - vetmind-brand--card
+ * - vetmind-brand--footer
+ */
+
+.vetmind-brand {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    width: 100%;
+    margin: 0 auto;
+}
+
+.vetmind-brand__icon {
+    display: block;
+    height: auto;
+}
+
+.vetmind-brand__name {
+    display: inline-flex;
+    align-items: baseline;
+    font-family:
+        "Trebuchet MS",
+        "Segoe UI",
+        Arial,
+        sans-serif;
+    font-weight: 700;
+    line-height: 1;
+    letter-spacing: 0.005em;
+    white-space: nowrap;
+    -webkit-text-stroke:
+        1px
+        rgba(24, 76, 83, 0.42);
+    filter:
+        drop-shadow(
+            0 2px 1px
+            rgba(18, 57, 62, 0.20)
+        );
+}
+
+.vetmind-brand__part {
+    display: inline-block;
+    background-clip: text;
+    -webkit-background-clip: text;
+    color: transparent;
+    -webkit-text-fill-color: transparent;
+}
+
+.vetmind-brand__vet {
+    background-image:
+        linear-gradient(
+            180deg,
+            #c8ded9 0%,
+            #8fb7b2 48%,
+            #4d7c80 100%
+        );
+    -webkit-text-stroke-color:
+        rgba(43, 87, 91, 0.32);
+}
+
+.vetmind-brand__mind {
+    background-image:
+        linear-gradient(
+            180deg,
+            #7fa9a5 0%,
+            #4f7f80 48%,
+            #234f55 100%
+        );
+}
+
+.vetmind-brand__i {
+    position: relative;
+    display: inline-block;
+    width: 0.34em;
+    margin-left: 0.06em;
+    margin-right: 0.02em;
+    font-size: 0.80em;
+    font-weight: 800;
+    line-height: 1;
+    text-align: center;
+    vertical-align: baseline;
+    -webkit-text-stroke-width: 1.2px;
+}
+
+.vetmind-brand__i-letter {
+    position: relative;
+    bottom: 0.04em;
+    display: inline-block;
+    background-image:
+        linear-gradient(
+            180deg,
+            #7fa9a5 0%,
+            #4f7f80 48%,
+            #234f55 100%
+        );
+    background-clip: text;
+    -webkit-background-clip: text;
+    color: transparent;
+    -webkit-text-fill-color: transparent;
+    transform: scaleY(0.74);
+    transform-origin: center bottom;
+    -webkit-text-stroke:
+        1.2px
+        rgba(24, 76, 83, 0.42);
+}
+
+.vetmind-brand__heart {
+    position: absolute;
+    top: -0.34em;
+    left: 50%;
+    transform: translateX(-50%);
+    font-family: Arial, sans-serif;
+    font-size: 0.44em;
+    font-weight: 700;
+    line-height: 1;
+    color: #79aaa6;
+    -webkit-text-fill-color: #79aaa6;
+    -webkit-text-stroke:
+        1px
+        rgba(24, 76, 83, 0.25);
+}
+
+/*
+ * Marca grande del banner izquierdo.
+ */
+
+.vetmind-brand--banner .vetmind-brand__icon {
+    width:
+        clamp(
+            210px,
+            16.5vw,
+            var(--banner-logo-width)
+        );
+    max-width: 58%;
+    filter:
+        drop-shadow(
+            0 9px 12px
+            rgba(24, 76, 83, 0.16)
+        );
+}
+
+.vetmind-brand--banner .vetmind-brand__name {
+    margin-top: 8px;
+    font-size:
+        clamp(
+            54px,
+            4.6vw,
+            var(--banner-name-size)
+        );
+}
+
+/*
+ * Marca dentro de la tarjeta de inicio de sesión.
+ */
+
+.vetmind-brand.vetmind-brand--card {
+    margin-bottom: 20px;
+}
+
+.vetmind-brand--card .vetmind-brand__icon {
+    width: 122px;
+    max-width: 48%;
+    filter: none;
+}
+
+.vetmind-brand--card .vetmind-brand__name {
+    margin-top: 6px;
+    font-size: 40px;
+}
+
+/*
+ * Marca horizontal para el footer.
+ */
+
+.vetmind-brand.vetmind-brand--footer {
+    flex-direction: row;
+    justify-content: flex-start;
+    width: auto;
+    margin: 0;
+    gap: 8px;
+}
+
+.vetmind-brand--footer .vetmind-brand__icon {
+    width: 38px;
+    max-width: none;
+    filter: none;
+}
+
+.vetmind-brand--footer .vetmind-brand__name {
+    margin: 0;
+    font-size: 26px;
+    filter:
+        drop-shadow(
+            0 1px 1px
+            rgba(18, 57, 62, 0.16)
+        );
+}
+
+/*
+ * Marca dentro del menú lateral.
+ */
+
+.vetmind-brand.vetmind-brand--sidebar {
+    box-sizing: border-box;
+    width: var(--sidebar-brand-width);
+    padding: 12px 10px 14px;
+    margin: -10px auto -24px;
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 18px;
+    background:
+        radial-gradient(
+            circle at 50% 38%,
+            rgba(216, 237, 232, 0.13),
+            transparent 62%
+        ),
+        linear-gradient(
+            160deg,
+            #0b2b3a 0%,
+            #0f465b 100%
+        );
+    box-shadow:
+        0 8px 24px
+        rgba(0, 0, 0, 0.24);
+}
+
+.vetmind-brand--sidebar .vetmind-brand__icon {
+    width: var(--sidebar-brand-icon-width);
+    max-width: 100%;
+    filter:
+        drop-shadow(
+            0 3px 7px
+            rgba(0, 0, 0, 0.22)
+        );
+}
+
+.vetmind-brand--sidebar .vetmind-brand__name {
+    margin-top: 5px;
+    font-size: var(--sidebar-brand-name-size);
+    -webkit-text-stroke:
+        0.8px
+        rgba(218, 238, 234, 0.30);
+}
+
+.vetmind-brand--sidebar .vetmind-brand__mind,
+.vetmind-brand--sidebar .vetmind-brand__i-letter {
+    background-image:
+        linear-gradient(
+            180deg,
+            #acd0cb 0%,
+            #78aaa6 48%,
+            #4f8182 100%
+        );
+}
+
+@media (max-width: 767.98px) {
+    .vetmind-brand--card .vetmind-brand__icon {
+        width: 132px;
+        max-width: 44vw;
+    }
+
+    .vetmind-brand--card .vetmind-brand__name {
+        margin-top: 8px;
+        font-size:
+            clamp(
+                36px,
+                12vw,
+                46px
+            );
+    }
+
+    .vetmind-brand--footer .vetmind-brand__icon {
+        width: 32px;
+    }
+
+    .vetmind-brand--footer .vetmind-brand__name {
+        font-size: 22px;
+    }
+}
+
+@media (max-height: 650px) and (min-width: 768px) {
+    .vetmind-brand--banner .vetmind-brand__icon {
+        width: 170px;
+    }
+
+    .vetmind-brand--banner .vetmind-brand__name {
+        margin-top: 4px;
+        font-size: 48px;
+    }
+
+    .vetmind-brand--card .vetmind-brand__icon {
+        width: 100px;
+    }
+
+    .vetmind-brand--card .vetmind-brand__name {
+        font-size: 34px;
+    }
+}
