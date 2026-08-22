@@ -131,112 +131,145 @@ foreach ($camposCatalogo as $campoCat) {
                     <?php endif; ?>
                 </label>
 
-                <?php if ($campoInterno === 'especie'): ?>
-                    <select
-                        id="manual_especie_select"
-                        class="select2 form-select"
-                        style="width:100%;"
-                        data-current-text="<?= manual_value($manualDataInicial, 'especie') ?>"
-                    >
-                        <?php lisEspecies($valorInicial); ?>
-                    </select>
+            <?php if ($campoInterno === 'especie'): ?>
+                <select
+                    id="manual_especie_select"
+                    class="select2 form-select"
+                    style="width:100%;"
+                    data-current-text="<?= manual_value($manualDataInicial, 'especie') ?>"
+                >
+                    <?php lisEspecies($valorInicial); ?>
+                </select>
 
-                    <input
-                        type="hidden"
-                        id="manual_especie"
-                        name="manual_especie"
-                        value="<?= manual_value($manualDataInicial, 'especie') ?>"
-                    >
+                <input
+                    type="hidden"
+                    id="manual_especie"
+                    name="manual_especie"
+                    value="<?= manual_value($manualDataInicial, 'especie') ?>"
+                >
 
-                <?php elseif ($campoInterno === 'raza'): ?>
-                    <select
-                        id="manual_raza_select"
-                        class="select2 form-select"
-                        style="width:100%;"
-                        data-current-text="<?= manual_value($manualDataInicial, 'raza') ?>"
-                    >
-                        <?php lisRazas(); ?>
-                    </select>
+            <?php elseif ($campoInterno === 'raza'): ?>
+                <select
+                    id="manual_raza_select"
+                    class="select2 form-select"
+                    style="width:100%;"
+                    data-current-text="<?= manual_value($manualDataInicial, 'raza') ?>"
+                >
+                    <?php lisRazas(); ?>
+                </select>
 
-                    <input
-                        type="hidden"
-                        id="manual_raza"
-                        name="manual_raza"
-                        value="<?= manual_value($manualDataInicial, 'raza') ?>"
-                    >
+                <input
+                    type="hidden"
+                    id="manual_raza"
+                    name="manual_raza"
+                    value="<?= manual_value($manualDataInicial, 'raza') ?>"
+                >
 
-                <?php elseif ($campoInterno === 'sexo'): ?>
-                    <select class="form-select" id="manual_sexo" name="manual_sexo">
-                        <option value="">Seleccione...</option>
+            <?php elseif ($campoInterno === 'sexo'): ?>
+                <select class="form-select" id="manual_sexo" name="manual_sexo">
+                    <option value="">Seleccione...</option>
 
-                        <?php foreach ($sexos_manual as $val => $label): ?>
-                            <option
-                                value="<?= htmlspecialchars($val) ?>"
-                                <?= $valorInicial === $val ? 'selected' : '' ?>
+                    <?php foreach ($sexos_manual as $val => $label): ?>
+                        <option
+                            value="<?= htmlspecialchars($val) ?>"
+                            <?= $valorInicial === $val ? 'selected' : '' ?>
+                        >
+                            <?= htmlspecialchars($label) ?>
+                        </option>
+                    <?php endforeach; ?>
+                </select>
+
+                <?php elseif ($campoInterno === 'fecha_nacimiento'): ?>
+                    <div class="manual-fecha-nacimiento-wrap">
+
+                        <div class="input-group manual-fecha-normal">
+                            <input
+                                type="date"
+                                class="form-control"
+                                name="manual_fecha_nacimiento"
+                                id="manual_fecha_nacimiento"
+                                value="<?= htmlspecialchars($valorInicial) ?>"
                             >
-                                <?= htmlspecialchars($label) ?>
-                            </option>
-                        <?php endforeach; ?>
-                    </select>
 
-<?php elseif ($campoInterno === 'fecha_nacimiento'): ?>
-    <div class="manual-fecha-nacimiento-wrap">
+                            <button
+                                type="button"
+                                class="btn btn-outline-secondary btn-calcular-edad-manual"
+                                title="Ingresar edad del paciente"
+                            >
+                                <i class="fas fa-calculator me-1"></i>
+                                Edad
+                            </button>
+                        </div>
 
-        <div class="input-group manual-fecha-normal">
-            <input
-                type="date"
-                class="form-control"
-                name="manual_fecha_nacimiento"
-                id="manual_fecha_nacimiento"
-                value="<?= htmlspecialchars($valorInicial) ?>"
-            >
+                        <div
+                            class="input-group manual-fecha-edad"
+                            style="display:none;"
+                        >
+                            <input
+                                type="number"
+                                class="form-control manual-edad-anios"
+                                min="0"
+                                step="1"
+                                inputmode="numeric"
+                                autocomplete="off"
+                                placeholder="Años"
+                                title="Años"
+                            >
 
-            <button
-                type="button"
-                class="btn btn-outline-secondary btn-calcular-edad-manual"
-                title="Ingresar edad del paciente"
-            >
-                <i class="fas fa-calculator me-1"></i>
-                Edad
-            </button>
-        </div>
+                            <input
+                                type="number"
+                                class="form-control manual-edad-meses"
+                                min="0"
+                                max="11"
+                                step="1"
+                                inputmode="numeric"
+                                autocomplete="off"
+                                placeholder="Meses"
+                                title="Meses"
+                            >
 
-        <div
-            class="input-group manual-fecha-edad"
-            style="display:none;"
-        >
-            <input
-                type="number"
-                class="form-control manual-edad-anios"
-                min="0"
-                step="1"
-                inputmode="numeric"
-                autocomplete="off"
-                placeholder="Años"
-                title="Años"
-            >
+                            <button
+                                type="button"
+                                class="btn btn-primary btn-aplicar-edad-manual"
+                            >
+                                Aplicar
+                            </button>
+                        </div>
 
-            <input
-                type="number"
-                class="form-control manual-edad-meses"
-                min="0"
-                max="11"
-                step="1"
-                inputmode="numeric"
-                autocomplete="off"
-                placeholder="Meses"
-                title="Meses"
-            >
+                    </div>
 
-            <button
-                type="button"
-                class="btn btn-primary btn-aplicar-edad-manual"
-            >
-                Aplicar
-            </button>
-        </div>
+                    <?php elseif ($campoInterno === 'propietario'): ?>
+                    <div class="manual-propietario-wrap position-relative">
+                        <input
+                            type="text"
+                            class="form-control campo-requerido-manual"
+                            name="manual_propietario"
+                            id="manual_propietario"
+                            data-required-manual="1"
+                            data-label="<?= htmlspecialchars($campoLabel) ?>"
+                            autocomplete="off"
+                            value="<?= htmlspecialchars($valorInicial) ?>"
+                        >
 
-    </div>
+                        <input
+                            type="hidden"
+                            name="tutor_existente_id"
+                            id="tutor_existente_id"
+                            value=""
+                        >
+
+                        <div
+                            class="manual-tutor-resultados"
+                            style="display:none;"
+                        ></div>
+                    </div>
+
+                    <div
+                        class="invalid-feedback-manual"
+                        id="feedback_<?= htmlspecialchars($inputId) ?>"
+                    >
+                        <?= htmlspecialchars($campoLabel) ?> es obligatorio.
+                    </div>
 
                 <?php else: ?>
                     <input

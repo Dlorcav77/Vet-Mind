@@ -42,17 +42,16 @@
 
     width: max-content;
     max-width: min(100%, 560px);
-
     max-height: 64px;
+
     overflow-y: auto;
     overflow-x: hidden;
 
     gap: 4px;
-
     padding-right: 2px;
 
     scrollbar-width: thin;
-    scrollbar-color: rgba(32, 178, 170, 0.45) transparent;
+    scrollbar-color: rgba(23, 162, 184, 0.45) transparent;
 }
 
 .manual-codigo-paciente-coincidencias-header::-webkit-scrollbar {
@@ -64,17 +63,18 @@
 }
 
 .manual-codigo-paciente-coincidencias-header::-webkit-scrollbar-thumb {
-    background: rgba(32, 178, 170, 0.42);
+    background: rgba(23, 162, 184, 0.42);
     border-radius: 999px;
 }
 
 .manual-codigo-paciente-coincidencias-header::-webkit-scrollbar-thumb:hover {
-    background: rgba(32, 178, 170, 0.62);
+    background: rgba(23, 162, 184, 0.62);
 }
 
 .manual-codigo-coincidencia {
     display: flex;
     align-items: stretch;
+
     gap: 4px;
 
     width: 100%;
@@ -87,9 +87,9 @@
     border-radius: 6px;
     overflow: hidden;
 
-    background: #e8f6f1;
-    border: 1px solid #b9ddd0;
-    color: #2f5f53;
+    background: #e8f7fa;
+    border: 1px solid #b9e3ea;
+    color: #2f6670;
 
     line-height: 1.1;
 }
@@ -105,7 +105,7 @@
     overflow: hidden;
     text-overflow: ellipsis;
 
-    color: #2f5f53;
+    color: #2f6670;
 }
 
 .manual-codigo-btn-usar {
@@ -118,22 +118,142 @@
 
     padding: 0 7px;
     margin: 0;
+
     font-size: 0.70rem;
     line-height: 1;
 
     white-space: nowrap;
+
     border-radius: 0;
     border-top-right-radius: 5px;
     border-bottom-right-radius: 5px;
 
-    background-color: #20b2aa;
-    border-color: #20b2aa;
+    background-color: #17a2b8;
+    border-color: #17a2b8;
     color: #fff;
 }
 
 .manual-codigo-btn-usar:hover,
 .manual-codigo-btn-usar:focus {
-    background-color: #1aa39c;
-    border-color: #1aa39c;
+    background-color: #138496;
+    border-color: #117a8b;
     color: #fff;
+}
+
+
+
+/* =========================================================
+   BUSCADOR DE TUTOR - INGRESO MANUAL
+   ========================================================= */
+
+.manual-propietario-wrap {
+    position: relative;
+}
+
+.manual-tutor-resultados {
+    position: absolute;
+    top: calc(100% + 4px);
+    left: 0;
+    right: 0;
+
+    z-index: 1080;
+
+    background: #fff;
+    border: 1px solid rgba(0, 0, 0, 0.15);
+    border-radius: 6px;
+
+    box-shadow:
+        0 4px 12px rgba(0, 0, 0, 0.12);
+
+    max-height: 230px;
+    overflow-y: auto;
+
+    padding: 4px;
+}
+
+.manual-tutor-coincidencia {
+    display: flex;
+    align-items: stretch;
+
+    border: 1px solid #dfe5e8;
+    border-radius: 5px;
+
+    background: #f8fafb;
+
+    overflow: hidden;
+
+    margin-bottom: 4px;
+}
+
+.manual-tutor-coincidencia:last-child {
+    margin-bottom: 0;
+}
+
+.manual-tutor-info {
+    min-width: 0;
+    flex: 1;
+
+    padding: 7px 9px;
+}
+
+.manual-tutor-nombre {
+    display: block;
+
+    font-size: 0.86rem;
+    font-weight: 600;
+
+    line-height: 1.2;
+}
+
+.manual-tutor-detalle {
+    display: block;
+
+    margin-top: 2px;
+
+    font-size: 0.74rem;
+    color: #6c757d;
+
+    line-height: 1.25;
+
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.manual-tutor-btn-usar {
+    border-radius: 0;
+    border-top: 0;
+    border-right: 0;
+    border-bottom: 0;
+
+    padding-left: 12px;
+    padding-right: 12px;
+
+    white-space: nowrap;
+}
+
+.manual-tutor-seleccionado {
+    border-color: #17a2b8;
+}
+
+.manual-tutor-seleccionado .manual-tutor-info {
+    background: rgba(23, 162, 184, 0.06);
+}
+
+.manual-tutor-resultados::-webkit-scrollbar {
+    width: 5px;
+}
+
+.manual-tutor-resultados::-webkit-scrollbar-track {
+    background: transparent;
+}
+
+.manual-tutor-resultados::-webkit-scrollbar-thumb {
+    background: rgba(0, 0, 0, 0.22);
+    border-radius: 10px;
+}
+
+.manual-tutor-resultados {
+    scrollbar-width: thin;
+    scrollbar-color: rgba(0, 0, 0, 0.22) transparent;
 }

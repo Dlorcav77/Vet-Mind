@@ -541,6 +541,7 @@ if ($plantilla_informe_id <= 0) {
 }
 
 $guardarMascota = isset($_POST['guardar_mascota']) && $_POST['guardar_mascota'] == '1';
+$tutorExistenteId = intval($_POST['tutor_existente_id'] ?? 0);
 
 $manual = [];
 foreach ($_POST as $k => $v) {
@@ -592,23 +593,98 @@ $manual_data = !empty($manual_extra_data)
     : null;
 
 if ($modo_manual && $guardarMascota && !empty($manual)) {
-    $tutorNombre = trim((string)($manual['propietario'] ?? ''));
+ 
 
+
+
+
+
+
+
+
+
+
+$tutorNombre = trim((string)($manual['propietario'] ?? ''));
+
+$tutorId = 0;
+
+/*
+ * Si el médico seleccionó explícitamente un tutor existente,
+ * comprobamos en servidor que realmente exista y que pertenezca
+ * al veterinario actual.
+ *
+ * Nunca confiamos solamente en el ID recibido desde JavaScript.
+ */
+if ($tutorExistenteId > 0) {
+    $stmtTutorExistente = $mysqli->prepare("
+        SELECT
+            id,
+            nombre_completo
+        FROM tutores
+        WHERE
+            id = ?
+            AND veterinario_id = ?
+        LIMIT 1
+    ");
+
+    if (!$stmtTutorExistente) {
+        echo json_encode([
+            'status' => 'error',
+            'message' => 'Error preparando validación del tutor seleccionado.',
+            'mysql_error' => $mysqli->error
+        ], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+        exit;
+    }
+
+    $stmtTutorExistente->bind_param(
+        "ii",
+        $tutorExistenteId,
+        $veterinario
+    );
+
+    if (!$stmtTutorExistente->execute()) {
+        echo json_encode([
+            'status' => 'error',
+            'message' => 'No se pudo validar el tutor seleccionado.',
+            'mysql_error' => $stmtTutorExistente->error
+        ], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+        exit;
+    }
+
+    $resTutorExistente =
+        $stmtTutorExistente->get_result();
+
+    $tutorExistente =
+        $resTutorExistente->fetch_assoc();
+
+    if (!$tutorExistente) {
+        echo json_encode([
+            'status' => 'error',
+            'message' => 'El tutor seleccionado no existe o no pertenece al veterinario actual.'
+        ], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+        exit;
+    }
+
+    $tutorId = (int)$tutorExistente['id'];
+
+} else {
     /*
-     * Si el usuario continúa en ingreso manual y mantiene "Guardar",
-     * se considera explícitamente un paciente nuevo.
+     * No se seleccionó ningún tutor existente.
      *
-     * No reutilizamos tutores solamente por nombre ni pacientes
-     * solamente por nombre/tutor.
+     * El médico continuó escribiendo el propietario manualmente,
+     * por lo tanto se considera explícitamente un tutor nuevo.
      */
-    $stmt = $mysqli->prepare("
+    $stmtTutorNuevo = $mysqli->prepare("
         INSERT INTO tutores
-            (nombre_completo, veterinario_id)
+            (
+                nombre_completo,
+                veterinario_id
+            )
         VALUES
             (?, ?)
     ");
 
-    if (!$stmt) {
+    if (!$stmtTutorNuevo) {
         echo json_encode([
             'status' => 'error',
             'message' => 'Error preparando creación de tutor.',
@@ -617,22 +693,22 @@ if ($modo_manual && $guardarMascota && !empty($manual)) {
         exit;
     }
 
-    $stmt->bind_param(
+    $stmtTutorNuevo->bind_param(
         "si",
         $tutorNombre,
         $veterinario
     );
 
-    if (!$stmt->execute()) {
+    if (!$stmtTutorNuevo->execute()) {
         echo json_encode([
             'status' => 'error',
             'message' => 'No se pudo crear el tutor.',
-            'mysql_error' => $stmt->error
+            'mysql_error' => $stmtTutorNuevo->error
         ], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
         exit;
     }
 
-    $tutorId = (int)$stmt->insert_id;
+    $tutorId = (int)$stmtTutorNuevo->insert_id;
 
     if ($tutorId <= 0) {
         echo json_encode([
@@ -641,6 +717,14 @@ if ($modo_manual && $guardarMascota && !empty($manual)) {
         ], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
         exit;
     }
+}
+
+
+
+
+
+
+
 
     $nombreMascota = trim((string)($manual['paciente'] ?? ''));
     $codigoPaciente = trim((string)($manual['codigo_paciente'] ?? ''));

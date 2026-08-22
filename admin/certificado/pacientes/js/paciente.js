@@ -754,9 +754,540 @@ if (
 }
 
 if (
+  typeof window.CERT_PACIENTE_MANUAL_STATE.tutorTimer === 'undefined'
+) {
+  window.CERT_PACIENTE_MANUAL_STATE.tutorTimer = null;
+}
+
+if (
+  typeof window.CERT_PACIENTE_MANUAL_STATE.tutorRequest === 'undefined'
+) {
+  window.CERT_PACIENTE_MANUAL_STATE.tutorRequest = null;
+}
+
+if (
+  typeof window.CERT_PACIENTE_MANUAL_STATE.tutorSeleccionadoId === 'undefined'
+) {
+  window.CERT_PACIENTE_MANUAL_STATE.tutorSeleccionadoId = 0;
+}
+
+if (
   typeof window.CERT_PACIENTE_MANUAL_STATE.codigoRequest === 'undefined'
 ) {
   window.CERT_PACIENTE_MANUAL_STATE.codigoRequest = null;
+}
+
+function getManualPropietarioInput() {
+  const $inputs = $('[id="manual_propietario"]');
+
+  if (!$inputs.length) {
+    return $();
+  }
+
+  const $visible = $inputs.filter(':visible').first();
+
+  if ($visible.length) {
+    return $visible;
+  }
+
+  return $inputs.first();
+}
+
+function getManualTutorResultados() {
+  const $input = getManualPropietarioInput();
+
+  if (!$input.length) {
+    return $();
+  }
+
+  return $input
+    .closest('.manual-propietario-wrap')
+    .find('.manual-tutor-resultados')
+    .first();
+}
+
+function limpiarResultadosTutorManual() {
+  const $resultados = getManualTutorResultados();
+
+  if ($resultados.length) {
+    $resultados
+      .empty()
+      .hide();
+  }
+}
+
+function limpiarTutorExistenteSeleccionado() {
+  const state =
+    window.CERT_PACIENTE_MANUAL_STATE;
+
+  state.tutorSeleccionadoId = 0;
+
+  $('[id="tutor_existente_id"]')
+    .val('');
+
+  $('.manual-propietario-wrap')
+    .removeClass('manual-tutor-seleccionado');
+}
+
+function obtenerTextoMascotasTutor(mascotas) {
+  if (
+    !Array.isArray(mascotas) ||
+    !mascotas.length
+  ) {
+    return 'Sin mascotas registradas';
+  }
+
+  const nombres = mascotas
+    .map(function (mascota) {
+      const nombre = String(
+        mascota.nombre || ''
+      ).trim();
+
+      const codigo = String(
+        mascota.codigo_paciente || ''
+      ).trim();
+
+      if (!nombre) {
+        return '';
+      }
+
+      if (codigo) {
+        return nombre + ' (' + codigo + ')';
+      }
+
+      return nombre;
+    })
+    .filter(function (nombre) {
+      return nombre !== '';
+    });
+
+  if (!nombres.length) {
+    return 'Sin mascotas registradas';
+  }
+
+  return nombres.join(' · ');
+}
+
+function mostrarResultadosTutorManual(matches) {
+  const $resultados =
+    getManualTutorResultados();
+
+  if (!$resultados.length) {
+    return;
+  }
+
+  $resultados.empty();
+
+  if (
+    !Array.isArray(matches) ||
+    !matches.length
+  ) {
+    limpiarResultadosTutorManual();
+    return;
+  }
+
+  matches.forEach(function (tutor) {
+    const tutorId = parseInt(
+      tutor.tutor_id,
+      10
+    ) || 0;
+
+    if (tutorId <= 0) {
+      return;
+    }
+
+    const nombre = String(
+      tutor.nombre || ''
+    ).trim();
+
+    const rut = String(
+      tutor.rut || ''
+    ).trim();
+
+    const mascotasTexto =
+      obtenerTextoMascotasTutor(
+        tutor.mascotas
+      );
+
+    const detalles = [];
+
+    if (rut) {
+      detalles.push('RUT: ' + rut);
+    }
+
+    if (mascotasTexto) {
+      detalles.push(mascotasTexto);
+    }
+
+    const $fila = $('<div>', {
+      class: 'manual-tutor-coincidencia'
+    });
+
+    const $info = $('<div>', {
+      class: 'manual-tutor-info'
+    });
+
+    const $nombre = $('<span>', {
+      class: 'manual-tutor-nombre'
+    }).text(
+      nombre || 'Tutor'
+    );
+
+    const $detalle = $('<span>', {
+      class: 'manual-tutor-detalle'
+    }).text(
+      detalles.join(' · ')
+    );
+
+    const $boton = $('<button>', {
+      type: 'button',
+      class:
+        'btn btn-info btn-sm ' +
+        'manual-tutor-btn-usar ' +
+        'btn-usar-tutor-manual'
+    }).html(
+      '<i class="fas fa-check me-1"></i>Usar'
+    );
+
+    $boton.data(
+      'tutor',
+      tutor
+    );
+
+    $info.append(
+      $nombre,
+      $detalle
+    );
+
+    $fila.append(
+      $info,
+      $boton
+    );
+
+    $resultados.append(
+      $fila
+    );
+  });
+
+  if (!$resultados.children().length) {
+    limpiarResultadosTutorManual();
+    return;
+  }
+
+  $resultados.show();
+}
+
+function seleccionarTutorManual(tutor) {
+  if (!tutor) {
+    return;
+  }
+
+  const tutorId = parseInt(
+    tutor.tutor_id,
+    10
+  ) || 0;
+
+  const nombre = String(
+    tutor.nombre || ''
+  ).trim();
+
+  if (
+    tutorId <= 0 ||
+    !nombre
+  ) {
+    return;
+  }
+
+  const state =
+    window.CERT_PACIENTE_MANUAL_STATE;
+
+  const $input =
+    getManualPropietarioInput();
+
+  if (!$input.length) {
+    return;
+  }
+
+  state.tutorSeleccionadoId =
+    tutorId;
+
+  $input
+    .val(nombre)
+    .trigger('input');
+
+  $('[id="tutor_existente_id"]')
+    .val(tutorId);
+
+  $input
+    .closest('.manual-propietario-wrap')
+    .addClass('manual-tutor-seleccionado');
+
+  limpiarResultadosTutorManual();
+}
+
+function buscarTutoresManual(query) {
+  const state =
+    window.CERT_PACIENTE_MANUAL_STATE;
+
+  const textoBuscado = String(
+    query || ''
+  ).trim();
+
+  if (textoBuscado.length < 3) {
+    limpiarResultadosTutorManual();
+    return;
+  }
+
+  if (state.tutorRequest) {
+    state.tutorRequest.abort();
+    state.tutorRequest = null;
+  }
+
+  const $resultados =
+    getManualTutorResultados();
+
+  if (!$resultados.length) {
+    return;
+  }
+
+  $resultados
+    .html(
+      '<div class="small text-muted px-2 py-1">' +
+        '<i class="fas fa-spinner fa-spin me-1"></i>' +
+        'Buscando tutor...' +
+      '</div>'
+    )
+    .show();
+
+  const request = $.ajax({
+    url: 'certificado/pacientes/buscar_tutor.php',
+    type: 'GET',
+    dataType: 'json',
+
+    data: {
+      q: textoBuscado
+    },
+
+    success: function (response) {
+      const $inputActual =
+        getManualPropietarioInput();
+
+      const textoActual = String(
+        $inputActual.val() || ''
+      ).trim();
+
+      if (
+        textoActual !== textoBuscado
+      ) {
+        return;
+      }
+
+      if (
+        !$('#toggle_manual').is(':checked')
+      ) {
+        limpiarResultadosTutorManual();
+        return;
+      }
+
+      if (
+        !response ||
+        response.status !== 'success' ||
+        !Array.isArray(response.matches)
+      ) {
+        limpiarResultadosTutorManual();
+        return;
+      }
+
+      mostrarResultadosTutorManual(
+        response.matches
+      );
+    },
+
+    error: function (xhr, status) {
+      if (status === 'abort') {
+        return;
+      }
+
+      const $inputActual =
+        getManualPropietarioInput();
+
+      const textoActual = String(
+        $inputActual.val() || ''
+      ).trim();
+
+      if (
+        textoActual !== textoBuscado
+      ) {
+        return;
+      }
+
+      $resultados
+        .html(
+          '<div class="small text-danger px-2 py-1">' +
+            'No se pudo buscar el tutor.' +
+          '</div>'
+        )
+        .show();
+    },
+
+    complete: function () {
+      if (
+        state.tutorRequest === request
+      ) {
+        state.tutorRequest = null;
+      }
+    }
+  });
+
+  state.tutorRequest = request;
+}
+
+function initBusquedaTutorManual() {
+  const state =
+    window.CERT_PACIENTE_MANUAL_STATE;
+
+  if (state.tutorTimer) {
+    clearTimeout(
+      state.tutorTimer
+    );
+
+    state.tutorTimer = null;
+  }
+
+  if (state.tutorRequest) {
+    state.tutorRequest.abort();
+    state.tutorRequest = null;
+  }
+
+  $(document)
+    .off(
+      'click.certUsarTutorManual',
+      '.btn-usar-tutor-manual'
+    )
+    .on(
+      'click.certUsarTutorManual',
+      '.btn-usar-tutor-manual',
+      function () {
+        const tutor = $(this).data(
+          'tutor'
+        );
+
+        seleccionarTutorManual(
+          tutor
+        );
+      }
+    );
+
+  $(document)
+    .off(
+      'input.certBuscarTutorManual',
+      '[id="manual_propietario"]'
+    )
+    .on(
+      'input.certBuscarTutorManual',
+      '[id="manual_propietario"]',
+      function (event) {
+        const $input = $(this);
+
+        const texto = String(
+          $input.val() || ''
+        ).trim();
+
+        if (state.tutorTimer) {
+          clearTimeout(
+            state.tutorTimer
+          );
+
+          state.tutorTimer = null;
+        }
+
+        if (state.tutorRequest) {
+          state.tutorRequest.abort();
+          state.tutorRequest = null;
+        }
+
+        /*
+         * Si el usuario modificó manualmente el nombre
+         * después de elegir un tutor, esa selección deja
+         * de ser válida.
+         *
+         * Al seleccionar desde el botón "Usar",
+         * tutorSeleccionadoId ya está definido y el texto
+         * se establece programáticamente.
+         */
+        if (
+          event.originalEvent &&
+          state.tutorSeleccionadoId > 0
+        ) {
+          limpiarTutorExistenteSeleccionado();
+        }
+
+        if (
+          !$('#toggle_manual').is(':checked') ||
+          texto.length < 3
+        ) {
+          limpiarResultadosTutorManual();
+          return;
+        }
+
+        /*
+         * Si acabamos de seleccionar un tutor,
+         * no volvemos a buscar inmediatamente
+         * el mismo nombre.
+         */
+        if (
+          !event.originalEvent &&
+          state.tutorSeleccionadoId > 0
+        ) {
+          return;
+        }
+
+        state.tutorTimer =
+          setTimeout(function () {
+            state.tutorTimer = null;
+
+            buscarTutoresManual(
+              texto
+            );
+          }, 500);
+      }
+    );
+
+  $(document)
+    .off(
+      'click.certCerrarTutorManual'
+    )
+    .on(
+      'click.certCerrarTutorManual',
+      function (event) {
+        if (
+          $(event.target).closest(
+            '.manual-propietario-wrap'
+          ).length
+        ) {
+          return;
+        }
+
+        limpiarResultadosTutorManual();
+      }
+    );
+
+  $(document)
+    .off(
+      'keydown.certTutorManual',
+      '[id="manual_propietario"]'
+    )
+    .on(
+      'keydown.certTutorManual',
+      '[id="manual_propietario"]',
+      function (event) {
+        if (event.key !== 'Escape') {
+          return;
+        }
+
+        limpiarResultadosTutorManual();
+      }
+    );
 }
 
 function getManualCodigoPacienteInput() {
@@ -925,6 +1456,9 @@ function limpiarFormularioManualParaPacienteExistente() {
     .trigger('change');
 
   $('#guardarMascota').prop('checked', false);
+
+  limpiarTutorExistenteSeleccionado();
+  limpiarResultadosTutorManual();
 }
 
 function usarPacienteDesdeCoincidenciaCodigo(paciente) {
@@ -1261,6 +1795,9 @@ $(function () {
     $('#paciente_id').val('');
     $('#paciente_seleccionado').val('').removeData();
 
+    limpiarTutorExistenteSeleccionado();
+    limpiarResultadosTutorManual();
+
     $('#paciente-manual')
       .find(
         'input[type="text"], ' +
@@ -1411,4 +1948,5 @@ $('#modalBuscarPaciente')
 $(function () {
   initBusquedaCodigoPacienteManual();
   initCalculadoraEdadManual();
+  initBusquedaTutorManual();
 });
