@@ -59,9 +59,9 @@ global $usuario_id;
     <form method="post" action="paciente/updPacientes.php" id="formPaciente">
       <div class="row mb-3">
         <div class="col-md-6 mb-2">
-          <label for="nombre" class="form-label">Nombre</label>
-          <input type="text" class="form-control" id="nombre" name="nombre" maxlength="100"
-                 value="<?php echo htmlspecialchars($fila['nombre']); ?>" required>
+            <label for="nombre" class="form-label">Nombre</label>
+            <input type="text" class="form-control" id="nombre" name="nombre" maxlength="100"
+                  value="<?php echo htmlspecialchars($fila['nombre'] ?? '', ENT_QUOTES, 'UTF-8'); ?>" required>
         </div>
 
         <div class="col-md-6 mb-2">

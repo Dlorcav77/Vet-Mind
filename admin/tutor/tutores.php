@@ -43,24 +43,23 @@ global $usuario_id;
           <div class="col-md-6 mb-2">
             <label for="rut" class="form-label">RUT</label>
             <!-- <input type="text" class="form-control" id="rut" name="rut" oninput="checkRut(this)" maxlength="12" autocomplete="off" value="<?php echo htmlspecialchars($fila['rut']); ?>"> -->
-            <input type="text" class="form-control" id="rut" name="rut" value="<?php echo htmlspecialchars($fila['rut']); ?>">
+            <input type="text" class="form-control" id="rut" name="rut" value="<?php echo htmlspecialchars($fila['rut'] ?? '', ENT_QUOTES, 'UTF-8'); ?>">
           </div>
           <div class="col-md-6 mb-2">
             <label for="nombre_completo" class="form-label">Nombre</label>
-            <input type="text" class="form-control" id="nombre_completo" name="nombre_completo" maxlength="150" value="<?php echo htmlspecialchars($fila['nombre_completo']); ?>" required>
+            <input type="text" class="form-control" id="nombre_completo" name="nombre_completo" maxlength="150" value="<?php echo htmlspecialchars($fila['nombre_completo'] ?? '', ENT_QUOTES, 'UTF-8'); ?>" required>
           </div>
           <div class="col-md-6 mb-2">
             <label for="telefono" class="form-label">Teléfono</label>
-            <input type="text" class="form-control" id="telefono" name="telefono" maxlength="20" value="<?php echo htmlspecialchars($fila['telefono']); ?>">
+            <input type="text" class="form-control" id="telefono" name="telefono" maxlength="20" value="<?php echo htmlspecialchars($fila['telefono'] ?? '', ENT_QUOTES, 'UTF-8'); ?>">
           </div>
           <div class="col-md-6 mb-2">
             <label for="email" class="form-label">Email</label>
-            <input type="email" class="form-control" id="email" name="email" maxlength="100" value="<?php echo htmlspecialchars($fila['email']); ?>">
+            <input type="email" class="form-control" id="email" name="email" maxlength="100" value="<?php echo htmlspecialchars($fila['email'] ?? '', ENT_QUOTES, 'UTF-8'); ?>">
           </div>
           <div class="col-md-12 mb-2">
             <label for="direccion" class="form-label">Dirección</label>
-            <input type="text" class="form-control" id="direccion" name="direccion" maxlength="200" value="<?php echo htmlspecialchars($fila['direccion']); ?>">
-          </div>
+            <input type="text" class="form-control" id="direccion" name="direccion" maxlength="200" value="<?php echo htmlspecialchars($fila['direccion'] ?? '', ENT_QUOTES, 'UTF-8'); ?>">          </div>
         </div>
         <?php if ($action == 'modificar'): ?>
           <input type="hidden" name="id" value="<?php echo $id; ?>">
