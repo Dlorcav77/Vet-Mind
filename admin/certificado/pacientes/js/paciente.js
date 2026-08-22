@@ -5,10 +5,27 @@ function sinAcentos(s) {
 }
 
 function limpiarCampoContenedor($wrap) {
-  $wrap.find('input[type="text"], input[type="date"], input[type="hidden"], textarea').val('');
+  $wrap
+    .find(
+      'input[type="text"], ' +
+      'input[type="date"], ' +
+      'input[type="number"], ' +
+      'input[type="hidden"], ' +
+      'textarea'
+    )
+    .val('');
+
   $wrap.find('select').each(function () {
     $(this).val('').trigger('change');
   });
+
+  $wrap
+    .find('.manual-fecha-edad')
+    .hide();
+
+  $wrap
+    .find('.manual-fecha-normal')
+    .css('display', 'flex');
 }
 
 function sincronizarHabilitacionPorInterno() {
@@ -448,6 +465,247 @@ function preselectRazaByTextAndEspecie(nombreRaza, nombreEspecie) {
   }
 }
 
+function mostrarAvisoEdadManual(mensaje) {
+  if (window.Swal) {
+    Swal.fire(
+      'Edad no válida',
+      mensaje,
+      'warning'
+    );
+
+    return;
+  }
+
+  window.alert(mensaje);
+}
+
+function calcularFechaNacimientoDesdeEdad(anios, meses) {
+  const hoy = new Date();
+
+  const anioActual = hoy.getFullYear();
+  const mesActual = hoy.getMonth();
+  const diaActual = hoy.getDate();
+
+  const mesesTotales =
+    (anios * 12) + meses;
+
+  const mesAbsolutoActual =
+    (anioActual * 12) + mesActual;
+
+  const mesAbsolutoNacimiento =
+    mesAbsolutoActual - mesesTotales;
+
+  const anioNacimiento = Math.floor(
+    mesAbsolutoNacimiento / 12
+  );
+
+  const mesNacimiento =
+    ((mesAbsolutoNacimiento % 12) + 12) % 12;
+
+  const ultimoDiaMes = new Date(
+    anioNacimiento,
+    mesNacimiento + 1,
+    0
+  ).getDate();
+
+  const diaNacimiento = Math.min(
+    diaActual,
+    ultimoDiaMes
+  );
+
+  const anioTexto = String(
+    anioNacimiento
+  ).padStart(4, '0');
+
+  const mesTexto = String(
+    mesNacimiento + 1
+  ).padStart(2, '0');
+
+  const diaTexto = String(
+    diaNacimiento
+  ).padStart(2, '0');
+
+  return (
+    anioTexto +
+    '-' +
+    mesTexto +
+    '-' +
+    diaTexto
+  );
+}
+
+function initCalculadoraEdadManual() {
+  $(document)
+    .off(
+      'click.certMostrarEdadManual',
+      '.btn-calcular-edad-manual'
+    )
+    .on(
+      'click.certMostrarEdadManual',
+      '.btn-calcular-edad-manual',
+      function () {
+        const $campo = $(this).closest(
+          '.campo-manual-item'
+        );
+
+        const $normal = $campo.find(
+          '.manual-fecha-normal'
+        ).first();
+
+        const $edad = $campo.find(
+          '.manual-fecha-edad'
+        ).first();
+
+        if (
+          !$normal.length ||
+          !$edad.length
+        ) {
+          return;
+        }
+
+        $normal.hide();
+        $edad.css('display', 'flex');
+
+        const $anios = $edad.find(
+          '.manual-edad-anios'
+        ).first();
+
+        setTimeout(function () {
+          $anios.trigger('focus');
+        }, 0);
+      }
+    );
+
+  $(document)
+    .off(
+      'click.certAplicarEdadManual',
+      '.btn-aplicar-edad-manual'
+    )
+    .on(
+      'click.certAplicarEdadManual',
+      '.btn-aplicar-edad-manual',
+      function () {
+        const $campo = $(this).closest(
+          '.campo-manual-item'
+        );
+
+        const $anios = $campo.find(
+          '.manual-edad-anios'
+        ).first();
+
+        const $meses = $campo.find(
+          '.manual-edad-meses'
+        ).first();
+
+        const $fecha = $campo.find(
+          'input[name="manual_fecha_nacimiento"]'
+        ).first();
+
+        const $normal = $campo.find(
+          '.manual-fecha-normal'
+        ).first();
+
+        const $edad = $campo.find(
+          '.manual-fecha-edad'
+        ).first();
+
+        if (!$fecha.length) {
+          return;
+        }
+
+        const valorAnios = String(
+          $anios.val() || ''
+        ).trim();
+
+        const valorMeses = String(
+          $meses.val() || ''
+        ).trim();
+
+        if (!valorAnios && !valorMeses) {
+          mostrarAvisoEdadManual(
+            'Ingresa los años o meses del paciente.'
+          );
+
+          $anios.trigger('focus');
+
+          return;
+        }
+
+        const anios = valorAnios
+          ? Number(valorAnios)
+          : 0;
+
+        const meses = valorMeses
+          ? Number(valorMeses)
+          : 0;
+
+        if (
+          !Number.isInteger(anios) ||
+          anios < 0
+        ) {
+          mostrarAvisoEdadManual(
+            'Los años deben ser un número entero igual o mayor a 0.'
+          );
+
+          $anios.trigger('focus');
+
+          return;
+        }
+
+        if (
+          !Number.isInteger(meses) ||
+          meses < 0 ||
+          meses > 11
+        ) {
+          mostrarAvisoEdadManual(
+            'Los meses deben estar entre 0 y 11.'
+          );
+
+          $meses.trigger('focus');
+
+          return;
+        }
+
+        const fechaNacimiento =
+          calcularFechaNacimientoDesdeEdad(
+            anios,
+            meses
+          );
+
+        $fecha
+          .val(fechaNacimiento)
+          .trigger('input')
+          .trigger('change');
+
+        $edad.hide();
+        $normal.css('display', 'flex');
+      }
+    );
+
+  $(document)
+    .off(
+      'keydown.certEdadManual',
+      '.manual-edad-anios, .manual-edad-meses'
+    )
+    .on(
+      'keydown.certEdadManual',
+      '.manual-edad-anios, .manual-edad-meses',
+      function (e) {
+        if (e.key !== 'Enter') {
+          return;
+        }
+
+        e.preventDefault();
+
+        $(this)
+          .closest('.campo-manual-item')
+          .find('.btn-aplicar-edad-manual')
+          .first()
+          .trigger('click');
+      }
+    );
+}
+
 function prefillManualFromData(data) {
   if (!data) return;
 
@@ -644,8 +902,22 @@ function limpiarFormularioManualParaPacienteExistente() {
   }
 
   $manual
-    .find('input[type="text"], input[type="date"], input[type="hidden"], textarea')
-    .val('');
+  .find(
+    'input[type="text"], ' +
+    'input[type="date"], ' +
+    'input[type="number"], ' +
+    'input[type="hidden"], ' +
+    'textarea'
+  )
+  .val('');
+
+  $manual
+    .find('.manual-fecha-edad')
+    .hide();
+
+  $manual
+    .find('.manual-fecha-normal')
+    .css('display', 'flex');
 
   $manual
     .find('select')
@@ -990,8 +1262,21 @@ $(function () {
     $('#paciente_seleccionado').val('').removeData();
 
     $('#paciente-manual')
-      .find('input[type="text"], input[type="date"], input[type="hidden"]')
+      .find(
+        'input[type="text"], ' +
+        'input[type="date"], ' +
+        'input[type="number"], ' +
+        'input[type="hidden"]'
+      )
       .val('');
+
+    $('#paciente-manual')
+      .find('.manual-fecha-edad')
+      .hide();
+
+    $('#paciente-manual')
+      .find('.manual-fecha-normal')
+      .css('display', 'flex');
 
     $('#paciente-manual')
       .find('select')
@@ -1125,4 +1410,5 @@ $('#modalBuscarPaciente')
 
 $(function () {
   initBusquedaCodigoPacienteManual();
+  initCalculadoraEdadManual();
 });

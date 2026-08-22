@@ -179,14 +179,64 @@ foreach ($camposCatalogo as $campoCat) {
                         <?php endforeach; ?>
                     </select>
 
-                <?php elseif ($campoInterno === 'fecha_nacimiento'): ?>
-                    <input
-                        type="date"
-                        class="form-control"
-                        name="manual_fecha_nacimiento"
-                        id="manual_fecha_nacimiento"
-                        value="<?= htmlspecialchars($valorInicial) ?>"
-                    >
+<?php elseif ($campoInterno === 'fecha_nacimiento'): ?>
+    <div class="manual-fecha-nacimiento-wrap">
+
+        <div class="input-group manual-fecha-normal">
+            <input
+                type="date"
+                class="form-control"
+                name="manual_fecha_nacimiento"
+                id="manual_fecha_nacimiento"
+                value="<?= htmlspecialchars($valorInicial) ?>"
+            >
+
+            <button
+                type="button"
+                class="btn btn-outline-secondary btn-calcular-edad-manual"
+                title="Ingresar edad del paciente"
+            >
+                <i class="fas fa-calculator me-1"></i>
+                Edad
+            </button>
+        </div>
+
+        <div
+            class="input-group manual-fecha-edad"
+            style="display:none;"
+        >
+            <input
+                type="number"
+                class="form-control manual-edad-anios"
+                min="0"
+                step="1"
+                inputmode="numeric"
+                autocomplete="off"
+                placeholder="Años"
+                title="Años"
+            >
+
+            <input
+                type="number"
+                class="form-control manual-edad-meses"
+                min="0"
+                max="11"
+                step="1"
+                inputmode="numeric"
+                autocomplete="off"
+                placeholder="Meses"
+                title="Meses"
+            >
+
+            <button
+                type="button"
+                class="btn btn-primary btn-aplicar-edad-manual"
+            >
+                Aplicar
+            </button>
+        </div>
+
+    </div>
 
                 <?php else: ?>
                     <input

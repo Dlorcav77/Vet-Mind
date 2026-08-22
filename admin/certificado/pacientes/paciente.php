@@ -104,4 +104,4 @@ window.MANUAL_DATA = <?php
     }
 ?>;
 </script>
-<script src="certificado/pacientes/js/paciente.js?v=12"></script>
+<script src="certificado/pacientes/js/paciente.js?v=14"></script>
