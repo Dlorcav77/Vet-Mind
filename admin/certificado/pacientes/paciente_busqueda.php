@@ -10,7 +10,12 @@
             </div>
 
             <div class="modal-body">
-                <input type="text" class="form-control mb-3" id="buscarPacienteInput" placeholder="Ingrese RUT, Nombre del Tutor o Mascota...">
+                <input
+                    type="text"
+                    class="form-control mb-3"
+                    id="buscarPacienteInput"
+                    placeholder="Ingrese código, RUT, nombre del Tutor o Mascota..."
+                >
                 <div id="resultadosBuscarPaciente" class="table-responsive">
                     <p class="text-muted">Comience a escribir para ver resultados.</p>
                 </div>

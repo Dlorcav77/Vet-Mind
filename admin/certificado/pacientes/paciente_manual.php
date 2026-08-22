@@ -15,14 +15,68 @@ function manual_value(array $data, string $key): string {
     return htmlspecialchars((string)($data[$key] ?? ''), ENT_QUOTES, 'UTF-8');
 }
 
+$ordenCamposManual = [
+    'codigo_paciente'  => 1,
+    'paciente'         => 2,
+    'especie'          => 3,
+    'raza'             => 4,
+    'sexo'             => 5,
+    'propietario'      => 6,
+    'fecha_nacimiento' => 7,
+    'n_chip'           => 8,
+];
+
+$camposCatalogoOrdenados = [];
+
+foreach ($camposCatalogo as $indiceCampo => $campoCatalogo) {
+    $campoInternoOrden = (
+        isset($campoCatalogo['campo_interno']) &&
+        $campoCatalogo['campo_interno'] !== '' &&
+        $campoCatalogo['campo_interno'] !== null
+    )
+        ? (string)$campoCatalogo['campo_interno']
+        : (string)($campoCatalogo['campo'] ?? '');
+
+    $camposCatalogoOrdenados[] = [
+        'prioridad' => $ordenCamposManual[$campoInternoOrden] ?? 1000,
+        'indice'    => (int)$indiceCampo,
+        'campo'     => $campoCatalogo,
+    ];
+}
+
+usort(
+    $camposCatalogoOrdenados,
+    static function (array $campoA, array $campoB): int {
+        if ($campoA['prioridad'] === $campoB['prioridad']) {
+            return $campoA['indice'] <=> $campoB['indice'];
+        }
+
+        return $campoA['prioridad'] <=> $campoB['prioridad'];
+    }
+);
+
+$camposCatalogo = [];
+
+foreach ($camposCatalogoOrdenados as $campoOrdenado) {
+    $camposCatalogo[] = $campoOrdenado['campo'];
+}
+
 $etiquetaPorCampo = [];
 foreach ($camposCatalogo as $campoCat) {
     $etiquetaPorCampo[$campoCat['campo']] = $campoCat['etiqueta'];
 }
 ?>
 <div id="paciente-manual" class="my-3 border rounded p-3 bg-light" style="<?= $toggleManualInitial ? '' : 'display:none;' ?>">
-    <div class="d-flex justify-content-between align-items-center mb-3">
-        <h5 class="fw-bold mb-0">Ingreso Manual</h5>
+    <div class="manual-header mb-3">
+        <h5 class="fw-bold mb-0">
+            Ingreso Manual
+        </h5>
+
+        <div class="manual-header-coincidencias">
+            <div
+                class="manual-codigo-paciente-coincidencias-header"
+            ></div>
+        </div>
 
         <div class="form-check form-switch mb-0">
             <input
@@ -52,7 +106,7 @@ foreach ($camposCatalogo as $campoCat) {
                     ? $campo['campo_interno']
                     : $campoKey;
 
-                $camposTipoEspecial = ['raza', 'sexo', 'fecha_nacimiento'];
+                $camposTipoEspecial = ['especie', 'raza', 'sexo', 'fecha_nacimiento'];
                 $esTipoEspecial = in_array($campoInterno, $camposTipoEspecial, true);
 
                 $campoLabel = $esTipoEspecial
@@ -77,16 +131,33 @@ foreach ($camposCatalogo as $campoCat) {
                     <?php endif; ?>
                 </label>
 
-                <?php if ($campoInterno === 'raza'): ?>
+                <?php if ($campoInterno === 'especie'): ?>
+                    <select
+                        id="manual_especie_select"
+                        class="select2 form-select"
+                        style="width:100%;"
+                        data-current-text="<?= manual_value($manualDataInicial, 'especie') ?>"
+                    >
+                        <?php lisEspecies($valorInicial); ?>
+                    </select>
+
+                    <input
+                        type="hidden"
+                        id="manual_especie"
+                        name="manual_especie"
+                        value="<?= manual_value($manualDataInicial, 'especie') ?>"
+                    >
+
+                <?php elseif ($campoInterno === 'raza'): ?>
                     <select
                         id="manual_raza_select"
                         class="select2 form-select"
                         style="width:100%;"
                         data-current-text="<?= manual_value($manualDataInicial, 'raza') ?>"
                     >
-                        <option value="">Seleccione raza...</option>
                         <?php lisRazas(); ?>
                     </select>
+
                     <input
                         type="hidden"
                         id="manual_raza"
@@ -97,8 +168,12 @@ foreach ($camposCatalogo as $campoCat) {
                 <?php elseif ($campoInterno === 'sexo'): ?>
                     <select class="form-select" id="manual_sexo" name="manual_sexo">
                         <option value="">Seleccione...</option>
+
                         <?php foreach ($sexos_manual as $val => $label): ?>
-                            <option value="<?= htmlspecialchars($val) ?>" <?= $valorInicial === $val ? 'selected' : '' ?>>
+                            <option
+                                value="<?= htmlspecialchars($val) ?>"
+                                <?= $valorInicial === $val ? 'selected' : '' ?>
+                            >
                                 <?= htmlspecialchars($label) ?>
                             </option>
                         <?php endforeach; ?>
@@ -124,8 +199,12 @@ foreach ($camposCatalogo as $campoCat) {
                         autocomplete="off"
                         value="<?= htmlspecialchars($valorInicial) ?>"
                     >
+
                     <?php if ($esObligatorioManual): ?>
-                        <div class="invalid-feedback-manual" id="feedback_<?= htmlspecialchars($inputId) ?>">
+                        <div
+                            class="invalid-feedback-manual"
+                            id="feedback_<?= htmlspecialchars($inputId) ?>"
+                        >
                             <?= htmlspecialchars($campoLabel) ?> es obligatorio.
                         </div>
                     <?php endif; ?>

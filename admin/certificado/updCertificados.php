@@ -592,114 +592,159 @@ $manual_data = !empty($manual_extra_data)
     : null;
 
 if ($modo_manual && $guardarMascota && !empty($manual)) {
-    $tutorNombre = trim($manual['propietario'] ?? '');
+    $tutorNombre = trim((string)($manual['propietario'] ?? ''));
 
-    $stmt = $mysqli->prepare("SELECT id FROM tutores WHERE nombre_completo = ? AND veterinario_id = ?");
+    /*
+     * Si el usuario continúa en ingreso manual y mantiene "Guardar",
+     * se considera explícitamente un paciente nuevo.
+     *
+     * No reutilizamos tutores solamente por nombre ni pacientes
+     * solamente por nombre/tutor.
+     */
+    $stmt = $mysqli->prepare("
+        INSERT INTO tutores
+            (nombre_completo, veterinario_id)
+        VALUES
+            (?, ?)
+    ");
+
     if (!$stmt) {
         echo json_encode([
             'status' => 'error',
-            'message' => 'Error preparando tutor.',
+            'message' => 'Error preparando creación de tutor.',
             'mysql_error' => $mysqli->error
         ], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
         exit;
     }
 
-    $stmt->bind_param("si", $tutorNombre, $veterinario);
-    $stmt->execute();
-    $res = $stmt->get_result();
+    $stmt->bind_param(
+        "si",
+        $tutorNombre,
+        $veterinario
+    );
 
-    $tutorId = null;
-    if ($row = $res->fetch_assoc()) {
-        $tutorId = (int)$row['id'];
-    } else {
-        $stmt = $mysqli->prepare("INSERT INTO tutores (nombre_completo, veterinario_id) VALUES (?, ?)");
-        if (!$stmt) {
-            echo json_encode([
-                'status' => 'error',
-                'message' => 'Error preparando creación de tutor.',
-                'mysql_error' => $mysqli->error
-            ], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
-            exit;
-        }
-
-        $stmt->bind_param("si", $tutorNombre, $veterinario);
-        if ($stmt->execute()) {
-            $tutorId = (int)$stmt->insert_id;
-        }
+    if (!$stmt->execute()) {
+        echo json_encode([
+            'status' => 'error',
+            'message' => 'No se pudo crear el tutor.',
+            'mysql_error' => $stmt->error
+        ], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+        exit;
     }
 
-    $nombreMascota  = trim($manual['paciente'] ?? '');
-    $codigoPaciente = trim($manual['codigo_paciente'] ?? '');
-    $especie        = trim($manual['especie'] ?? '');
-    $raza           = trim($manual['raza'] ?? '');
-    $sexo           = trim($manual['sexo'] ?? '');
-    $n_chip         = trim($manual['n_chip'] ?? '');
+    $tutorId = (int)$stmt->insert_id;
 
-    $fecha_nacimiento_raw = trim($manual['fecha_nacimiento'] ?? '');
+    if ($tutorId <= 0) {
+        echo json_encode([
+            'status' => 'error',
+            'message' => 'No se obtuvo el ID del tutor creado.'
+        ], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+        exit;
+    }
+
+    $nombreMascota = trim((string)($manual['paciente'] ?? ''));
+    $codigoPaciente = trim((string)($manual['codigo_paciente'] ?? ''));
+    $especie = trim((string)($manual['especie'] ?? ''));
+    $raza = trim((string)($manual['raza'] ?? ''));
+    $sexo = trim((string)($manual['sexo'] ?? ''));
+    $n_chip = trim((string)($manual['n_chip'] ?? ''));
+
+    $fecha_nacimiento_raw = trim(
+        (string)($manual['fecha_nacimiento'] ?? '')
+    );
+
     $fecha_nacimiento = null;
+
     if ($fecha_nacimiento_raw !== '') {
-        $dt = DateTime::createFromFormat('Y-m-d', $fecha_nacimiento_raw);
-        if ($dt && $dt->format('Y-m-d') === $fecha_nacimiento_raw) {
+        $dt = DateTime::createFromFormat(
+            'Y-m-d',
+            $fecha_nacimiento_raw
+        );
+
+        if (
+            $dt &&
+            $dt->format('Y-m-d') === $fecha_nacimiento_raw
+        ) {
             $fecha_nacimiento = $fecha_nacimiento_raw;
         }
     }
 
-    $stmt = $mysqli->prepare("SELECT id FROM pacientes WHERE nombre = ? AND tutor_id = ? AND veterinario_id = ?");
+    $stmt = $mysqli->prepare("
+        INSERT INTO pacientes
+            (
+                nombre,
+                codigo_paciente,
+                especie,
+                raza,
+                sexo,
+                fecha_nacimiento,
+                tutor_id,
+                veterinario_id,
+                n_chip
+            )
+        VALUES
+            (?, ?, ?, ?, ?, ?, ?, ?, ?)
+    ");
+
     if (!$stmt) {
         echo json_encode([
             'status' => 'error',
-            'message' => 'Error preparando búsqueda de paciente.',
+            'message' => 'Error preparando creación de paciente.',
             'mysql_error' => $mysqli->error
         ], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
         exit;
     }
 
-    $stmt->bind_param("sii", $nombreMascota, $tutorId, $veterinario);
-    $stmt->execute();
-    $res = $stmt->get_result();
+    $stmt->bind_param(
+        "ssssssiis",
+        $nombreMascota,
+        $codigoPaciente,
+        $especie,
+        $raza,
+        $sexo,
+        $fecha_nacimiento,
+        $tutorId,
+        $veterinario,
+        $n_chip
+    );
 
-    if ($row = $res->fetch_assoc()) {
-        $paciente_id = (int)$row['id'];
-    } else {
-        $stmt = $mysqli->prepare("
-            INSERT INTO pacientes
-                (nombre, codigo_paciente, especie, raza, sexo, fecha_nacimiento, tutor_id, veterinario_id, n_chip)
-            VALUES
-                (?, ?, ?, ?, ?, ?, ?, ?, ?)
-        ");
-
-        if (!$stmt) {
-            echo json_encode([
-                'status' => 'error',
-                'message' => 'Error preparando creación de paciente.',
-                'mysql_error' => $mysqli->error
-            ], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
-            exit;
-        }
-
-        $stmt->bind_param(
-            "ssssssiis",
-            $nombreMascota,
-            $codigoPaciente,
-            $especie,
-            $raza,
-            $sexo,
-            $fecha_nacimiento,
-            $tutorId,
-            $veterinario,
-            $n_chip
-        );
-
-        if ($stmt->execute()) {
-            $paciente_id = (int)$stmt->insert_id;
-        }
+    if (!$stmt->execute()) {
+        echo json_encode([
+            'status' => 'error',
+            'message' => 'No se pudo crear el paciente.',
+            'mysql_error' => $stmt->error
+        ], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+        exit;
     }
 
-    // Mascota guardada en su tabla: el dato vive en `pacientes`, no duplicar en manual_data
+    $paciente_id = (int)$stmt->insert_id;
+
+    if ($paciente_id <= 0) {
+        echo json_encode([
+            'status' => 'error',
+            'message' => 'No se obtuvo el ID del paciente creado.'
+        ], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+        exit;
+    }
+
+    /*
+     * El paciente quedó guardado en las tablas reales.
+     * El certificado queda asociado mediante paciente_id,
+     * por lo que no necesitamos duplicar estos datos en manual_data.
+     */
     $manual_data = null;
+
 } elseif ($modo_manual && !empty($manual)) {
+    /*
+     * Ingreso manual sin "Guardar":
+     * no se crean tutor ni paciente.
+     */
     $paciente_id = null;
-    $manual_data = json_encode($manual, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+
+    $manual_data = json_encode(
+        $manual,
+        JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES
+    );
 }
 
 $imagenes = [];
@@ -842,8 +887,20 @@ if ($action === 'ingresar') {
     }
 
     $stmt = $mysqli->prepare("UPDATE certificados
-        SET fecha_examen = ?, contenido_html = ?, archivo_pdf = ?, imagenes_json = ?, medico_solicitante = ?, recinto = ?, tipo_estudio = ?, configuracion_informe_id = ?, motivo = ?, manual_data = ?, updated_at = NOW()
-        WHERE id = ? AND veterinario_id = ?");
+        SET paciente_id = ?,
+            fecha_examen = ?,
+            contenido_html = ?,
+            archivo_pdf = ?,
+            imagenes_json = ?,
+            medico_solicitante = ?,
+            recinto = ?,
+            tipo_estudio = ?,
+            configuracion_informe_id = ?,
+            motivo = ?,
+            manual_data = ?,
+            updated_at = NOW()
+        WHERE id = ?
+            AND veterinario_id = ?");
 
     if (!$stmt) {
         echo json_encode([
@@ -855,7 +912,8 @@ if ($action === 'ingresar') {
     }
 
     $stmt->bind_param(
-        "sssssssissii",
+        "isssssssissii",
+        $paciente_id,
         $fecha_examen,
         $descripcion,
         $rutaPdf,

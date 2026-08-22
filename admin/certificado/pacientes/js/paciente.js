@@ -12,42 +12,104 @@ function limpiarCampoContenedor($wrap) {
 }
 
 function sincronizarHabilitacionPorInterno() {
-  // Para cada campo_interno, habilitar solo los inputs del item visible; deshabilitar el resto
-  const vistosVisibles = {};
-
-  $('.campo-manual-item, [data-campo-general]').each(function () {
+  $('.campo-manual-item').each(function () {
     const $item = $(this);
-    const interno = String($item.data('interno') || '').trim();
-    if (!interno) return;
-    if ($item.is(':visible')) {
-      vistosVisibles[interno] = true;
+
+    const habilitado =
+      $item.attr('data-campo-habilitado') === '1';
+
+    const especieDerivada =
+      $item.attr('data-especie-derivada') === '1';
+
+    if (especieDerivada) {
+      $item
+        .find('input, select, textarea')
+        .prop('disabled', true);
+
+      $item
+        .find('input[type="hidden"][name="manual_especie"]')
+        .prop('disabled', false);
+
+      return;
     }
+
+    $item
+      .find('input, select, textarea')
+      .prop('disabled', !habilitado);
   });
 
-  $('.campo-manual-item, [data-campo-general]').each(function () {
+  $('[data-campo-general]').each(function () {
     const $item = $(this);
-    const interno = String($item.data('interno') || '').trim();
-    if (!interno) return;
 
-    const esVisible = $item.is(':visible');
-    const hayVisibleParaInterno = !!vistosVisibles[interno];
+    const habilitado =
+      $item.attr('data-campo-habilitado') === '1';
 
-    // Si este item está visible -> habilitar sus inputs.
-    // Si está oculto y existe otro visible con el mismo interno -> deshabilitar (no se envía).
-    // Si está oculto y NO hay ninguno visible -> deshabilitar igual (oculto no debe enviarse).
-    const habilitar = esVisible && (!hayVisibleParaInterno || true);
-
-    $item.find('input, select, textarea').prop('disabled', !esVisible);
+    $item
+      .find('input, select, textarea')
+      .prop('disabled', !habilitado);
   });
 }
 
 function aplicarCamposVisiblesFormulario(camposVisibles) {
-  window.CERT_CAMPOS_VISIBLES = Array.isArray(camposVisibles) ? camposVisibles : [];
+  const visibles = Array.isArray(camposVisibles)
+    ? camposVisibles
+    : [];
+
+  window.CERT_CAMPOS_VISIBLES = visibles;
+
+  let razaVisible = false;
+  let especieVisible = false;
 
   $('.campo-manual-item').each(function () {
     const $item = $(this);
     const campo = String($item.data('campo') || '').trim();
-    const visible = window.CERT_CAMPOS_VISIBLES.includes(campo);
+    const interno = String($item.data('interno') || '').trim();
+    const visible = visibles.includes(campo);
+
+    if (!visible) {
+      return;
+    }
+
+    if (interno === 'raza') {
+      razaVisible = true;
+    }
+
+    if (interno === 'especie') {
+      especieVisible = true;
+    }
+  });
+
+  const combinarRazaEspecie =
+    razaVisible && especieVisible;
+
+  window.CERT_RAZA_ESPECIE_COMBINADAS =
+    combinarRazaEspecie;
+
+  $('.campo-manual-item').each(function () {
+    const $item = $(this);
+    const campo = String($item.data('campo') || '').trim();
+    const interno = String($item.data('interno') || '').trim();
+    const visible = visibles.includes(campo);
+
+    const especieDerivada =
+      visible &&
+      combinarRazaEspecie &&
+      interno === 'especie';
+
+    $item.attr(
+      'data-campo-habilitado',
+      visible ? '1' : '0'
+    );
+
+    $item.attr(
+      'data-especie-derivada',
+      especieDerivada ? '1' : '0'
+    );
+
+    if (especieDerivada) {
+      $item.stop(true, true).hide();
+      return;
+    }
 
     if (visible) {
       $item.stop(true, true).slideDown(150);
@@ -59,8 +121,16 @@ function aplicarCamposVisiblesFormulario(camposVisibles) {
 
   $('[data-campo-general]').each(function () {
     const $item = $(this);
-    const campo = String($item.data('campo-general') || '').trim();
-    const visible = window.CERT_CAMPOS_VISIBLES.includes(campo);
+    const campo = String(
+      $item.data('campo-general') || ''
+    ).trim();
+
+    const visible = visibles.includes(campo);
+
+    $item.attr(
+      'data-campo-habilitado',
+      visible ? '1' : '0'
+    );
 
     if (visible) {
       $item.stop(true, true).show();
@@ -70,8 +140,44 @@ function aplicarCamposVisiblesFormulario(camposVisibles) {
     }
   });
 
-  // Tras mostrar/ocultar, sincronizar qué inputs se envían
-  setTimeout(sincronizarHabilitacionPorInterno, 160);
+  setTimeout(function () {
+    sincronizarHabilitacionPorInterno();
+
+    if (combinarRazaEspecie) {
+      const $razaSelect = $('#manual_raza_select');
+      const razaId = String($razaSelect.val() || '').trim();
+      const razaTexto = String(
+        $('#manual_raza').val() || ''
+      ).trim();
+
+      const especieTexto = String(
+        $('#manual_especie').val() || ''
+      ).trim();
+
+      if (razaId) {
+        $razaSelect.trigger('change');
+      } else if (razaTexto) {
+        preselectRazaByTextAndEspecie(
+          razaTexto,
+          especieTexto
+        );
+      } else {
+        $('#manual_especie').val('');
+      }
+
+      return;
+    }
+
+    if (especieVisible) {
+      const especieTexto = String(
+        $('#manual_especie').val() || ''
+      ).trim();
+
+      if (especieTexto) {
+        preselectEspecieByText(especieTexto);
+      }
+    }
+  }, 160);
 }
 
 function getCamposManualesVisibles() {
@@ -112,13 +218,84 @@ function validarPacienteManualUI() {
   return true;
 }
 
+function preselectEspecieByText(nombreEspecie) {
+  const $sel = $('#manual_especie_select');
+  if (!$sel.length) return;
+
+  const objetivo = sinAcentos(String(nombreEspecie || ''))
+    .trim()
+    .toLowerCase();
+
+  let found = null;
+
+  $sel.find('option').each(function () {
+    const texto = sinAcentos($(this).text() || '')
+      .trim()
+      .toLowerCase();
+
+    if (objetivo && texto === objetivo) {
+      found = $(this).val();
+      return false;
+    }
+  });
+
+  if (found !== null) {
+    $sel.val(found).trigger('change');
+  }
+}
+
+function initSelect2EspecieManual() {
+  const $sel = $('#manual_especie_select');
+  if (!$sel.length) return;
+
+  const especieActualHidden = ($('#manual_especie').val() || '').trim();
+  const especieActualData = String($sel.data('current-text') || '').trim();
+  const especieObjetivo = especieActualHidden || especieActualData;
+
+  if ($sel.hasClass('select2-hidden-accessible')) {
+    $sel.select2('destroy');
+  }
+
+  $sel.select2({
+    placeholder: 'Seleccione especie...',
+    allowClear: true,
+    minimumResultsForSearch: 0,
+    width: 'resolve'
+  });
+
+  $sel.off('change.certEspecie').on('change.certEspecie', function () {
+    const $opt = $(this).find('option:selected');
+    const especieId = String($(this).val() || '').trim();
+    const especieNombre = ($opt.text() || '').trim();
+
+    $('#manual_especie').val(
+      especieId && especieNombre !== 'Seleccione especie...'
+        ? especieNombre
+        : ''
+    );
+  });
+
+  if (especieObjetivo) {
+    preselectEspecieByText(especieObjetivo);
+  } else {
+    $sel.trigger('change');
+  }
+}
+
 function initSelect2RazaManual() {
   const $sel = $('#manual_raza_select');
   if (!$sel.length) return;
 
-  const razaActualHidden = ($('#manual_raza').val() || '').trim();
-  const razaActualData = ($sel.data('current-text') || '').trim();
-  const razaObjetivo = razaActualHidden || razaActualData;
+  const razaActualHidden = String(
+    $('#manual_raza').val() || ''
+  ).trim();
+
+  const razaActualData = String(
+    $sel.data('current-text') || ''
+  ).trim();
+
+  const razaObjetivo =
+    razaActualHidden || razaActualData;
 
   if ($sel.hasClass('select2-hidden-accessible')) {
     $sel.select2('destroy');
@@ -131,22 +308,38 @@ function initSelect2RazaManual() {
     width: 'resolve'
   });
 
-  $sel.off('change.certRaza').on('change.certRaza', function () {
-    const $opt = $(this).find('option:selected');
-    const razaNom = ($opt.text() || '').trim();
-    const especie = ($opt.closest('optgroup').attr('label') || '').trim();
+  $sel
+    .off('change.certRaza')
+    .on('change.certRaza', function () {
+      const $opt = $(this).find('option:selected');
+      const razaId = String($(this).val() || '').trim();
+      const razaNombre = ($opt.text() || '').trim();
 
-    $('#manual_raza').val(razaNom && razaNom !== 'Seleccione raza...' ? razaNom : '');
+      const especieNombre = (
+        $opt.closest('optgroup').attr('label') || ''
+      ).trim();
 
-    if ($('#manual_especie').length) {
-      if (especie) {
-        $('#manual_especie').val(especie);
+      $('#manual_raza').val(
+        razaId && razaNombre !== 'Seleccione raza...'
+          ? razaNombre
+          : ''
+      );
+
+      if (
+        window.CERT_RAZA_ESPECIE_COMBINADAS === true &&
+        $('#manual_especie').length
+      ) {
+        $('#manual_especie').val(
+          razaId ? especieNombre : ''
+        );
       }
-    }
-  });
+    });
 
   if (razaObjetivo) {
-    preselectRazaByTextAndEspecie(razaObjetivo, ($('#manual_especie').val() || '').trim());
+    preselectRazaByTextAndEspecie(
+      razaObjetivo,
+      String($('#manual_especie').val() || '').trim()
+    );
   } else {
     $sel.trigger('change');
   }
@@ -162,17 +355,61 @@ function abrirModalBuscarPaciente(triggerEl = null) {
   $('#modalBuscarPaciente').modal('show');
 }
 
-function seleccionarPaciente(id, mascota, tutor, especie, raza, edad, sexo, fecha_nacimiento) {
+function seleccionarPaciente(
+  id,
+  mascota,
+  tutor,
+  especie,
+  raza,
+  edad,
+  sexo,
+  fecha_nacimiento,
+  codigo_paciente = ''
+) {
+  const nombreMascota = String(
+    mascota || ''
+  ).trim();
+
+  const codigoPaciente = String(
+    codigo_paciente || ''
+  ).trim();
+
+  const razaPaciente = String(
+    raza || ''
+  ).trim();
+
+  const tutorPaciente = String(
+    tutor || ''
+  ).trim();
+
+  let textoPaciente = nombreMascota;
+
+  if (codigoPaciente) {
+    textoPaciente += ' (' + codigoPaciente + ')';
+  }
+
+  if (razaPaciente) {
+    textoPaciente += ', ' + razaPaciente;
+  }
+
+  if (tutorPaciente) {
+    textoPaciente += ' - Tutor: ' + tutorPaciente;
+  }
+
   $('#paciente_id').val(id);
+
   $('#paciente_seleccionado')
-    .val(`${mascota}, ${especie}, ${raza} - Tutor: ${tutor}`)
+    .val(textoPaciente)
+    .data('codigo_paciente', codigoPaciente)
     .data('especie', especie)
     .data('raza', raza)
     .data('edad', edad)
     .data('fecha_nacimiento', fecha_nacimiento || '')
     .data('sexo', sexo);
 
-  const inputFueraModal = document.getElementById('paciente_seleccionado');
+  const inputFueraModal =
+    document.getElementById('paciente_seleccionado');
+
   if (inputFueraModal) {
     inputFueraModal.focus();
     inputFueraModal.blur();
@@ -229,16 +466,485 @@ function prefillManualFromData(data) {
     }
   });
 
+  if (data.especie) {
+    preselectEspecieByText(data.especie);
+  }
+
   if (data.sexo && $('#manual_sexo').length) {
     $('#manual_sexo').val(data.sexo).trigger('change');
   }
 
   if (data.raza) {
-    preselectRazaByTextAndEspecie(data.raza, data.especie || null);
+    preselectRazaByTextAndEspecie(
+      data.raza,
+      data.especie || null
+    );
   }
 
   if (data.raza && !$('#manual_raza').val()) {
     $('#manual_raza').val(data.raza);
+  }
+}
+
+window.CERT_PACIENTE_MANUAL_STATE =
+  window.CERT_PACIENTE_MANUAL_STATE || {};
+
+if (
+  typeof window.CERT_PACIENTE_MANUAL_STATE.codigoTimer === 'undefined'
+) {
+  window.CERT_PACIENTE_MANUAL_STATE.codigoTimer = null;
+}
+
+if (
+  typeof window.CERT_PACIENTE_MANUAL_STATE.codigoRequest === 'undefined'
+) {
+  window.CERT_PACIENTE_MANUAL_STATE.codigoRequest = null;
+}
+
+function getManualCodigoPacienteInput() {
+  const $inputs = $('[id="manual_codigo_paciente"]');
+
+  if (!$inputs.length) {
+    return $();
+  }
+
+  const $visible = $inputs.filter(':visible').first();
+
+  if ($visible.length) {
+    return $visible;
+  }
+
+  return $inputs.first();
+}
+
+function asegurarContenedorCoincidenciasCodigoPaciente() {
+  const $manualVisible = $('[id="paciente-manual"]')
+    .filter(':visible')
+    .first();
+
+  if (!$manualVisible.length) {
+    return $();
+  }
+
+  return $manualVisible
+    .find('.manual-codigo-paciente-coincidencias-header')
+    .first();
+}
+
+function limpiarCoincidenciasCodigoPaciente() {
+  const $contenedor = asegurarContenedorCoincidenciasCodigoPaciente();
+
+  if ($contenedor.length) {
+    $contenedor.empty();
+  }
+}
+
+function formatearFechaPacienteManual(fecha) {
+  const valor = String(fecha || '').trim();
+
+  if (!valor) {
+    return '';
+  }
+
+  const partes = valor.split('-');
+
+  if (partes.length !== 3) {
+    return valor;
+  }
+
+  return partes[2] + '/' + partes[1] + '/' + partes[0];
+}
+
+function mostrarCoincidenciasCodigoPaciente(matches) {
+  const $contenedor =
+    asegurarContenedorCoincidenciasCodigoPaciente();
+
+  if (!$contenedor.length) {
+    return;
+  }
+
+  $contenedor.empty();
+
+  if (!Array.isArray(matches) || !matches.length) {
+    return;
+  }
+
+  matches.forEach(function (paciente) {
+    const nombre = String(
+      paciente.paciente || 'Paciente'
+    ).trim();
+
+    const codigo = String(
+      paciente.codigo_paciente || ''
+    ).trim();
+
+    const raza = String(
+      paciente.raza || ''
+    ).trim();
+
+    const propietario = String(
+      paciente.propietario || ''
+    ).trim();
+
+    let texto = nombre;
+
+    if (codigo) {
+      texto += ' (' + codigo + ')';
+    }
+
+    if (raza) {
+      texto += ' · ' + raza;
+    }
+
+    if (propietario) {
+      texto += ' - Tutor: ' + propietario;
+    }
+
+    const $coincidencia = $('<div>', {
+      class:
+        'alert alert-warning ' +
+        'manual-codigo-coincidencia ' +
+        'd-flex align-items-center ' +
+        'gap-2 mb-1'
+    });
+
+    const $texto = $('<span>', {
+      class:
+        'manual-codigo-coincidencia-texto ' +
+        'small flex-grow-1'
+    }).text(texto);
+
+    const $boton = $('<button>', {
+      type: 'button',
+      class:
+        'btn btn-success ' +
+        'btn-usar-paciente-codigo ' +
+        'manual-codigo-btn-usar ' +
+        'flex-shrink-0'
+    }).html(
+      '<i class="fas fa-check"></i> Usar'
+    );
+
+    $boton.data('paciente', paciente);
+
+    $coincidencia.append(
+      $texto,
+      $boton
+    );
+
+    $contenedor.append($coincidencia);
+  });
+}
+
+function limpiarFormularioManualParaPacienteExistente() {
+  const $manual = $('#paciente-manual');
+
+  if (!$manual.length) {
+    return;
+  }
+
+  $manual
+    .find('input[type="text"], input[type="date"], input[type="hidden"], textarea')
+    .val('');
+
+  $manual
+    .find('select')
+    .val('')
+    .trigger('change');
+
+  $('#guardarMascota').prop('checked', false);
+}
+
+function usarPacienteDesdeCoincidenciaCodigo(paciente) {
+  if (!paciente) {
+    return;
+  }
+
+  const pacienteId = parseInt(
+    paciente.paciente_id,
+    10
+  ) || 0;
+
+  if (pacienteId <= 0) {
+    return;
+  }
+
+  const nombre = String(
+    paciente.paciente || ''
+  ).trim();
+
+  const propietario = String(
+    paciente.propietario || ''
+  ).trim();
+
+  const especie = String(
+    paciente.especie || ''
+  ).trim();
+
+  const raza = String(
+    paciente.raza || ''
+  ).trim();
+
+  const sexo = String(
+    paciente.sexo || ''
+  ).trim();
+
+  const fechaNacimiento = String(
+    paciente.fecha_nacimiento || ''
+  ).trim();
+
+  seleccionarPaciente(
+    pacienteId,
+    nombre,
+    propietario,
+    especie,
+    raza,
+    '',
+    sexo,
+    fechaNacimiento,
+    String(paciente.codigo_paciente || '').trim()
+  );
+
+  limpiarFormularioManualParaPacienteExistente();
+
+  const $toggleManual = $('[id="toggle_manual"]')
+    .filter(':visible')
+    .first();
+
+  if ($toggleManual.length) {
+    $toggleManual
+      .prop('checked', false)
+      .trigger('change');
+  }
+
+  limpiarCoincidenciasCodigoPaciente();
+}
+
+function buscarCoincidenciasCodigoPaciente(codigo) {
+  const state = window.CERT_PACIENTE_MANUAL_STATE;
+
+  const codigoBuscado = String(codigo || '').trim();
+
+  if (!codigoBuscado) {
+    limpiarCoincidenciasCodigoPaciente();
+    return;
+  }
+
+  if (state.codigoRequest) {
+    state.codigoRequest.abort();
+    state.codigoRequest = null;
+  }
+
+  const $contenedor =
+    asegurarContenedorCoincidenciasCodigoPaciente();
+
+  if (!$contenedor.length) {
+    return;
+  }
+
+  $contenedor.html(
+    '<span class="small text-muted text-nowrap">' +
+      '<i class="fas fa-spinner fa-spin me-1"></i>' +
+      'Buscando código...' +
+    '</span>'
+  );
+
+  const request = $.ajax({
+    url: 'certificado/pacientes/buscar_codigo.php',
+    type: 'GET',
+    dataType: 'json',
+
+    data: {
+      q: codigoBuscado
+    },
+
+    success: function (response) {
+      const $inputActual =
+        getManualCodigoPacienteInput();
+
+      const codigoActual = String(
+        $inputActual.val() || ''
+      ).trim();
+
+      if (codigoActual !== codigoBuscado) {
+        return;
+      }
+
+      if (!$('#toggle_manual').is(':checked')) {
+        limpiarCoincidenciasCodigoPaciente();
+        return;
+      }
+
+      if (
+        !response ||
+        response.status !== 'success' ||
+        !Array.isArray(response.matches)
+      ) {
+        limpiarCoincidenciasCodigoPaciente();
+        return;
+      }
+
+      mostrarCoincidenciasCodigoPaciente(
+        response.matches
+      );
+    },
+
+    error: function (xhr, status) {
+      if (status === 'abort') {
+        return;
+      }
+
+      const $inputActual =
+        getManualCodigoPacienteInput();
+
+      const codigoActual = String(
+        $inputActual.val() || ''
+      ).trim();
+
+      if (codigoActual !== codigoBuscado) {
+        return;
+      }
+
+      $contenedor.html(
+        '<div class="small text-danger">' +
+          'No se pudo comprobar el código.' +
+        '</div>'
+      );
+    },
+
+    complete: function () {
+      if (state.codigoRequest === request) {
+        state.codigoRequest = null;
+      }
+    }
+  });
+
+  state.codigoRequest = request;
+}
+
+function initBusquedaCodigoPacienteManual() {
+  const state = window.CERT_PACIENTE_MANUAL_STATE;
+
+  if (state.codigoTimer) {
+    clearTimeout(state.codigoTimer);
+    state.codigoTimer = null;
+  }
+
+  if (state.codigoRequest) {
+    state.codigoRequest.abort();
+    state.codigoRequest = null;
+  }
+
+  asegurarContenedorCoincidenciasCodigoPaciente();
+
+  $(document)
+    .off(
+      'click.certUsarPacienteCodigo',
+      '.btn-usar-paciente-codigo'
+    )
+    .on(
+      'click.certUsarPacienteCodigo',
+      '.btn-usar-paciente-codigo',
+      function () {
+        const paciente = $(this).data('paciente');
+
+        usarPacienteDesdeCoincidenciaCodigo(
+          paciente
+        );
+      }
+    );
+
+  $(document)
+    .off(
+      'input.certCodigoPaciente',
+      '[id="manual_codigo_paciente"]'
+    )
+    .on(
+      'input.certCodigoPaciente',
+      '[id="manual_codigo_paciente"]',
+      function () {
+        const codigo = String(
+          $(this).val() || ''
+        ).trim();
+
+        if (state.codigoTimer) {
+          clearTimeout(state.codigoTimer);
+          state.codigoTimer = null;
+        }
+
+        if (state.codigoRequest) {
+          state.codigoRequest.abort();
+          state.codigoRequest = null;
+        }
+
+        if (
+          !$('#toggle_manual').is(':checked') ||
+          !codigo
+        ) {
+          limpiarCoincidenciasCodigoPaciente();
+          return;
+        }
+
+        state.codigoTimer = setTimeout(function () {
+          state.codigoTimer = null;
+
+          buscarCoincidenciasCodigoPaciente(
+            codigo
+          );
+        }, 500);
+      }
+    );
+
+  $(document)
+    .off(
+      'change.certCodigoPaciente',
+      '#toggle_manual'
+    )
+    .on(
+      'change.certCodigoPaciente',
+      '#toggle_manual',
+      function () {
+        if (!this.checked) {
+          limpiarCoincidenciasCodigoPaciente();
+
+          if (state.codigoTimer) {
+            clearTimeout(state.codigoTimer);
+            state.codigoTimer = null;
+          }
+
+          if (state.codigoRequest) {
+            state.codigoRequest.abort();
+            state.codigoRequest = null;
+          }
+
+          return;
+        }
+
+        const $input =
+          getManualCodigoPacienteInput();
+
+        const codigo = String(
+          $input.val() || ''
+        ).trim();
+
+        if (codigo) {
+          $input.trigger('input');
+        }
+      }
+    );
+
+  const $inputInicial =
+    getManualCodigoPacienteInput();
+
+  const codigoInicial = String(
+    $inputInicial.val() || ''
+  ).trim();
+
+  if (
+    codigoInicial &&
+    $('#toggle_manual').is(':checked')
+  ) {
+    $inputInicial.trigger('input');
   }
 }
 
@@ -260,8 +966,18 @@ $(function () {
     $('#paciente-manual').show();
     $('#paciente_seleccionado').prop('readonly', true);
 
-    if ($('#manual_raza_select').length && !$('#manual_raza_select').hasClass('select2-hidden-accessible')) {
+    if (
+      $('#manual_raza_select').length &&
+      !$('#manual_raza_select').hasClass('select2-hidden-accessible')
+    ) {
       initSelect2RazaManual();
+    }
+
+    if (
+      $('#manual_especie_select').length &&
+      !$('#manual_especie_select').hasClass('select2-hidden-accessible')
+    ) {
+      initSelect2EspecieManual();
     }
 
     aplicarCamposVisiblesFormulario(window.CERT_CAMPOS_VISIBLES);
@@ -273,11 +989,18 @@ $(function () {
     $('#paciente_id').val('');
     $('#paciente_seleccionado').val('').removeData();
 
-    $('#paciente-manual').find('input[type="text"], input[type="date"], input[type="hidden"]').val('');
-    $('#paciente-manual').find('select').val('').trigger('change');
+    $('#paciente-manual')
+      .find('input[type="text"], input[type="date"], input[type="hidden"]')
+      .val('');
+
+    $('#paciente-manual')
+      .find('select')
+      .val('')
+      .trigger('change');
 
     setTimeout(function () {
       initSelect2RazaManual();
+      initSelect2EspecieManual();
       aplicarCamposVisiblesFormulario(window.CERT_CAMPOS_VISIBLES);
     }, 0);
   }
@@ -290,8 +1013,18 @@ $(function () {
     $toggle.prop('checked', true);
     abrirManualSinLimpiar();
 
-    if ($('#manual_raza_select').length && !$('#manual_raza_select').hasClass('select2-hidden-accessible')) {
+    if (
+      $('#manual_raza_select').length &&
+      !$('#manual_raza_select').hasClass('select2-hidden-accessible')
+    ) {
       initSelect2RazaManual();
+    }
+
+    if (
+      $('#manual_especie_select').length &&
+      !$('#manual_especie_select').hasClass('select2-hidden-accessible')
+    ) {
+      initSelect2EspecieManual();
     }
 
     aplicarCamposVisiblesFormulario(window.CERT_CAMPOS_VISIBLES);
@@ -389,3 +1122,7 @@ $('#modalBuscarPaciente')
       }
     }, 0);
   });
+
+$(function () {
+  initBusquedaCodigoPacienteManual();
+});

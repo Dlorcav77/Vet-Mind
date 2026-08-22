@@ -160,284 +160,56 @@ function lisRazas(?string $especieNombre = null, ?string $razaSeleccionadaNombre
     if ($especieActual !== null) echo "</optgroup>";
 }
 
+function lisEspecies(?string $especieSeleccionadaNombre = null, ?int $especieSeleccionadaId = null)
+{
+    $mysqli = conn();
 
+    $sql = "
+        SELECT id, nombre
+        FROM especies
+        ORDER BY
+            CASE
+                WHEN nombre = 'Canino' THEN 0
+                WHEN nombre = 'Felino' THEN 1
+                ELSE 2
+            END,
+            nombre ASC
+    ";
 
+    $res = $mysqli->query($sql);
 
+    echo "<option value=''>Seleccione especie...</option>";
 
-// function lisAplicaciones($aplicaciones = array())
-// {
-//     $mysqli = conn();
-//     global $root;
-    
-//     $categorias = array_map(function($categoria) use ($mysqli) {
-//         return "'" . $mysqli->real_escape_string($categoria) . "'";
-//     }, $root);
-//     $categoriasList = implode(",", $categorias);
+    if (!$res) {
+        return;
+    }
 
-//     $sel = "
-//         SELECT * 
-//         FROM aplicaciones 
-//         WHERE deleted_at IS NULL
-//         " . (!empty($categorias) ? "AND categoria IN ($categoriasList)" : "") . "
-//         ORDER BY
-//           FIELD(categoria, 'Administrador', 'Documentos', 'Contratos'), 
-//           grupo, id";
-//     $res = $mysqli->query($sel);
+    $especieSelNorm = mb_strtolower(
+        trim((string)$especieSeleccionadaNombre),
+        'UTF-8'
+    );
 
-//     $menu  = "";
-//     $currentCategory = "";
-//     $group = "";
+    while ($fila = $res->fetch_assoc()) {
+        $id     = (int)$fila['id'];
+        $nombre = trim((string)$fila['nombre']);
 
-//     while ($fila = $res->fetch_assoc()) {
-//         $id     = $fila['id'];
-//         $grupo  = $fila['grupo'];
-//         $accion = $fila['accion'];
-//         $categoria = $fila['categoria']; 
-        
-//         if ($categoria != $currentCategory) {
-//             if ($currentCategory != "") {
-//                 $menu .= "</optgroup>";
-//             }
-//             $menu .= "<optgroup label='---------------- $categoria ----------------'>";
-//             $currentCategory = $categoria;
-//         }
+        $selected = '';
 
-//         if ($grupo != $group) {
-//             if ($group != "") {
-//                 $menu .= "</optgroup>";
-//             }
-//             $menu .= "<optgroup label='$grupo'>";
-//             $group = $grupo;
-//         }
+        if (
+            $especieSeleccionadaId !== null &&
+            $especieSeleccionadaId === $id
+        ) {
+            $selected = ' selected';
+        } elseif (
+            $especieSeleccionadaId === null &&
+            $especieSeleccionadaNombre !== null &&
+            mb_strtolower($nombre, 'UTF-8') === $especieSelNorm
+        ) {
+            $selected = ' selected';
+        }
 
-//         $selected = in_array($id, $aplicaciones) ? "selected" : "";
-
-//         $menu .= "<option value='$id' $selected>$accion</option>";
-//     }
-
-//     if ($group != "") {
-//         $menu .= "</optgroup>";
-//     }
-
-//     print $menu;
-// }
-
-
-
-
-
-
-
-
-
-
-
-// function lisCategoriaContratos($idCat = null)
-// {
-//  global $codsede;
-//  $mysqli = conn();
-//  $sel    = "SELECT * FROM categoriaContratos WHERE codsede='$codsede' AND deleted_at IS NULL ORDER BY id";
-//  $res    = $mysqli->query($sel);
-
-//  $menu="";
-//  while($fila = $res->fetch_assoc())
-//  {
-//   $id     = $fila['id'];
-//   $nombre = $fila['nombre'];
-//   $desc   = $fila['descripcion'];
-
-//   if($idCat==$id){$selected="selected";}else{$selected="";}
-
-//   $menu  = $menu."<option value='$id' $selected>"."$nombre - $desc"."</option>";
-//  }
-//  print "$menu";
-// }
-
-
-// function lisCategoriaDocumentos($idCat = null)
-// {
-//  global $codsede;
-//  $mysqli = conn();
-//  $sel    = "SELECT * FROM categoriaDocumentos WHERE codsede='$codsede' AND deleted_at IS NULL ORDER BY id";
-//  $res    = $mysqli->query($sel);
-
-//  $menu="";
-//  while($fila = $res->fetch_assoc())
-//  {
-//   $id     = $fila['id'];
-//   $nombre = $fila['nombre'];
-//   // $desc   = $fila['descripcion'];
-
-//   if($idCat==$id){$selected="selected";}else{$selected="";}
-
-//   $menu  = $menu."<option value='$id' $selected>"."$nombre"."</option>";
-//  }
-//  print "$menu";
-// }
-
-
-
-// function lisTipo($tipo_id = null)
-// {
-//  global $codsede;
-//  $mysqli = conn();
-//  $sel    = "SELECT * FROM tipo_noticias WHERE codsede='$codsede' AND deleted_at IS NULL ORDER BY id";
-//  $res    = $mysqli->query($sel);
-
-//  $menu="";
-//  while($fila = $res->fetch_assoc())
-//  {
-//   $id     = $fila['id'];
-//   $nombre = $fila['nombre'];
-//   $icono = $fila['icono'];
-//   $color = $fila['color'];
-  
-//   if($tipo_id==$id){$selected="selected";}else{if($nombre=="Todos" || $nombre=="Todo" || $nombre=="All"){$selected="selected";}else{$selected="";}}
-  
-//   $menu .= "<option value='$id' data-icon='$icono' data-color='$color' $selected>$nombre</option>";
-// }
-//  print "$menu";
-// }
-
-
-
-// function lisArea($area_id = null)
-// {
-//  global $codsede;
-//  $mysqli = conn();
-//  $sel    = "SELECT * FROM areas WHERE codsede='$codsede' AND deleted_at IS NULL ORDER BY  id";
-//  $res    = $mysqli->query($sel);
-
-//  $menu="";
-//  while($fila = $res->fetch_assoc())
-//  {
-//   $id     = $fila['id'];
-//   $nombre = $fila['nombre'];
-  
-//   if($area_id==$id){$selected="selected";}else{if($nombre=="Todos" || $nombre=="Todo" || $nombre=="All"){$selected="selected";}else{$selected="";}}
-  
-//   $menu  = $menu."<option value='$id' $selected>"."$nombre"."</option>";
-//  }
-//  print "$menu";
-// }
-
-
-
-// function lisEmpresas($empresa_id = null)
-// {
-//  global $codsede;
-//  $mysqli = conn();
-//  $sel    = "SELECT * FROM empresas WHERE codsede='$codsede' AND deleted_at IS NULL ORDER BY  id";
-//  $res    = $mysqli->query($sel);
-
-//  $menu="";
-//  while($fila = $res->fetch_assoc())
-//  {
-//   $id         = $fila['id'];
-//   $rut        = $fila['rut'];
-//   $razon_social = $fila['razon_social'];
-  
-//   if($empresa_id==$id){$selected="selected";}else{$selected="";}
-  
-//   $menu  = $menu."<option value='$id' $selected>"."$rut - $razon_social"."</option>";
-//  }
-//  print "$menu";
-// }
-
-// function lisClientes($cliente_id = null)
-// {
-//     global $codsede;
-//     $mysqli = conn();
-//     $sel    = "SELECT * FROM clientes WHERE deleted_at IS NULL ORDER BY id";
-//     $res    = $mysqli->query($sel);
-
-//     $menu = "";
-//     while ($fila = $res->fetch_assoc()) {
-//         $id      = $fila['id'];
-//         $rut     = $fila['rut'];
-//         $nombre  = $fila['nombre'];
-
-//         if ($cliente_id == $id) {
-//             $selected = "selected";
-//         } else {
-//             $selected = "";
-//         }
-
-//         $menu = $menu . "<option value='$id' $selected>" . "$nombre" . "</option>";
-//     }
-//     print "$menu";
-// }
-
-// function lisTiposServicios($tipo_servicio_id = null)
-// {
-//     $mysqli = conn();
-//     $sel    = "SELECT * FROM tipos_servicios WHERE deleted_at IS NULL ORDER BY id";
-//     $res    = $mysqli->query($sel);
-
-//     $menu = "";
-//     while ($fila = $res->fetch_assoc()) {
-//         $id      = $fila['id'];
-//         $nombre  = $fila['nombre'];
-
-//         $selected = ($tipo_servicio_id == $id) ? "selected" : "";
-
-//         $menu .= "<option value='$id' $selected>" . htmlspecialchars($nombre, ENT_QUOTES, 'UTF-8') . "</option>";
-//     }
-//     print $menu;
-// }
-
-// function lisDocumentos($documentos_id = null)
-// {
-//  global $codsede;
-//  $mysqli = conn();
-//  $sel    = "SELECT * FROM documentos WHERE codsede='$codsede' AND estado = 'activo' AND deleted_at IS NULL ORDER BY fecha_publicacion DESC";
-//  $res    = $mysqli->query($sel);
-
-//  $menu="";
-//  while($fila = $res->fetch_assoc())
-//  {
-//   $id            = $fila['id'];
-//   $num_documento = $fila['num_documento'];
-//   $categoria_id  = $fila['categoria_id'];
-//   $version       = $fila['version'];
-
-//   $selC  = "SELECT * FROM categorias WHERE codsede='$codsede' AND id='$categoria_id' AND deleted_at IS NULL ORDER BY id";
-//   $resC  = $mysqli->query($selC);
-//   $filaC = $resC->fetch_assoc();
-
-//   $nombre            = $filaC['nombre'];
-  
-//   if($documentos_id==$id){$selected="selected";}else{$selected="";}
-  
-//   $menu  = $menu."<option value='$id' $selected>"."$num_documento - $version - $nombre"."</option>";
-//  }
-//  print "$menu";
-// }
-
-
-
-// function lisPerfilesAccesos($perfiles_seleccionados = [])
-// {
-//   global $codsede;
-//   $mysqli = conn();
-//   $sel    = "SELECT * FROM perfiles WHERE codsede='$codsede' AND nombre != 'superAdmin' ORDER BY id";
-//   $res    = $mysqli->query($sel);
- 
-//   if($perfiles_seleccionados){
-//     $menu = "<option value='todos' " . (in_array('Todos', $perfiles_seleccionados) ? "selected" : "") . ">Todos</option>";
-//   }else{
-//     $menu = "<option value='todos' " . (empty($perfiles_seleccionados) ? "selected" : "") . ">Todos</option>";
-//   }
-
-//   while($fila = $res->fetch_assoc())
-//   {
-//     $id          = $fila['id'];
-//     $nombre      = $fila['nombre'];
-//     $descripcion = $fila['descripcion'];
-
-//     $selected = in_array($nombre, $perfiles_seleccionados) ? "selected" : "";
-    
-//     $menu  = $menu."<option value='$id' $selected>"."$nombre"."</option>";
-//   }
-//   print "$menu";
-// }
+        echo "<option value='" . htmlspecialchars((string)$id, ENT_QUOTES, 'UTF-8') . "'" . $selected . ">"
+           . htmlspecialchars($nombre, ENT_QUOTES, 'UTF-8')
+           . "</option>";
+    }
+}

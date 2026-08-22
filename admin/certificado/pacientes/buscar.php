@@ -1,4 +1,5 @@
 <?php
+
 require_once("../../config.php");
 
 $mysqli = conn();
@@ -16,9 +17,10 @@ if (strlen($q) < 3) {
 }
 
 $stmt = $mysqli->prepare("
-    SELECT  
-        p.id, 
-        p.nombre, 
+    SELECT
+        p.id,
+        p.nombre,
+        p.codigo_paciente,
         t.nombre_completo,
         p.especie,
         p.raza,
@@ -28,6 +30,7 @@ $stmt = $mysqli->prepare("
     INNER JOIN tutores t ON p.tutor_id = t.id
     WHERE (
             p.nombre LIKE CONCAT('%', ?, '%')
+            OR p.codigo_paciente LIKE CONCAT('%', ?, '%')
             OR t.nombre_completo LIKE CONCAT('%', ?, '%')
             OR t.rut LIKE CONCAT('%', ?, '%')
           )
@@ -37,11 +40,21 @@ $stmt = $mysqli->prepare("
 ");
 
 if (!$stmt) {
-    echo '<div class="alert alert-danger mb-0">Error preparando búsqueda: ' . htmlspecialchars($mysqli->error) . '</div>';
+    echo '<div class="alert alert-danger mb-0">Error preparando búsqueda: '
+        . htmlspecialchars($mysqli->error)
+        . '</div>';
     exit;
 }
 
-$stmt->bind_param("sssi", $q, $q, $q, $usuario_id);
+$stmt->bind_param(
+    "ssssi",
+    $q,
+    $q,
+    $q,
+    $q,
+    $usuario_id
+);
+
 $stmt->execute();
 $res = $stmt->get_result();
 
@@ -73,6 +86,7 @@ while ($row = $res->fetch_assoc()) {
 
             if ($diff->y > 0) {
                 $edad = $diff->y . ' años';
+
                 if ($diff->m > 0) {
                     $edad .= ' ' . $diff->m . ' meses';
                 }
@@ -86,11 +100,33 @@ while ($row = $res->fetch_assoc()) {
         }
     }
 
+    $nombreMascota = trim((string)($row['nombre'] ?? ''));
+    $codigoPaciente = trim((string)($row['codigo_paciente'] ?? ''));
+
+    $mascotaMostrar = $nombreMascota;
+
+    if ($codigoPaciente !== '') {
+        $mascotaMostrar .= ' (' . $codigoPaciente . ')';
+    }
+
     echo '<tr>';
-    echo '<td>' . htmlspecialchars($row['nombre'] ?? '') . '</td>';
-    echo '<td>' . htmlspecialchars($row['especie'] ?? '') . '</td>';
-    echo '<td>' . htmlspecialchars($row['raza'] ?? '') . '</td>';
-    echo '<td>' . htmlspecialchars($row['nombre_completo'] ?? '') . '</td>';
+
+    echo '<td>'
+        . htmlspecialchars($mascotaMostrar)
+        . '</td>';
+
+    echo '<td>'
+        . htmlspecialchars($row['especie'] ?? '')
+        . '</td>';
+
+    echo '<td>'
+        . htmlspecialchars($row['raza'] ?? '')
+        . '</td>';
+
+    echo '<td>'
+        . htmlspecialchars($row['nombre_completo'] ?? '')
+        . '</td>';
+
     echo '<td>
             <button
                 type="button"
@@ -103,11 +139,13 @@ while ($row = $res->fetch_assoc()) {
                     . addslashes($row['raza'] ?? '') . '\', \''
                     . addslashes($edad ?? '') . '\', \''
                     . addslashes($row['sexo'] ?? '') . '\', \''
-                    . addslashes($row['fecha_nacimiento'] ?? '') . '\'
+                    . addslashes($row['fecha_nacimiento'] ?? '') . '\', \''
+                    . addslashes($row['codigo_paciente'] ?? '') . '\'
                 )">
                 Seleccionar
             </button>
           </td>';
+
     echo '</tr>';
 }
 

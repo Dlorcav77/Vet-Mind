@@ -124,7 +124,7 @@ try {
     $previewDir = __DIR__ . '/../../../uploads/tmp/informe/';
     $previewImgDir = __DIR__ . '/../../../uploads/tmp/img/';
 
-    $limiteImagenes = 24;
+    $limiteImagenes = 40;
     $cantidadImagenesAntiguas = 0;
 
     if (!empty($_POST['imagenes_antiguas'])) {
