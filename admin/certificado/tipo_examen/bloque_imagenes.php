@@ -26,15 +26,19 @@
                 type="button"
                 class="btn btn-sm btn-outline-secondary"
                 id="btnToggleImagenesPreview"
-                data-visible="1"
-                title="Ocultar imágenes"
+                data-visible="0"
+                title="Mostrar imágenes"
             >
-                <i class="fas fa-eye-slash"></i>
+                <i class="fas fa-eye"></i>
             </button>
         </div>
     </div>
 
-    <div id="imagenesPreview" class="border rounded bg-light" style="min-height: 400px;">
+    <div
+        id="imagenesPreview"
+        class="border rounded bg-light"
+        style="display:none; min-height: 400px;"
+    >
         <em class="text-muted">Sube imágenes para verlas aquí.</em>
     </div>
 

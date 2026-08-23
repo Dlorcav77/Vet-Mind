@@ -182,15 +182,19 @@ if (!function_exists('valorManualCertificado')) {
                             type="button"
                             class="btn btn-sm btn-outline-secondary"
                             id="btnTogglePlantillaPreview"
-                            data-visible="1"
-                            title="Ocultar plantilla asociada"
+                            data-visible="0"
+                            title="Mostrar plantilla asociada"
                         >
-                            <i class="fas fa-eye-slash"></i>
+                            <i class="fas fa-eye"></i>
                         </button>
                     </div>
                 </div>
 
-                <div class="border rounded p-3 bg-light" id="plantillaContenido" style="min-height: 400px; overflow-y: auto;">
+                <div
+                    class="border rounded p-3 bg-light"
+                    id="plantillaContenido"
+                    style="display:none; min-height: 400px; overflow-y: auto;"
+                >
                     <em class="text-muted">Selecciona un tipo de examen para ver su plantilla...</em>
                 </div>
             </div>
