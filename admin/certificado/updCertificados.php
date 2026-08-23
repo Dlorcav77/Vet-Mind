@@ -499,6 +499,17 @@ $borrador_id             = (int)($_POST['borrador_id'] ?? 0);
 $borrador_scope_key      = trim((string)($_POST['borrador_scope_key'] ?? (($action === 'modificar' && $id > 0) ? 'modificar:' . $id : 'nuevo')));
 $audio_tmp               = trim((string)($_POST['audio_tmp'] ?? ''));
 
+$es_destacado = (
+    isset($_POST['es_destacado']) &&
+    (string)$_POST['es_destacado'] === '1'
+) ? 1 : 0;
+
+$destacado_titulo = trim((string)($_POST['destacado_titulo'] ?? ''));
+
+if ($es_destacado !== 1 || $destacado_titulo === '') {
+    $destacado_titulo = null;
+}
+
 $recinto                 = trim($_POST['recinto'] ?? '');
 
 if ($recinto === '' && $configuracion_informe_id > 0) {
@@ -950,8 +961,25 @@ $rutaPdf = "uploads/certificados/informes/" . $pdfFilename;
 
 if ($action === 'ingresar') {
     $stmt = $mysqli->prepare("INSERT INTO certificados 
-        (veterinario_id, paciente_id, fecha_examen, contenido_html, archivo_pdf, imagenes_json, medico_solicitante, recinto, tipo_estudio, configuracion_informe_id, motivo, manual_data, created_at, updated_at)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), NOW())");
+        (
+            veterinario_id,
+            paciente_id,
+            fecha_examen,
+            contenido_html,
+            archivo_pdf,
+            imagenes_json,
+            medico_solicitante,
+            recinto,
+            tipo_estudio,
+            configuracion_informe_id,
+            motivo,
+            manual_data,
+            es_destacado,
+            destacado_titulo,
+            created_at,
+            updated_at
+        )
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), NOW())");
 
     if (!$stmt) {
         rollbackCertificadoSiActivo(
@@ -968,7 +996,7 @@ if ($action === 'ingresar') {
     }
 
     $stmt->bind_param(
-        "iisssssssiss",
+        "iisssssssissis",
         $veterinario,
         $paciente_id,
         $fecha_examen,
@@ -980,7 +1008,9 @@ if ($action === 'ingresar') {
         $plantilla_informe_id,
         $configuracion_informe_id,
         $motivo,
-        $manual_data
+        $manual_data,
+        $es_destacado,
+        $destacado_titulo
     );
 } elseif ($action === 'modificar' && $id > 0) {
     $stmtPrev = $mysqli->prepare("SELECT archivo_pdf, imagenes_json FROM certificados WHERE id = ? AND veterinario_id = ?");
@@ -1037,6 +1067,8 @@ if ($action === 'ingresar') {
             configuracion_informe_id = ?,
             motivo = ?,
             manual_data = ?,
+            es_destacado = ?,
+            destacado_titulo = ?,
             updated_at = NOW()
         WHERE id = ?
             AND veterinario_id = ?");
@@ -1056,7 +1088,7 @@ if ($action === 'ingresar') {
     }
 
     $stmt->bind_param(
-        "isssssssissii",
+        "isssssssissisii",
         $paciente_id,
         $fecha_examen,
         $descripcion,
@@ -1068,6 +1100,8 @@ if ($action === 'ingresar') {
         $configuracion_informe_id,
         $motivo,
         $manual_data,
+        $es_destacado,
+        $destacado_titulo,
         $id,
         $veterinario
     );

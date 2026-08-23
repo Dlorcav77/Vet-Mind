@@ -38,6 +38,14 @@ $borrador_payload                = $formData['borrador_payload'];
 $borrador_scope_key              = $formData['borrador_scope_key'];
 $modo_ingreso_contenido_inicial  = $formData['modo_ingreso_contenido_inicial'];
 $clinicas_recinto                = $formData['clinicas_recinto'];
+$es_destacado_inicial = (
+    isset($fila['es_destacado']) &&
+    (int)$fila['es_destacado'] === 1
+);
+
+$destacado_titulo_inicial = trim(
+    (string)($fila['destacado_titulo'] ?? '')
+);
 ?>
 <link rel="stylesheet" href="certificado/common/css/certificado.css?v=2">
 <div class="card" id="certificado" data-page-id="certificado">
@@ -45,9 +53,22 @@ $clinicas_recinto                = $formData['clinicas_recinto'];
         <div class="cert-header-top">
             <div class="cert-title-row">
                 <div class="cert-title-wrap">
+
                     <h1 class="h3 fw-bold mb-0"><?= htmlspecialchars($accion) ?> Informe</h1>
 
+                    <button
+                        type="button"
+                        id="btnToggleDestacado"
+                        class="btn btn-sm p-0 border-0 shadow-none <?= $es_destacado_inicial ? 'text-warning' : 'text-secondary' ?>"
+                        title="<?= $es_destacado_inicial ? 'Quitar destacado' : 'Destacar informe' ?>"
+                        aria-label="<?= $es_destacado_inicial ? 'Quitar destacado' : 'Destacar informe' ?>"
+                        style="font-size: 1.15rem; line-height: 1;"
+                    >
+                        <i class="fas fa-star"></i>
+                    </button>
+
                     <span id="draftBadgeStatus" class="draft-badge-status <?= !empty($hay_borrador) ? 'is-saved' : 'is-idle' ?>">
+
                         <span class="draft-dot"></span>
 
                         <span id="draftBadgeText">
@@ -63,9 +84,10 @@ $clinicas_recinto                = $formData['clinicas_recinto'];
                         >
                             <i class="fas fa-trash-alt"></i>
                         </button>
-                    </span>
-                </div>
 
+                    </span>
+
+                </div>
                 <div class="w-100 w-md-auto" style="max-width: 320px;">
                     <select name="configuracion_informe_id" id="configuracion_informe_id" class="form-select">
                         <option value="">Plantilla de diseño</option>
@@ -104,4 +126,5 @@ $clinicas_recinto                = $formData['clinicas_recinto'];
 <script src="certificado/common/js/editor.js?v=4"></script>
 <script src="certificado/metodo_ingreso/js/ia.js?v=16"></script>
 <script src="certificado/preview/js/preview.js?v=4"></script>
+<script src="certificado/common/js/destacado.js?v=1"></script>
 <script src="certificado/guardar/js/guardar.js?v=22"></script>

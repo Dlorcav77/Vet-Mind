@@ -1,5 +1,5 @@
 <?php
-//admin/certificado/guardar/upBorradorCertificado.php
+//admin/certificado/guardar/updBorradorCertificado.php
 require_once("../../config.php");
 
 header('Content-Type: application/json; charset=utf-8');
@@ -95,6 +95,9 @@ $payload = [
     'rid_ia'                    => trim((string)($_POST['rid_ia'] ?? '')),
     'rid_revision'              => trim((string)($_POST['rid_revision'] ?? '')),
     'audio_tmp'                 => trim((string)($_POST['audio_tmp'] ?? '')),
+
+    'es_destacado'              => isset($_POST['es_destacado']) && (string)$_POST['es_destacado'] === '1' ? 1 : 0,
+    'destacado_titulo'          => trim((string)($_POST['destacado_titulo'] ?? '')),
 ];
 
 $payloadJson = json_encode($payload, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);

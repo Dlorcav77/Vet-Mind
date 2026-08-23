@@ -22,7 +22,9 @@ if (!function_exists('certificado_get_form_data')) {
             'configuracion_informe_id'  => '',
             'rid_ia'                    => '',
             'rid_revision'              => '',
-            'audio_tmp'                 => ''
+            'audio_tmp'                 => '',
+            'es_destacado'              => 0,
+            'destacado_titulo'          => ''
         ];
 
         $imagenesGuardadas = [];
@@ -185,6 +187,13 @@ if (!function_exists('certificado_get_form_data')) {
                     }
                     if (array_key_exists('audio_tmp', $payload)) {
                         $fila['audio_tmp'] = (string)$payload['audio_tmp'];
+                    }
+                    if (array_key_exists('es_destacado', $payload)) {
+                        $fila['es_destacado'] = ((string)$payload['es_destacado'] === '1') ? 1 : 0;
+                    }
+
+                    if (array_key_exists('destacado_titulo', $payload)) {
+                        $fila['destacado_titulo'] = trim((string)$payload['destacado_titulo']);
                     }
 
                     $modo_ingreso_contenido_inicial = (!empty($payload['toggle_audio_manual']) && (int)$payload['toggle_audio_manual'] === 1)
