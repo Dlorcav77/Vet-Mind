@@ -64,7 +64,7 @@ $destacado_titulo_inicial = trim(
                         aria-label="<?= $es_destacado_inicial ? 'Quitar destacado' : 'Destacar informe' ?>"
                         style="font-size: 1.15rem; line-height: 1;"
                     >
-                        <i class="fas fa-star"></i>
+                        <i class="fas fa-bookmark"></i>
                     </button>
 
                     <span id="draftBadgeStatus" class="draft-badge-status <?= !empty($hay_borrador) ? 'is-saved' : 'is-idle' ?>">

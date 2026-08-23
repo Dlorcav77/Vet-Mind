@@ -17,7 +17,7 @@
         >
             <div class="border rounded bg-light p-2">
                 <label for="destacado_titulo" class="form-label fw-bold mb-1">
-                    <i class="fas fa-star text-warning me-1"></i>
+                    <i class="fas fa-bookmark text-warning me-1"></i>
                     Título del destacado
                     <span class="text-muted fw-normal">(opcional)</span>
                 </label>

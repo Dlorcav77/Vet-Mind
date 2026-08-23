@@ -12,10 +12,13 @@ $(document).on('click', '.dropdown-toggle', function (e) {
 // ✅ Inicializa DataTables para todas las tablas con .datatable
 function initDataTables() {
     $('.datatable').each(function () {
-        // 🛠️ Evita reinit si ya está inicializada
+
+        // Si ya está inicializada, conservamos su estado actual:
+        // búsqueda, página, orden y filtros.
         if ($.fn.DataTable.isDataTable(this)) {
-            $(this).DataTable().destroy();
+            return;
         }
+
         $(this).DataTable({
             responsive: true,
             dom: 'Bfrtip',

@@ -23,7 +23,9 @@ $sel = "SELECT
         pi.nombre AS tipo_examen,
         c.archivo_pdf,
         c.manual_data,
-        c.tipo_ingreso 
+        c.tipo_ingreso,
+        c.es_destacado,
+        c.destacado_titulo
       FROM certificados c
       LEFT JOIN pacientes p ON c.paciente_id = p.id
       LEFT JOIN tutores t ON p.tutor_id = t.id
@@ -54,6 +56,64 @@ $res = $stmt->get_result();
         font-size: 12px;
         padding-top: 4px;
         padding-bottom: 4px;
+    }
+    .cert-numero-wrap {
+        display: inline-flex;
+        align-items: center;
+        gap: 5px;
+        white-space: nowrap;
+    }
+
+    .cert-destacado-star {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        padding: 0;
+        border: 0;
+        background: transparent;
+        color: #d39e00;
+        font-size: 12px;
+        line-height: 1;
+        cursor: pointer;
+        transition: transform 0.12s ease, opacity 0.12s ease;
+    }
+
+    .cert-destacado-star:hover {
+        transform: scale(1.15);
+        opacity: 0.8;
+    }
+
+    #btnFiltroDestacados {
+        width: 28px;
+        height: 28px;
+        padding: 0;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        border: 0 !important;
+        background: transparent !important;
+        box-shadow: none !important;
+        font-size: 15px;
+        color: #6c757d;
+    }
+
+    #btnFiltroDestacados:hover {
+        color: #d39e00;
+    }
+
+    #btnFiltroDestacados.is-active {
+        color: #d39e00;
+    }
+
+    #tablaCertificados_wrapper .dataTables_filter {
+        display: flex;
+        align-items: center;
+        justify-content: flex-end;
+        gap: 6px;
+    }
+
+    #tablaCertificados_wrapper .dataTables_filter label {
+        margin-bottom: 0;
     }
 
 </style>
@@ -128,9 +188,54 @@ $res = $stmt->get_result();
                   if ($medicoListado === '') {
                       $medicoListado = '-';
                   }
+
+                  $esDestacado = (
+                      isset($fila['es_destacado']) &&
+                      (int)$fila['es_destacado'] === 1
+                  );
+
+                  $destacadoTitulo = trim(
+                      (string)($fila['destacado_titulo'] ?? '')
+                  );
+
+                  $numeroListado = $i++;
+
+                  $textoBusquedaNumero = (string)$numeroListado;
+
+                  if ($esDestacado) {
+                      $textoBusquedaNumero .= ' destacado';
+
+                      if ($destacadoTitulo !== '') {
+                          $textoBusquedaNumero .= ' ' . $destacadoTitulo;
+                      }
+                  }
                 ?>
-                  <tr>
-                    <td><?= $i++ ?></td>
+                  <tr data-destacado="<?= $esDestacado ? '1' : '0' ?>">
+
+                    <td
+                        data-search="<?= htmlspecialchars($textoBusquedaNumero, ENT_QUOTES) ?>"
+                        data-filter="<?= htmlspecialchars($textoBusquedaNumero, ENT_QUOTES) ?>"
+                    >
+                        <span class="cert-numero-wrap">
+
+                            <span><?= $numeroListado ?></span>
+
+                            <?php if ($esDestacado): ?>
+
+                                <button
+                                    type="button"
+                                    class="cert-destacado-star"
+                                    data-destacado-titulo="<?= htmlspecialchars($destacadoTitulo, ENT_QUOTES) ?>"
+                                    title="Ver referencia destacada"
+                                    aria-label="Ver referencia destacada"
+                                >
+                                    <i class="fas fa-bookmark"></i>
+                                </button>
+
+                            <?php endif; ?>
+
+                        </span>
+                    </td>
                     <td>
                       <div class="d-flex justify-content-between">
                         <span><?= htmlspecialchars($paciente) ?></span>
@@ -197,7 +302,55 @@ $res = $stmt->get_result();
     </div>
   </div>
 </div>
+<div
+    class="modal fade"
+    id="modalDestacadoCertificado"
+    tabindex="-1"
+    aria-labelledby="modalDestacadoCertificadoLabel"
+    aria-hidden="true"
+>
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
 
+            <div class="modal-header">
+                <h5
+                    class="modal-title"
+                    id="modalDestacadoCertificadoLabel"
+                >
+                    <i class="fas fa-star text-warning me-2"></i>
+                    Informe destacado
+                </h5>
+
+                <button
+                    type="button"
+                    class="btn-close"
+                    data-bs-dismiss="modal"
+                    aria-label="Cerrar"
+                ></button>
+            </div>
+
+            <div class="modal-body">
+
+                <div
+                    id="modalDestacadoContenido"
+                    class="fs-6"
+                ></div>
+
+            </div>
+
+            <div class="modal-footer">
+                <button
+                    type="button"
+                    class="btn btn-secondary"
+                    data-bs-dismiss="modal"
+                >
+                    Cerrar
+                </button>
+            </div>
+
+        </div>
+    </div>
+</div>
 <?php include 'envio_email/envio_email.php'; ?>
 
 <script>
@@ -247,4 +400,285 @@ function confirmDelete(id, tipo) {
       });
     });
 }
+</script>
+<script>
+(function () {
+
+    window.vmCertificadosSoloDestacados =
+        window.vmCertificadosSoloDestacados || false;
+
+    /*
+     * Eliminamos un filtro anterior si esta pantalla
+     * ya había sido cargada anteriormente por AJAX.
+     */
+    if (
+        window.vmFiltroDestacadosCertificados &&
+        $.fn.dataTable &&
+        $.fn.dataTable.ext
+    ) {
+        const filtros = $.fn.dataTable.ext.search;
+
+        const indice = filtros.indexOf(
+            window.vmFiltroDestacadosCertificados
+        );
+
+        if (indice !== -1) {
+            filtros.splice(indice, 1);
+        }
+    }
+
+    /*
+     * Filtro DataTables.
+     *
+     * Solo afecta a #tablaCertificados.
+     * Las demás tablas del sistema siguen funcionando
+     * normalmente.
+     */
+    window.vmFiltroDestacadosCertificados = function (
+        settings,
+        data,
+        dataIndex
+    ) {
+        if (
+            !settings.nTable ||
+            settings.nTable.id !== 'tablaCertificados'
+        ) {
+            return true;
+        }
+
+        if (!window.vmCertificadosSoloDestacados) {
+            return true;
+        }
+
+        const filaData = settings.aoData[dataIndex];
+
+        if (!filaData || !filaData.nTr) {
+            return false;
+        }
+
+        return (
+            filaData.nTr.getAttribute('data-destacado') === '1'
+        );
+    };
+
+    $.fn.dataTable.ext.search.push(
+        window.vmFiltroDestacadosCertificados
+    );
+
+
+    function actualizarBotonDestacados() {
+        const $btn = $('#btnFiltroDestacados');
+
+        if (!$btn.length) {
+            return;
+        }
+
+        const activo =
+            window.vmCertificadosSoloDestacados === true;
+
+        $btn
+            .toggleClass('is-active', activo)
+            .attr('aria-pressed', activo ? 'true' : 'false')
+            .attr(
+                'title',
+                activo
+                    ? 'Mostrar todos los informes'
+                    : 'Mostrar solo casos de referencia'
+            )
+            .attr(
+                'aria-label',
+                activo
+                    ? 'Mostrar todos los informes'
+                    : 'Mostrar solo casos de referencia'
+            );
+
+        $btn.html(
+            activo
+                ? '<i class="fas fa-bookmark"></i>'
+                : '<i class="far fa-bookmark"></i>'
+        );
+    }
+
+    function insertarBotonFiltroDestacados() {
+        const $tabla = $('#tablaCertificados');
+
+        if (
+            !$tabla.length ||
+            !$.fn.DataTable ||
+            !$.fn.DataTable.isDataTable($tabla[0])
+        ) {
+            return;
+        }
+
+        const $wrapper =
+            $('#tablaCertificados_wrapper');
+
+        const $filter =
+            $wrapper.find('.dataTables_filter');
+
+        if (!$filter.length) {
+            return;
+        }
+
+        if (!$('#btnFiltroDestacados').length) {
+
+          const $boton = $(
+              '<button>',
+              {
+                  type: 'button',
+                  id: 'btnFiltroDestacados',
+                  title:
+                      'Mostrar solo casos de referencia',
+                  'aria-label':
+                      'Mostrar solo casos de referencia',
+                  'aria-pressed':
+                      'false'
+              }
+          );
+
+          $boton.html(
+              '<i class="far fa-bookmark"></i>'
+          );
+
+            $filter.append($boton);
+        }
+
+        actualizarBotonDestacados();
+
+        /*
+         * Si DataTables fue reinicializado por global.js
+         * mientras el filtro estaba activo,
+         * volvemos a dibujarlo.
+         */
+        if (window.vmCertificadosSoloDestacados) {
+            $tabla.DataTable().draw(false);
+        }
+    }
+
+
+    /*
+     * Clic en estrella junto al buscador.
+     */
+    $(document)
+        .off(
+            'click.certFiltroDestacados',
+            '#btnFiltroDestacados'
+        )
+        .on(
+            'click.certFiltroDestacados',
+            '#btnFiltroDestacados',
+            function () {
+
+                window.vmCertificadosSoloDestacados =
+                    !window.vmCertificadosSoloDestacados;
+
+                actualizarBotonDestacados();
+
+                const $tabla =
+                    $('#tablaCertificados');
+
+                if (
+                    $tabla.length &&
+                    $.fn.DataTable.isDataTable(
+                        $tabla[0]
+                    )
+                ) {
+                    $tabla.DataTable().draw();
+                }
+            }
+        );
+
+
+    /*
+     * Clic en la estrella de un informe.
+     */
+    $(document)
+        .off(
+            'click.certDestacadoModal',
+            '.cert-destacado-star'
+        )
+        .on(
+            'click.certDestacadoModal',
+            '.cert-destacado-star',
+            function (e) {
+
+                e.preventDefault();
+                e.stopPropagation();
+
+                const titulo =
+                    String(
+                        $(this).attr(
+                            'data-destacado-titulo'
+                        ) || ''
+                    ).trim();
+
+                if (titulo !== '') {
+
+                    $('#modalDestacadoContenido')
+                        .text(titulo);
+
+                } else {
+
+                    $('#modalDestacadoContenido')
+                        .html(
+                            '<span class="text-muted">' +
+                            'Este informe fue marcado como destacado, ' +
+                            'pero todavía no tiene un título.' +
+                            '</span>'
+                        );
+                }
+
+                const modalEl =
+                    document.getElementById(
+                        'modalDestacadoCertificado'
+                    );
+
+                if (!modalEl) {
+                    return;
+                }
+
+                const modal =
+                    bootstrap.Modal.getOrCreateInstance(
+                        modalEl
+                    );
+
+                modal.show();
+            }
+        );
+
+
+    /*
+     * Primera inicialización.
+     *
+     * global.js crea DataTables, por eso damos
+     * un pequeño margen para colocar nuestro botón.
+     */
+    setTimeout(function () {
+        insertarBotonFiltroDestacados();
+    }, 100);
+
+
+    /*
+     * global.js reinicializa DataTables después
+     * de llamadas AJAX.
+     *
+     * Volvemos a insertar solamente nuestro botón
+     * cuando corresponda.
+     */
+    $(document)
+        .off(
+            'ajaxComplete.certDestacados'
+        )
+        .on(
+            'ajaxComplete.certDestacados',
+            function () {
+
+                setTimeout(function () {
+                    insertarBotonFiltroDestacados();
+                }, 50);
+
+            }
+        );
+
+})();
 </script>
