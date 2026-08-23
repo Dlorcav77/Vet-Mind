@@ -1,5 +1,10 @@
 <?php
 // admin/certificado/partials/formulario_certificado.php
+
+/**
+ * @var string $es_destacado_inicial
+ * @var string $destacado_titulo_inicial
+ */
 ?>
 <form method="post" action="certificado/updCertificados.php" enctype="multipart/form-data" id="formCertificado">
     <div class="row g-1 mb-1">

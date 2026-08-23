@@ -39,6 +39,7 @@ $stmt->bind_param('i', $usuario_id);
 $stmt->execute();
 $res = $stmt->get_result();
 ?>
+<link rel="stylesheet" href="certificado/ver/css/ver.css?v=1">
 <style>
     .dataTables_wrapper .dt-buttons {
         float: left;
@@ -256,6 +257,14 @@ $res = $stmt->get_result();
                         </button>
 
                         <div class="dropdown-menu dropdown-menu-end">
+                          <a
+                              class="dropdown-item btn-ver-informe"
+                              href="#"
+                              data-id="<?= (int)$fila['id'] ?>"
+                          >
+                              <i class="fas fa-eye me-2 text-info"></i>
+                              Ver
+                          </a>
                           <?php if ($tipo_ingreso === 'manual'): ?>
                             <a class="dropdown-item ajax-link" href="certificado/subir_informe/subir_informe.php?action=modificar&id=<?= (int)$fila['id'] ?>">
                               <i class="fas fa-edit me-2 text-primary"></i>Editar
@@ -265,21 +274,19 @@ $res = $stmt->get_result();
                               <i class="fas fa-edit me-2 text-primary"></i>Editar
                             </a>
                           <?php endif; ?>
-
-                          <a class="dropdown-item" href="#" onclick="confirmDelete(<?= (int)$fila['id'] ?>, '<?= htmlspecialchars($tipo_ingreso, ENT_QUOTES) ?>')">
-                            <i class="fas fa-trash-alt me-2 text-danger"></i> Eliminar
+                          <div class="dropdown-divider"></div>
+                          <a
+                              class="dropdown-item btn-ver-pdf-informe"
+                              href="#"
+                              data-id="<?= (int)$fila['id'] ?>"
+                          >
+                              <i class="fas fa-file-pdf me-2 text-danger"></i>
+                              Ver PDF
                           </a>
-
-                          <a class="dropdown-item" href="certificado/pdf/descargar.php?id=<?= (int)$fila['id'] ?>" target="_blank">
-                            <i class="fas fa-file-pdf me-2 text-danger"></i>Ver PDF
-                          </a>
-
                           <a class="dropdown-item" href="certificado/pdf/descargar.php?id=<?= (int)$fila['id'] ?>&dl=1">
                             <i class="fas fa-download me-2 text-primary"></i>Descargar PDF
                           </a>
-
                           <div class="dropdown-divider"></div>
-
                           <a class="dropdown-item" href="#"
                               onclick="abrirModalCorreo(this, <?= (int)$fila['id'] ?>)"
                               data-id="<?= (int)$fila['id'] ?>"
@@ -288,6 +295,9 @@ $res = $stmt->get_result();
                               data-tipo_examen="<?= htmlspecialchars($fila['tipo_examen'] ?? '-') ?>"
                               data-email="<?= htmlspecialchars($fila['email'] ?? '') ?>">
                             <i class="fas fa-envelope me-2 text-success"></i> Enviar por correo
+                          </a>
+                          <a class="dropdown-item" href="#" onclick="confirmDelete(<?= (int)$fila['id'] ?>, '<?= htmlspecialchars($tipo_ingreso, ENT_QUOTES) ?>')">
+                            <i class="fas fa-trash-alt me-2 text-danger"></i> Eliminar
                           </a>
                         </div>
                       </div>
@@ -351,8 +361,11 @@ $res = $stmt->get_result();
         </div>
     </div>
 </div>
+
+<?php require __DIR__ . '/partials/modal_ver_informe.php'; ?>
 <?php include 'envio_email/envio_email.php'; ?>
 
+<script src="certificado/ver/js/ver.js?v=1"></script>
 <script>
 function confirmDelete(id, tipo) {
     Swal.fire({

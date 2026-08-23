@@ -1,0 +1,284 @@
+/* admin/certificado/ver/css/ver.css */
+
+#modalVerInforme .modal-dialog {
+    max-width: 980px;
+}
+
+
+
+
+
+
+
+
+
+#modalVerInforme .modal-header {
+    padding: 8px 14px;
+}
+
+#modalVerInforme .vm-ver-header {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+    align-items: center;
+    gap: 12px;
+}
+
+#modalVerInforme .vm-ver-header-title {
+    min-width: 0;
+    font-size: 14px;
+    line-height: 1.2;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+#modalVerInforme .vm-ver-header-center {
+    justify-self: center;
+}
+
+#modalVerInforme .vm-ver-header-close {
+    justify-self: end;
+    display: flex;
+    align-items: center;
+}
+
+#modalVerInforme .vm-ver-header-close .btn-close {
+    margin: 0;
+    padding: 0.4rem;
+}
+
+
+
+
+
+#modalVerInforme .modal-body {
+    padding: 12px 16px;
+}
+
+#modalVerInforme .modal-footer {
+    padding: 8px 16px;
+}
+
+#modalVerInformeLabel {
+    font-size: 15px;
+    line-height: 1.25;
+}
+
+.vm-ver-tabs {
+    margin-bottom: 0;
+}
+
+.vm-ver-tabs .btn {
+    padding: 4px 10px;
+    font-size: 12px;
+}
+
+.vm-ver-card {
+    background: rgba(23, 162, 184, 0.07);
+    border: 1px solid rgba(23, 162, 184, 0.22) !important;
+}
+
+.vm-ver-card .row {
+    --bs-gutter-y: 0.75rem;
+}
+
+.vm-ver-label {
+    font-size: 11px;
+    color: #6c757d;
+    margin-bottom: 1px;
+}
+
+.vm-ver-value {
+    font-size: 13px;
+    font-weight: 600;
+}
+
+#modalVerInforme .vm-ver-seccion-titulo {
+    margin-bottom: 5px;
+    padding-left: 2px;
+    font-size: 12px;
+    font-weight: 600;
+    color: #6c757d;
+}
+
+#modalVerInforme .vm-ver-seccion-titulo i {
+    color: #17a2b8;
+}
+
+#modalVerInforme .vm-ver-resumen-grid {
+    display: grid;
+    gap: 12px;
+    align-items: start;
+}
+
+/*
+ * Con caso de referencia:
+ *
+ * izquierda:
+ * Informe
+ * Caso de referencia
+ *
+ * derecha:
+ * Paciente
+ */
+#modalVerInforme .vm-ver-resumen-grid.is-with-referencia {
+    grid-template-columns:
+        minmax(360px, 1fr)
+        minmax(0, 1.15fr);
+
+    grid-template-areas:
+        "general paciente"
+        "referencia paciente";
+}
+
+/*
+ * Sin caso de referencia:
+ *
+ * izquierda:
+ * Informe más compacto
+ *
+ * derecha:
+ * Paciente más ancho
+ */
+#modalVerInforme .vm-ver-resumen-grid.is-no-referencia {
+    grid-template-columns:
+        minmax(300px, 1fr)
+        minmax(0, 1.7fr);
+
+    grid-template-areas:
+        "general paciente";
+}
+
+#modalVerInforme #verInformePacienteWrap {
+    grid-area: paciente;
+    margin-bottom: 0 !important;
+    min-width: 0;
+}
+
+#modalVerInforme #verInformeGeneralWrap {
+    grid-area: general;
+    margin-bottom: 0 !important;
+    min-width: 0;
+}
+
+#modalVerInforme #verInformeDestacadoWrap {
+    grid-area: referencia;
+    margin-bottom: 0 !important;
+    min-width: 0;
+}
+
+#modalVerInforme #verInformePacienteWrap .vm-ver-card,
+#modalVerInforme #verInformeGeneralWrap .vm-ver-card,
+#modalVerInforme #verInformeDestacadoWrap {
+    height: 100%;
+}
+
+#modalVerInforme #verInformePacienteWrap .row,
+#modalVerInforme #verInformeGeneralWrap .row {
+    --bs-gutter-x: 1rem;
+    --bs-gutter-y: 0.45rem;
+}
+
+#modalVerInforme .vm-ver-campo {
+    min-width: 0;
+    margin-bottom: 10px;
+}
+
+#modalVerInforme .vm-ver-campo:nth-last-child(-n + 3) {
+    margin-bottom: 0;
+}
+
+#modalVerInforme .vm-ver-value {
+    overflow-wrap: anywhere;
+}
+
+.vm-ver-referencia {
+    background: rgba(23, 162, 184, 0.09);
+    border: 1px solid rgba(23, 162, 184, 0.28) !important;
+}
+
+.vm-ver-referencia .fa-bookmark {
+    color: #17a2b8;
+}
+
+#verInformeContenido {
+    min-height: 160px !important;
+    padding: 12px 16px !important;
+    font-size: 13px;
+    line-height: 1.5;
+}
+
+#verInformePdfContenido {
+    min-height: 68vh !important;
+}
+
+#modalVerInforme .vm-btn-accent {
+    background: #17a2b8;
+    border-color: #17a2b8;
+    color: #fff;
+}
+
+#modalVerInforme .vm-btn-accent:hover,
+#modalVerInforme .vm-btn-accent:focus {
+    background: #138496;
+    border-color: #117a8b;
+    color: #fff;
+}
+
+#modalVerInforme .vm-btn-accent-outline {
+    background: #fff;
+    border-color: #17a2b8;
+    color: #17a2b8;
+}
+
+#modalVerInforme .vm-btn-accent-outline:hover,
+#modalVerInforme .vm-btn-accent-outline:focus {
+    background: rgba(23, 162, 184, 0.08);
+    border-color: #17a2b8;
+    color: #138496;
+}
+
+@media (max-width: 767.98px) {
+    #modalVerInforme .modal-dialog {
+        max-width: none;
+        margin: 8px;
+    }
+
+    #modalVerInforme .modal-header,
+    #modalVerInforme .modal-body,
+    #modalVerInforme .modal-footer {
+        padding-left: 10px;
+        padding-right: 10px;
+    }
+
+    #modalVerInforme .vm-ver-header {
+        grid-template-columns: minmax(0, 1fr) auto;
+        gap: 8px;
+    }
+
+    #modalVerInforme .vm-ver-header-title {
+        grid-column: 1;
+        grid-row: 1;
+    }
+
+    #modalVerInforme .vm-ver-header-close {
+        grid-column: 2;
+        grid-row: 1;
+    }
+
+    #modalVerInforme .vm-ver-header-center {
+        grid-column: 1 / -1;
+        grid-row: 2;
+        justify-self: center;
+    }
+
+    #modalVerInforme .vm-ver-resumen-grid,
+    #modalVerInforme .vm-ver-resumen-grid.is-with-referencia,
+    #modalVerInforme .vm-ver-resumen-grid.is-no-referencia {
+        grid-template-columns: 1fr;
+        grid-template-areas:
+            "general"
+            "referencia"
+            "paciente";
+    }
+}
