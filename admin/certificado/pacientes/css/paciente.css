@@ -257,3 +257,91 @@
     scrollbar-width: thin;
     scrollbar-color: rgba(0, 0, 0, 0.22) transparent;
 }
+
+
+/* =========================================================
+   DETALLE DE TUTOR - INGRESO MANUAL
+   ========================================================= */
+
+.manual-tutor-top {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+
+    min-width: 0;
+}
+
+.manual-tutor-btn-ver {
+    flex: 0 0 auto;
+
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+
+    padding: 0;
+    margin: 0;
+
+    border: 0;
+    background: transparent;
+
+    color: #17a2b8;
+    font-size: 0.75rem;
+    line-height: 1;
+    white-space: nowrap;
+}
+
+.manual-tutor-btn-ver:hover,
+.manual-tutor-btn-ver:focus {
+    color: #138496;
+    text-decoration: none;
+    background: transparent;
+    box-shadow: none;
+}
+
+.manual-tutor-btn-usar {
+    flex: 0 0 auto;
+
+    border-radius: 0;
+    border-top-right-radius: 5px;
+    border-bottom-right-radius: 5px;
+
+    white-space: nowrap;
+}
+
+
+.manual-tutor-modal-vacio {
+    padding: 18px 12px;
+    text-align: center;
+    color: #6c757d;
+    font-size: 0.85rem;
+}
+
+.manual-tutor-modal-mascota {
+    padding: 9px 11px;
+    margin-bottom: 7px;
+
+    border: 1px solid #b9e3ea;
+    border-radius: 6px;
+
+    background: #e8f7fa;
+}
+
+.manual-tutor-modal-mascota:last-child {
+    margin-bottom: 0;
+}
+
+.manual-tutor-modal-mascota-nombre {
+    font-size: 0.9rem;
+    font-weight: 600;
+    color: #2f6670;
+}
+
+.manual-tutor-modal-mascota-detalle {
+    margin-top: 3px;
+
+    font-size: 0.76rem;
+    color: #6c757d;
+
+    line-height: 1.3;
+}

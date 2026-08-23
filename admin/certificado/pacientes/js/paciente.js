@@ -919,6 +919,11 @@ function mostrarResultadosTutorManual(matches) {
       detalles.push(mascotasTexto);
     }
 
+
+
+
+
+
     const $fila = $('<div>', {
       class: 'manual-tutor-coincidencia'
     });
@@ -927,10 +932,23 @@ function mostrarResultadosTutorManual(matches) {
       class: 'manual-tutor-info'
     });
 
+    const $top = $('<div>', {
+      class: 'manual-tutor-top'
+    });
+
     const $nombre = $('<span>', {
       class: 'manual-tutor-nombre'
     }).text(
       nombre || 'Tutor'
+    );
+
+    const $botonVer = $('<button>', {
+      type: 'button',
+      class:
+        'manual-tutor-btn-ver ' +
+        'btn-ver-tutor-manual'
+    }).html(
+      '<i class="fas fa-eye"></i><span>Ver</span>'
     );
 
     const $detalle = $('<span>', {
@@ -939,7 +957,7 @@ function mostrarResultadosTutorManual(matches) {
       detalles.join(' · ')
     );
 
-    const $boton = $('<button>', {
+    const $botonUsar = $('<button>', {
       type: 'button',
       class:
         'btn btn-info btn-sm ' +
@@ -949,20 +967,36 @@ function mostrarResultadosTutorManual(matches) {
       '<i class="fas fa-check me-1"></i>Usar'
     );
 
-    $boton.data(
+    $botonVer.data(
       'tutor',
       tutor
     );
 
-    $info.append(
+    $botonUsar.data(
+      'tutor',
+      tutor
+    );
+
+    $top.append(
       $nombre,
+      $botonVer
+    );
+
+    $info.append(
+      $top,
       $detalle
     );
 
     $fila.append(
       $info,
-      $boton
+      $botonUsar
     );
+
+
+
+
+
+
 
     $resultados.append(
       $fila
@@ -975,6 +1009,155 @@ function mostrarResultadosTutorManual(matches) {
   }
 
   $resultados.show();
+}
+
+function mostrarDetalleTutorManual(tutor) {
+  if (!tutor) {
+    return;
+  }
+
+  const tutorId = parseInt(
+    tutor.tutor_id,
+    10
+  ) || 0;
+
+  if (tutorId <= 0) {
+    return;
+  }
+
+  const nombre = String(
+    tutor.nombre || ''
+  ).trim();
+
+  const rut = String(
+    tutor.rut || ''
+  ).trim();
+
+  const mascotas = Array.isArray(
+    tutor.mascotas
+  )
+    ? tutor.mascotas
+    : [];
+
+  $('#modalDetalleTutorManualLabel')
+    .text(
+      nombre || 'Tutor'
+    );
+
+  $('#modalDetalleTutorRut')
+    .text(
+      rut
+        ? 'RUT: ' + rut
+        : 'Sin RUT registrado'
+    );
+
+  const $mascotas =
+    $('#modalDetalleTutorMascotas');
+
+  $mascotas.empty();
+
+  if (!mascotas.length) {
+    $('<div>', {
+      class: 'manual-tutor-modal-vacio'
+    })
+      .text(
+        'Este tutor no tiene mascotas registradas.'
+      )
+      .appendTo($mascotas);
+
+  } else {
+    mascotas.forEach(function (mascota) {
+      const nombreMascota = String(
+        mascota.nombre || ''
+      ).trim();
+
+      const codigo = String(
+        mascota.codigo_paciente || ''
+      ).trim();
+
+      const especie = String(
+        mascota.especie || ''
+      ).trim();
+
+      const raza = String(
+        mascota.raza || ''
+      ).trim();
+
+      const chip = String(
+        mascota.n_chip || ''
+      ).trim();
+
+      let titulo =
+        nombreMascota || 'Paciente';
+
+      if (codigo) {
+        titulo +=
+          ' (' +
+          codigo +
+          ')';
+      }
+
+      const detalles = [];
+
+      if (especie) {
+        detalles.push(
+          especie
+        );
+      }
+
+      if (raza) {
+        detalles.push(
+          raza
+        );
+      }
+
+      if (chip) {
+        detalles.push(
+          'Chip: ' + chip
+        );
+      }
+
+      const $fila = $('<div>', {
+        class:
+          'manual-tutor-modal-mascota'
+      });
+
+      const $nombre = $('<div>', {
+        class:
+          'manual-tutor-modal-mascota-nombre'
+      }).text(
+        titulo
+      );
+
+      $fila.append(
+        $nombre
+      );
+
+      if (detalles.length) {
+        $('<div>', {
+          class:
+            'manual-tutor-modal-mascota-detalle'
+        })
+          .text(
+            detalles.join(' · ')
+          )
+          .appendTo($fila);
+      }
+
+      $mascotas.append(
+        $fila
+      );
+    });
+  }
+
+  $('.btn-usar-tutor-modal')
+    .data(
+      'tutor',
+      tutor
+    );
+
+  $('#modalDetalleTutorManual')
+    .modal('show');
 }
 
 function seleccionarTutorManual(tutor) {
@@ -1158,6 +1341,68 @@ function initBusquedaTutorManual() {
     state.tutorRequest.abort();
     state.tutorRequest = null;
   }
+
+  $(document)
+    .off(
+      'click.certVerTutorManual',
+      '.btn-ver-tutor-manual'
+    )
+    .on(
+      'click.certVerTutorManual',
+      '.btn-ver-tutor-manual',
+      function () {
+        const tutor = $(this).data(
+          'tutor'
+        );
+
+        mostrarDetalleTutorManual(
+          tutor
+        );
+      }
+    );
+
+  $(document)
+    .off(
+      'click.certUsarTutorModal',
+      '.btn-usar-tutor-modal'
+    )
+    .on(
+      'click.certUsarTutorModal',
+      '.btn-usar-tutor-modal',
+      function () {
+        const tutor = $(this).data(
+          'tutor'
+        );
+
+        if (!tutor) {
+          return;
+        }
+
+        $('#modalDetalleTutorManual')
+          .modal('hide');
+
+        seleccionarTutorManual(
+          tutor
+        );
+      }
+    );
+
+  $('#modalDetalleTutorManual')
+    .off(
+      'hidden.bs.modal.certDetalleTutorManual'
+    )
+    .on(
+      'hidden.bs.modal.certDetalleTutorManual',
+      function () {
+        $('.btn-usar-tutor-modal')
+          .removeData(
+            'tutor'
+          );
+
+        $('#modalDetalleTutorMascotas')
+          .empty();
+      }
+    );
 
   $(document)
     .off(

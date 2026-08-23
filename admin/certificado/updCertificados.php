@@ -14,6 +14,18 @@ header('Content-Type: application/json; charset=utf-8');
 $pdfDir = "../../uploads/certificados/informes/";
 $mysqli = conn();
 
+$transaccionActiva = false;
+
+function rollbackCertificadoSiActivo($mysqli, &$transaccionActiva)
+{
+    if (!$transaccionActiva) {
+        return;
+    }
+
+    $mysqli->rollback();
+    $transaccionActiva = false;
+}
+
 function normalizarRutaImagenCertificado($ruta)
 {
     $ruta = trim((string)$ruta);
@@ -474,7 +486,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'elimi
 
 $action                  = $_POST['action'] ?? '';
 $id                      = intval($_POST['id'] ?? 0);
-$veterinario             = intval($_POST['veterinario_id'] ?? ($_SESSION['usuario_id'] ?? 0));
+$veterinario             = intval($_SESSION['usuario_id'] ?? 0);
 $paciente_id             = intval($_POST['paciente_id'] ?? 0);
 $fecha_examen            = $_POST['fecha_examen'] ?? date('Y-m-d');
 $descripcion             = trim($_POST['contenido_html'] ?? '');
@@ -593,138 +605,161 @@ $manual_data = !empty($manual_extra_data)
     : null;
 
 if ($modo_manual && $guardarMascota && !empty($manual)) {
- 
-
-
-
-
-
-
-
-
-
-
-$tutorNombre = trim((string)($manual['propietario'] ?? ''));
-
-$tutorId = 0;
-
-/*
- * Si el médico seleccionó explícitamente un tutor existente,
- * comprobamos en servidor que realmente exista y que pertenezca
- * al veterinario actual.
- *
- * Nunca confiamos solamente en el ID recibido desde JavaScript.
- */
-if ($tutorExistenteId > 0) {
-    $stmtTutorExistente = $mysqli->prepare("
-        SELECT
-            id,
-            nombre_completo
-        FROM tutores
-        WHERE
-            id = ?
-            AND veterinario_id = ?
-        LIMIT 1
-    ");
-
-    if (!$stmtTutorExistente) {
+    if (!$mysqli->begin_transaction()) {
         echo json_encode([
             'status' => 'error',
-            'message' => 'Error preparando validación del tutor seleccionado.',
+            'message' => 'No se pudo iniciar la transacción de guardado.',
             'mysql_error' => $mysqli->error
         ], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
         exit;
     }
 
-    $stmtTutorExistente->bind_param(
-        "ii",
-        $tutorExistenteId,
-        $veterinario
-    );
+    $transaccionActiva = true;
 
-    if (!$stmtTutorExistente->execute()) {
-        echo json_encode([
-            'status' => 'error',
-            'message' => 'No se pudo validar el tutor seleccionado.',
-            'mysql_error' => $stmtTutorExistente->error
-        ], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
-        exit;
-    }
+    $tutorNombre = trim((string)($manual['propietario'] ?? ''));
 
-    $resTutorExistente =
-        $stmtTutorExistente->get_result();
+    $tutorId = 0;
 
-    $tutorExistente =
-        $resTutorExistente->fetch_assoc();
-
-    if (!$tutorExistente) {
-        echo json_encode([
-            'status' => 'error',
-            'message' => 'El tutor seleccionado no existe o no pertenece al veterinario actual.'
-        ], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
-        exit;
-    }
-
-    $tutorId = (int)$tutorExistente['id'];
-
-} else {
     /*
-     * No se seleccionó ningún tutor existente.
-     *
-     * El médico continuó escribiendo el propietario manualmente,
-     * por lo tanto se considera explícitamente un tutor nuevo.
-     */
-    $stmtTutorNuevo = $mysqli->prepare("
-        INSERT INTO tutores
-            (
-                nombre_completo,
-                veterinario_id
-            )
-        VALUES
-            (?, ?)
-    ");
+    * Si el médico seleccionó explícitamente un tutor existente,
+    * comprobamos en servidor que realmente exista y que pertenezca
+    * al veterinario actual.
+    *
+    * Nunca confiamos solamente en el ID recibido desde JavaScript.
+    */
+    if ($tutorExistenteId > 0) {
+        $stmtTutorExistente = $mysqli->prepare("
+            SELECT
+                id,
+                nombre_completo
+            FROM tutores
+            WHERE
+                id = ?
+                AND veterinario_id = ?
+            LIMIT 1
+        ");
 
-    if (!$stmtTutorNuevo) {
-        echo json_encode([
-            'status' => 'error',
-            'message' => 'Error preparando creación de tutor.',
-            'mysql_error' => $mysqli->error
-        ], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
-        exit;
+        if (!$stmtTutorExistente) {
+            rollbackCertificadoSiActivo(
+                $mysqli,
+                $transaccionActiva
+            );
+
+            echo json_encode([
+                'status' => 'error',
+                'message' => 'Error preparando validación del tutor seleccionado.',
+                'mysql_error' => $mysqli->error
+            ], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+            exit;
+        }
+
+        $stmtTutorExistente->bind_param(
+            "ii",
+            $tutorExistenteId,
+            $veterinario
+        );
+
+        if (!$stmtTutorExistente->execute()) {
+            rollbackCertificadoSiActivo(
+                $mysqli,
+                $transaccionActiva
+            );
+
+            echo json_encode([
+                'status' => 'error',
+                'message' => 'No se pudo validar el tutor seleccionado.',
+                'mysql_error' => $stmtTutorExistente->error
+            ], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+            exit;
+        }
+
+        $resTutorExistente =
+            $stmtTutorExistente->get_result();
+
+        $tutorExistente =
+            $resTutorExistente->fetch_assoc();
+
+        if (!$tutorExistente) {
+            rollbackCertificadoSiActivo(
+                $mysqli,
+                $transaccionActiva
+            );
+
+            echo json_encode([
+                'status' => 'error',
+                'message' => 'El tutor seleccionado no existe o no pertenece al veterinario actual.'
+            ], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+            exit;
+        }
+
+        $tutorId = (int)$tutorExistente['id'];
+
+    } else {
+        /*
+        * No se seleccionó ningún tutor existente.
+        *
+        * El médico continuó escribiendo el propietario manualmente,
+        * por lo tanto se considera explícitamente un tutor nuevo.
+        */
+        $stmtTutorNuevo = $mysqli->prepare("
+            INSERT INTO tutores
+                (
+                    nombre_completo,
+                    veterinario_id
+                )
+            VALUES
+                (?, ?)
+        ");
+
+        if (!$stmtTutorNuevo) {
+            rollbackCertificadoSiActivo(
+                $mysqli,
+                $transaccionActiva
+            );
+
+            echo json_encode([
+                'status' => 'error',
+                'message' => 'Error preparando creación de tutor.',
+                'mysql_error' => $mysqli->error
+            ], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+            exit;
+        }
+
+        $stmtTutorNuevo->bind_param(
+            "si",
+            $tutorNombre,
+            $veterinario
+        );
+
+        if (!$stmtTutorNuevo->execute()) {
+            rollbackCertificadoSiActivo(
+                $mysqli,
+                $transaccionActiva
+            );
+
+            echo json_encode([
+                'status' => 'error',
+                'message' => 'No se pudo crear el tutor.',
+                'mysql_error' => $stmtTutorNuevo->error
+            ], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+            exit;
+        }
+
+        $tutorId = (int)$stmtTutorNuevo->insert_id;
+
+        if ($tutorId <= 0) {
+            rollbackCertificadoSiActivo(
+                $mysqli,
+                $transaccionActiva
+            );
+
+            echo json_encode([
+                'status' => 'error',
+                'message' => 'No se obtuvo el ID del tutor creado.'
+            ], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+            exit;
+        }
     }
-
-    $stmtTutorNuevo->bind_param(
-        "si",
-        $tutorNombre,
-        $veterinario
-    );
-
-    if (!$stmtTutorNuevo->execute()) {
-        echo json_encode([
-            'status' => 'error',
-            'message' => 'No se pudo crear el tutor.',
-            'mysql_error' => $stmtTutorNuevo->error
-        ], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
-        exit;
-    }
-
-    $tutorId = (int)$stmtTutorNuevo->insert_id;
-
-    if ($tutorId <= 0) {
-        echo json_encode([
-            'status' => 'error',
-            'message' => 'No se obtuvo el ID del tutor creado.'
-        ], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
-        exit;
-    }
-}
-
-
-
-
-
-
-
 
     $nombreMascota = trim((string)($manual['paciente'] ?? ''));
     $codigoPaciente = trim((string)($manual['codigo_paciente'] ?? ''));
@@ -771,6 +806,11 @@ if ($tutorExistenteId > 0) {
     ");
 
     if (!$stmt) {
+        rollbackCertificadoSiActivo(
+            $mysqli,
+            $transaccionActiva
+        );
+
         echo json_encode([
             'status' => 'error',
             'message' => 'Error preparando creación de paciente.',
@@ -793,6 +833,11 @@ if ($tutorExistenteId > 0) {
     );
 
     if (!$stmt->execute()) {
+        rollbackCertificadoSiActivo(
+            $mysqli,
+            $transaccionActiva
+        );
+
         echo json_encode([
             'status' => 'error',
             'message' => 'No se pudo crear el paciente.',
@@ -804,6 +849,11 @@ if ($tutorExistenteId > 0) {
     $paciente_id = (int)$stmt->insert_id;
 
     if ($paciente_id <= 0) {
+        rollbackCertificadoSiActivo(
+            $mysqli,
+            $transaccionActiva
+        );
+
         echo json_encode([
             'status' => 'error',
             'message' => 'No se obtuvo el ID del paciente creado.'
@@ -904,6 +954,11 @@ if ($action === 'ingresar') {
         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), NOW())");
 
     if (!$stmt) {
+        rollbackCertificadoSiActivo(
+            $mysqli,
+            $transaccionActiva
+        );
+
         echo json_encode([
             'status' => 'error',
             'message' => 'Error preparando inserción.',
@@ -987,6 +1042,11 @@ if ($action === 'ingresar') {
             AND veterinario_id = ?");
 
     if (!$stmt) {
+        rollbackCertificadoSiActivo(
+            $mysqli,
+            $transaccionActiva
+        );
+
         echo json_encode([
             'status' => 'error',
             'message' => 'Error preparando actualización.',
@@ -1012,6 +1072,11 @@ if ($action === 'ingresar') {
         $veterinario
     );
 } else {
+    rollbackCertificadoSiActivo(
+        $mysqli,
+        $transaccionActiva
+    );
+
     echo json_encode([
         'status' => 'error',
         'message' => 'Acción no válida.'
@@ -1020,6 +1085,24 @@ if ($action === 'ingresar') {
 }
 
 if ($stmt->execute()) {
+    if ($transaccionActiva) {
+        if (!$mysqli->commit()) {
+            rollbackCertificadoSiActivo(
+                $mysqli,
+                $transaccionActiva
+            );
+
+            echo json_encode([
+                'status' => 'error',
+                'message' => 'No se pudo confirmar la transacción de guardado.',
+                'mysql_error' => $mysqli->error
+            ], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+            exit;
+        }
+
+        $transaccionActiva = false;
+    }
+
     $certId = 0;
 
     if ($action === 'ingresar') {
@@ -1087,6 +1170,11 @@ if ($stmt->execute()) {
         'audio' => $audioResultado
     ], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
 } else {
+    rollbackCertificadoSiActivo(
+        $mysqli,
+        $transaccionActiva
+    );
+
     echo json_encode([
         'status' => 'error',
         'message' => 'Error al guardar el certificado.',

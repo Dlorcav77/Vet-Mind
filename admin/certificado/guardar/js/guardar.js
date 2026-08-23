@@ -12,6 +12,8 @@ $(function () {
     let draftInitializing = true;
     let draftWatcherTimer = null;
     let draftHideTextTimer = null;
+    let draftRequest = null;
+    let draftFinalizando = false;
 
     function syncConfiguracionInformeId() {
         $('#configuracion_informe_id_hidden').val($('#configuracion_informe_id').val() || '');
@@ -210,7 +212,11 @@ function updateDraftStatus(text, cls) {
     }
 
     function scheduleDraftSave() {
-        if (!AUTOSAVE_HABILITADO || draftInitializing) {
+        if (
+            !AUTOSAVE_HABILITADO ||
+            draftInitializing ||
+            draftFinalizando
+        ) {
             return;
         }
 
@@ -235,23 +241,41 @@ function updateDraftStatus(text, cls) {
         }
 
         draftDirty = true;
-        updateDraftStatus('Cambios sin guardar', 'text-muted');
+
+        updateDraftStatus(
+            'Cambios sin guardar',
+            'text-muted'
+        );
 
         if (draftTimer) {
             clearTimeout(draftTimer);
         }
 
         draftTimer = setTimeout(function () {
-            saveDraft({ silent: false, force: false });
+            draftTimer = null;
+
+            saveDraft({
+                silent: false,
+                force: false
+            });
         }, AUTOSAVE_MS);
     }
 
     function saveDraft(options = {}) {
-        if (!AUTOSAVE_HABILITADO) {
+        if (
+            !AUTOSAVE_HABILITADO ||
+            draftFinalizando
+        ) {
             return;
         }
 
-        const opts = Object.assign({ silent: false, force: false }, options);
+        const opts = Object.assign(
+            {
+                silent: false,
+                force: false
+            },
+            options
+        );
 
         if (draftSaving) {
             pendingDraftSave = true;
@@ -265,55 +289,109 @@ function updateDraftStatus(text, cls) {
             draftDirty = false;
             lastDraftHash = currentHash;
             restaurarEstadoDraftSinGuardar();
+
             return;
         }
 
-        if (!opts.force && currentHash === lastDraftHash) {
+        if (
+            !opts.force &&
+            currentHash === lastDraftHash
+        ) {
             return;
         }
 
         draftSaving = true;
 
         if (!opts.silent) {
-            updateDraftStatus('Guardando borrador...', 'text-warning');
+            updateDraftStatus(
+                'Guardando borrador...',
+                'text-warning'
+            );
         }
 
-        $.ajax({
+        draftRequest = $.ajax({
             url: 'certificado/guardar/updBorradorCertificado.php',
             type: 'POST',
             data: data,
             dataType: 'json',
+            timeout: 15000,
+
             success: function (response) {
-                if (response && response.status === 'success') {
+                if (
+                    response &&
+                    response.status === 'success'
+                ) {
                     if (response.borrador_id) {
-                        $('#borrador_id').val(response.borrador_id);
+                        $('#borrador_id').val(
+                            response.borrador_id
+                        );
                     }
 
-                    const syncedData = collectDraftData();
-                    lastDraftHash = JSON.stringify(syncedData);
+                    const syncedData =
+                        collectDraftData();
+
+                    lastDraftHash =
+                        JSON.stringify(syncedData);
+
                     draftDirty = false;
 
-                    updateDraftStatus('Guardado en borrador', 'text-success');
+                    updateDraftStatus(
+                        'Guardado en borrador',
+                        'text-success'
+                    );
                 } else {
-                    updateDraftStatus('Error al guardar borrador', 'text-danger');
+                    updateDraftStatus(
+                        'Error al guardar borrador',
+                        'text-danger'
+                    );
                 }
             },
-            error: function () {
-                updateDraftStatus('Error al guardar borrador', 'text-danger');
+
+            error: function (xhr, status) {
+                if (
+                    status === 'abort' &&
+                    draftFinalizando
+                ) {
+                    return;
+                }
+
+                updateDraftStatus(
+                    'Error al guardar borrador',
+                    'text-danger'
+                );
             },
+
             complete: function () {
                 draftSaving = false;
+                draftRequest = null;
+
+                /*
+                * Si ya comenzó el guardado final,
+                * no lanzamos ningún borrador pendiente.
+                */
+                if (draftFinalizando) {
+                    pendingDraftSave = false;
+                    return;
+                }
 
                 if (pendingDraftSave) {
                     pendingDraftSave = false;
-                    saveDraft({ silent: true, force: false });
+
+                    saveDraft({
+                        silent: true,
+                        force: false
+                    });
                 }
             }
         });
     }
 
     function saveDraftWithBeacon() {
-        if (!AUTOSAVE_HABILITADO || !draftDirty) {
+        if (
+            !AUTOSAVE_HABILITADO ||
+            draftFinalizando ||
+            !draftDirty
+        ) {
             return;
         }
 
@@ -331,18 +409,94 @@ function updateDraftStatus(text, cls) {
         }
 
         try {
-            const payload = new URLSearchParams(data);
+            const payload =
+                new URLSearchParams(data);
+
             navigator.sendBeacon(
                 'certificado/guardar/updBorradorCertificado.php',
-                new Blob([payload.toString()], { type: 'application/x-www-form-urlencoded;charset=UTF-8' })
+                new Blob(
+                    [payload.toString()],
+                    {
+                        type:
+                            'application/x-www-form-urlencoded;charset=UTF-8'
+                    }
+                )
             );
 
             lastDraftHash = currentHash;
             draftDirty = false;
+
         } catch (e) {
             // silencioso
         }
     }
+
+    window.prepararGuardadoFinalBorrador = function () {
+        draftFinalizando = true;
+        pendingDraftSave = false;
+
+        if (draftTimer) {
+            clearTimeout(draftTimer);
+            draftTimer = null;
+        }
+
+        window.removeEventListener(
+            'beforeunload',
+            saveDraftWithBeacon
+        );
+
+        /*
+        * Si no hay un borrador viajando,
+        * podemos guardar el informe inmediatamente.
+        */
+        if (
+            !draftSaving ||
+            !draftRequest
+        ) {
+            return Promise.resolve();
+        }
+
+        /*
+        * Si ya existe un AJAX de borrador en curso,
+        * esperamos que termine.
+        *
+        * Así, si genera un borrador_id,
+        * estará disponible antes de guardar
+        * definitivamente el certificado.
+        */
+        return new Promise(function (resolve) {
+            draftRequest.always(function () {
+                resolve();
+            });
+        });
+    };
+
+    window.reanudarAutoguardadoBorrador = function () {
+        if (!AUTOSAVE_HABILITADO) {
+            return;
+        }
+
+        draftFinalizando = false;
+        pendingDraftSave = false;
+
+        window.removeEventListener(
+            'beforeunload',
+            saveDraftWithBeacon
+        );
+
+        window.addEventListener(
+            'beforeunload',
+            saveDraftWithBeacon
+        );
+
+        /*
+        * Dejamos que scheduleDraftSave vuelva
+        * a detectar si quedaron cambios.
+        */
+        draftDirty = false;
+
+        scheduleDraftSave();
+    };
 
     syncConfiguracionInformeId();
 
@@ -444,7 +598,11 @@ function updateDraftStatus(text, cls) {
         });
 
     draftWatcherTimer = setInterval(function () {
-        if (draftInitializing || draftSaving) {
+        if (
+            draftInitializing ||
+            draftSaving ||
+            draftFinalizando
+        ) {
             return;
         }
 
@@ -541,133 +699,383 @@ function updateDraftStatus(text, cls) {
     window.addEventListener('beforeunload', saveDraftWithBeacon);
 });
 
-$('#btnGuardarCertificado').off('click.guardarCertificado').on('click.guardarCertificado', function (e) {
-    e.preventDefault();
+$('#btnGuardarCertificado')
+    .off('click.guardarCertificado')
+    .on('click.guardarCertificado', function (e) {
+        e.preventDefault();
 
-    let esManual = $('#toggle_manual').is(':checked');
+        const $btnGuardar = $(this);
 
-    let configuracionInformeId = $('#configuracion_informe_id').val() || '';
-    if (!configuracionInformeId) {
-        Swal.fire('Falta Plantilla', 'Debes seleccionar una plantilla de diseño.', 'warning');
-        return;
-    }
+        let esManual = $('#toggle_manual').is(':checked');
 
-    if (!esManual) {
-        let pacienteId = $('input[name="paciente_id"]').val() || 0;
-        if (!pacienteId) {
-            Swal.fire('Falta Paciente', 'Debes seleccionar un paciente.', 'warning');
+        let configuracionInformeId =
+            $('#configuracion_informe_id').val() || '';
+
+        if (!configuracionInformeId) {
+            Swal.fire(
+                'Falta Plantilla',
+                'Debes seleccionar una plantilla de diseño.',
+                'warning'
+            );
             return;
         }
-    } else {
-        let manualOk = true;
 
-        if (typeof validarPacienteManualAntesDeGuardar === 'function') {
-            manualOk = validarPacienteManualAntesDeGuardar();
-        } else if (typeof validarPacienteManualUI === 'function') {
-            manualOk = validarPacienteManualUI();
+        if (!esManual) {
+            let pacienteId =
+                $('input[name="paciente_id"]').val() || 0;
+
+            if (!pacienteId) {
+                Swal.fire(
+                    'Falta Paciente',
+                    'Debes seleccionar un paciente.',
+                    'warning'
+                );
+                return;
+            }
+        } else {
+            let manualOk = true;
+
+            if (
+                typeof validarPacienteManualAntesDeGuardar ===
+                'function'
+            ) {
+                manualOk =
+                    validarPacienteManualAntesDeGuardar();
+
+            } else if (
+                typeof validarPacienteManualUI ===
+                'function'
+            ) {
+                manualOk =
+                    validarPacienteManualUI();
+            }
+
+            if (!manualOk) {
+                Swal.fire(
+                    'Faltan datos',
+                    'Debes completar Paciente y Propietario en ingreso manual.',
+                    'warning'
+                );
+                return;
+            }
         }
 
-        if (!manualOk) {
-            Swal.fire('Faltan datos', 'Debes completar Paciente y Propietario en ingreso manual.', 'warning');
+        if (
+            archivosSeleccionados.length >
+            LIMITE_IMAGENES
+        ) {
+            Swal.fire({
+                icon: 'warning',
+                title: 'Demasiadas imágenes',
+                html:
+                    'Se pueden subir como máximo <b>' +
+                    LIMITE_IMAGENES +
+                    '</b> imágenes.<br>' +
+                    'Elimina <b>' +
+                    (
+                        archivosSeleccionados.length -
+                        LIMITE_IMAGENES
+                    ) +
+                    '</b> para poder guardar el informe.',
+                confirmButtonText: 'Entendido',
+                customClass: {
+                    title: 'fw-bold',
+                    popup: 'shadow rounded-4'
+                }
+            });
+
             return;
         }
-    }
 
-    if (archivosSeleccionados.length > LIMITE_IMAGENES) {
+        if (
+            window.VetmindTiptap &&
+            typeof window.VetmindTiptap
+                .syncMainEditorToTextarea === 'function'
+        ) {
+            window.VetmindTiptap
+                .syncMainEditorToTextarea();
+        }
+
+        let contenido =
+            $('textarea[name="contenido_html"]')
+                .val()
+                ?.trim() || '';
+
+        if (contenido.length < 5) {
+            Swal.fire(
+                'Falta Contenido',
+                'El informe debe tener contenido.',
+                'warning'
+            );
+            return;
+        }
+
+        /*
+         * Desde este momento no permitimos
+         * otro clic de Guardar mientras termina
+         * el proceso.
+         */
+        $btnGuardar.prop('disabled', true);
+
         Swal.fire({
-            icon: 'warning',
-            title: 'Demasiadas imágenes',
-            html: 'Se pueden subir como máximo <b>' + LIMITE_IMAGENES + '</b> imágenes.<br>Elimina <b>' + (archivosSeleccionados.length - LIMITE_IMAGENES) + '</b> para poder guardar el informe.',
-            confirmButtonText: 'Entendido',
-            customClass: {
-                title: 'fw-bold',
-                popup: 'shadow rounded-4'
-            }
+            title: 'Guardando certificado...',
+            text: 'Por favor espera unos segundos.',
+            allowOutsideClick: false,
+            didOpen: () => Swal.showLoading()
         });
-        return;
-    }
 
-    if (window.VetmindTiptap && typeof window.VetmindTiptap.syncMainEditorToTextarea === 'function') {
-        window.VetmindTiptap.syncMainEditorToTextarea();
-    }
+        /*
+         * Antes de crear FormData:
+         *
+         * - detenemos nuevos autosaves;
+         * - esperamos cualquier borrador AJAX
+         *   que ya esté en curso;
+         * - permitimos que borrador_id quede
+         *   actualizado antes del guardado final.
+         */
+        let prepararBorrador = Promise.resolve();
 
-    let contenido = $('textarea[name="contenido_html"]').val()?.trim() || '';
-    if (contenido.length < 5) {
-        Swal.fire('Falta Contenido', 'El informe debe tener contenido.', 'warning');
-        return;
-    }
-
-    let form = $('#formCertificado')[0];
-    let formData = new FormData(form);
-
-    if ($('#guardarMascota').is(':checked')) {
-        formData.append('guardar_mascota', '1');
-    }
-
-    formData.set('toggle_manual', $('#toggle_manual').is(':checked') ? '1' : '0');
-    formData.set('toggle_audio_manual', $('#toggle_audio_manual').is(':checked') ? '1' : '0');
-    formData.set('borrador_id', $('#borrador_id').val() || '0');
-    formData.set('borrador_scope_key', $('#borrador_scope_key').val() || (window.CERT_BORRADOR?.scopeKey || ''));
-
-    Swal.fire({
-        title: 'Guardando certificado...',
-        text: 'Por favor espera unos segundos.',
-        allowOutsideClick: false,
-        didOpen: () => Swal.showLoading()
-    });
-
-    $.ajax({
-        url: 'certificado/updCertificados.php',
-        type: 'POST',
-        data: formData,
-        processData: false,
-        contentType: false,
-        dataType: 'json',
-        success: function (response) {
-            Swal.close();
-
-            if (response.status === 'success') {
-                let certId = response.id || 0;
-
-                if (certId) {
-                    window.open('certificado/pdf/descargar.php?id=' + encodeURIComponent(certId), '_blank');
-                } else {
-                    let rutaPdf = response.rutaPdf || null;
-                    if (rutaPdf) {
-                        let urlPdf = rutaPdf.startsWith('/') ? rutaPdf : '/' + rutaPdf;
-                        window.open(urlPdf, '_blank');
-                    }
-                }
-
-                if (window.VetmindTiptap && typeof window.VetmindTiptap.destroyMainEditor === 'function') {
-                    window.VetmindTiptap.destroyMainEditor();
-                }
-
-                if (typeof destroyTiptapEditors === 'function') {
-                    destroyTiptapEditors();
-                }
-
-                $('#content').empty().load('certificado/lisCertificados.php');
-            } else {
-                Swal.fire('Error', response.message || 'No se pudo guardar el certificado.', 'error');
-            }
-        },
-        error: function (xhr) {
-            Swal.close();
-
-            let msg = 'No se pudo guardar el certificado.';
-            if (xhr.responseText) {
-                try {
-                    let res = JSON.parse(xhr.responseText);
-                    if (res.message) msg += "\n" + res.message;
-                    if (res.mysql_error) msg += "\n" + res.mysql_error;
-                } catch (e) {
-                    msg += "\n" + xhr.responseText;
-                }
-            }
-
-            Swal.fire('Error', msg, 'error');
-            console.error('AJAX error:', xhr);
+        if (
+            typeof window
+                .prepararGuardadoFinalBorrador ===
+            'function'
+        ) {
+            prepararBorrador =
+                window.prepararGuardadoFinalBorrador();
         }
+
+        Promise.resolve(prepararBorrador)
+            .then(function () {
+
+                /*
+                 * Importante:
+                 * FormData se crea DESPUÉS de esperar
+                 * el borrador, para tomar el borrador_id
+                 * más reciente.
+                 */
+                let form =
+                    $('#formCertificado')[0];
+
+                let formData =
+                    new FormData(form);
+
+                if (
+                    $('#guardarMascota').is(':checked')
+                ) {
+                    formData.set(
+                        'guardar_mascota',
+                        '1'
+                    );
+                } else {
+                    formData.delete(
+                        'guardar_mascota'
+                    );
+                }
+
+                formData.set(
+                    'toggle_manual',
+                    $('#toggle_manual').is(':checked')
+                        ? '1'
+                        : '0'
+                );
+
+                formData.set(
+                    'toggle_audio_manual',
+                    $('#toggle_audio_manual')
+                        .is(':checked')
+                        ? '1'
+                        : '0'
+                );
+
+                formData.set(
+                    'borrador_id',
+                    $('#borrador_id').val() || '0'
+                );
+
+                formData.set(
+                    'borrador_scope_key',
+                    $('#borrador_scope_key').val() ||
+                    (
+                        window.CERT_BORRADOR?.scopeKey ||
+                        ''
+                    )
+                );
+
+                return $.ajax({
+                    url:
+                        'certificado/updCertificados.php',
+                    type: 'POST',
+                    data: formData,
+                    processData: false,
+                    contentType: false,
+                    dataType: 'json'
+                });
+            })
+            .then(function (response) {
+                Swal.close();
+
+                if (
+                    response &&
+                    response.status === 'success'
+                ) {
+                    let certId =
+                        response.id || 0;
+
+                    if (certId) {
+                        window.open(
+                            'certificado/pdf/descargar.php?id=' +
+                            encodeURIComponent(certId),
+                            '_blank'
+                        );
+
+                    } else {
+                        let rutaPdf =
+                            response.rutaPdf || null;
+
+                        if (rutaPdf) {
+                            let urlPdf =
+                                rutaPdf.startsWith('/')
+                                    ? rutaPdf
+                                    : '/' + rutaPdf;
+
+                            window.open(
+                                urlPdf,
+                                '_blank'
+                            );
+                        }
+                    }
+
+                    /*
+                     * No reactivamos el autosave:
+                     * el informe ya quedó finalizado
+                     * y abandonaremos esta pantalla.
+                     */
+                    if (
+                        window.VetmindTiptap &&
+                        typeof window.VetmindTiptap
+                            .destroyMainEditor ===
+                        'function'
+                    ) {
+                        window.VetmindTiptap
+                            .destroyMainEditor();
+                    }
+
+                    if (
+                        typeof destroyTiptapEditors ===
+                        'function'
+                    ) {
+                        destroyTiptapEditors();
+                    }
+
+                    $('#content')
+                        .empty()
+                        .load(
+                            'certificado/lisCertificados.php'
+                        );
+
+                    return;
+                }
+
+                /*
+                 * El servidor respondió,
+                 * pero no pudo guardar el informe.
+                 * Reactivamos autosave.
+                 */
+                if (
+                    typeof window
+                        .reanudarAutoguardadoBorrador ===
+                    'function'
+                ) {
+                    window
+                        .reanudarAutoguardadoBorrador();
+                }
+
+                $btnGuardar.prop(
+                    'disabled',
+                    false
+                );
+
+                Swal.fire(
+                    'Error',
+                    (
+                        response &&
+                        response.message
+                    )
+                        ? response.message
+                        : 'No se pudo guardar el certificado.',
+                    'error'
+                );
+            })
+            .catch(function (xhr) {
+                Swal.close();
+
+                /*
+                 * Si falló la petición definitiva,
+                 * el usuario sigue dentro del formulario.
+                 * Volvemos a habilitar el borrador.
+                 */
+                if (
+                    typeof window
+                        .reanudarAutoguardadoBorrador ===
+                    'function'
+                ) {
+                    window
+                        .reanudarAutoguardadoBorrador();
+                }
+
+                $btnGuardar.prop(
+                    'disabled',
+                    false
+                );
+
+                let msg =
+                    'No se pudo guardar el certificado.';
+
+                if (
+                    xhr &&
+                    xhr.responseText
+                ) {
+                    try {
+                        let res =
+                            JSON.parse(
+                                xhr.responseText
+                            );
+
+                        if (res.message) {
+                            msg +=
+                                "\n" +
+                                res.message;
+                        }
+
+                        if (res.mysql_error) {
+                            msg +=
+                                "\n" +
+                                res.mysql_error;
+                        }
+
+                    } catch (e) {
+                        msg +=
+                            "\n" +
+                            xhr.responseText;
+                    }
+                } else if (
+                    xhr &&
+                    xhr.message
+                ) {
+                    msg +=
+                        "\n" +
+                        xhr.message;
+                }
+
+                Swal.fire(
+                    'Error',
+                    msg,
+                    'error'
+                );
+
+                console.error(
+                    'Error guardando certificado:',
+                    xhr
+                );
+            });
     });
-});
