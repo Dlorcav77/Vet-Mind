@@ -1,7 +1,17 @@
 <?php
-session_start();
-session_unset();
-session_destroy();
+
+require_once __DIR__ . '/funciones/session/funcionesSesion.php';
+require_once __DIR__ . '/funciones/session/csrf.php';
+
+iniciarSesionSegura();
+
+if (sesionAutenticada()) {
+    header('Location: admin/index.php');
+    exit;
+}
+
+$csrf = tokenCsrf();
+
 ?>
 <!DOCTYPE html>
 <html lang="es">
@@ -392,6 +402,11 @@ session_destroy();
                         id="loginForm"
                         method="POST"
                     >
+                        <input
+                            type="hidden"
+                            name="csrf_token"
+                            value="<?= htmlspecialchars($csrf, ENT_QUOTES, 'UTF-8') ?>"
+                        >
                         <div class="form-group">
                             <label for="email">
                                 Email
@@ -492,14 +507,6 @@ session_destroy();
                                     : response;
 
                             if (data.status === 'success') {
-                                try {
-                                    localStorage.removeItem('lastPage');
-                                } catch (error) {
-                                    console.warn(
-                                        'No fue posible limpiar lastPage.',
-                                        error
-                                    );
-                                }
 
                                 window.location.href =
                                     data.redirect_url;

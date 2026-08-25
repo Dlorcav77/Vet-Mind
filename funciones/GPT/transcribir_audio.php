@@ -4,9 +4,18 @@
 header('Content-Type: application/json; charset=utf-8');
 date_default_timezone_set('America/Santiago');
 
-require_once(dirname(__DIR__, 2) . "/configP.php");
+$ROOT_DIR = dirname(__DIR__, 2);
 
-session_start();
+require_once(
+    $ROOT_DIR . "/configP.php"
+);
+
+require_once(
+    $ROOT_DIR
+    . "/funciones/session/funcionesSesion.php"
+);
+
+iniciarSesionSegura();
 
 /////////////////////////////////////////////////////////////////
 // Motor de transcripción manual para pruebas.

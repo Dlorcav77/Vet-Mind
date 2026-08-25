@@ -1,19 +1,13 @@
 <?php
-// admin/inicio/componentes/inicio_grafico_data.php
+
+require_once(
+    $_SERVER['DOCUMENT_ROOT']
+    . "/admin/config.php"
+);
+
 header('Content-Type: application/json; charset=utf-8');
 
-if (session_status() === PHP_SESSION_NONE) {
-  session_start();
-}
-
-require_once($_SERVER['DOCUMENT_ROOT'] . "/funciones/conn/conn.php");
 $mysqli = conn();
-
-$usuario_id = $_SESSION['usuario_id'] ?? 0;
-if (!$usuario_id) {
-  echo json_encode(['ok' => 0, 'error' => 'Sesión no válida.'], JSON_UNESCAPED_UNICODE);
-  exit;
-}
 
 // color primario (si existe config)
 $color_primario = '#3498db';

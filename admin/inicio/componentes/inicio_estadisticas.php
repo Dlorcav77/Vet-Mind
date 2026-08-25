@@ -1,10 +1,10 @@
 <?php
-if (session_status() === PHP_SESSION_NONE) {
-  session_start();
-}
-$usuario_id = $_SESSION['usuario_id'] ?? null;
 
-require_once($_SERVER['DOCUMENT_ROOT'] . "/funciones/conn/conn.php");
+require_once(
+    $_SERVER['DOCUMENT_ROOT']
+    . "/admin/config.php"
+);
+
 $mysqli = conn();
 
 // Obtener mes/año actual o desde URL
@@ -188,81 +188,176 @@ while ($row = $res->fetch_assoc()) {
 
 <script>
 function cargarEstadisticas(mes, anio) {
-  const btnPrev = document.getElementById('inicioStatsBtnPrev');
-  const btnNext = document.getElementById('inicioStatsBtnNext');
-  const label   = document.getElementById('inicioStatsMesLabel');
-  const loading = document.getElementById('inicioStatsLoading');
+    const btnPrev = document.getElementById('inicioStatsBtnPrev');
+    const btnNext = document.getElementById('inicioStatsBtnNext');
+    const label = document.getElementById('inicioStatsMesLabel');
+    const loading = document.getElementById('inicioStatsLoading');
 
-  const colDoble  = document.getElementById('inicioStatsColDoble');
-  const colSimple = document.getElementById('inicioStatsColSimple');
+    const colDoble = document.getElementById('inicioStatsColDoble');
+    const colSimple = document.getElementById('inicioStatsColSimple');
 
-  const informesHoy = document.getElementById('inicioStatsInformesHoy');
-  const informesMesA = document.getElementById('inicioStatsInformesMesA');
-  const informesMesB = document.getElementById('inicioStatsInformesMesB');
-  const topBody = document.getElementById('inicioStatsTopBody');
+    const informesHoy = document.getElementById('inicioStatsInformesHoy');
+    const informesMesA = document.getElementById('inicioStatsInformesMesA');
+    const informesMesB = document.getElementById('inicioStatsInformesMesB');
+    const topBody = document.getElementById('inicioStatsTopBody');
 
-  if (loading) loading.style.display = '';
-  if (btnPrev) btnPrev.disabled = true;
-  if (btnNext) btnNext.disabled = true;
+    if (loading) loading.style.display = '';
+    if (btnPrev) btnPrev.disabled = true;
+    if (btnNext) btnNext.disabled = true;
 
-  fetch('inicio/componentes/inicio_estadisticas_data.php?mes=' + encodeURIComponent(mes) + '&anio=' + encodeURIComponent(anio))
-    .then(res => res.json())
-    .then(data => {
-      if (!data || !data.ok) throw new Error((data && data.error) ? data.error : 'Respuesta inválida');
+    const url =
+        'inicio/componentes/inicio_estadisticas_data.php'
+        + '?mes=' + encodeURIComponent(mes)
+        + '&anio=' + encodeURIComponent(anio);
 
-      if (label) label.textContent = data.label || '';
-
-      // actualizar navegación (sin rearmar la card)
-      if (btnPrev) {
-        btnPrev.disabled = false;
-        btnPrev.setAttribute('onclick', 'cargarEstadisticas(' + data.mes_anterior + ',' + data.anio_anterior + ')');
-      }
-      if (btnNext) {
-        const canNext = (String(data.mostrar_siguiente) === '1');
-        btnNext.disabled = !canNext;
-        btnNext.setAttribute('onclick', 'cargarEstadisticas(' + data.mes_siguiente + ',' + data.anio_siguiente + ')');
-      }
-
-      // layout hoy/mes
-      const esMesActual = (String(data.es_mes_actual) === '1');
-      if (colDoble) colDoble.style.display = esMesActual ? '' : 'none';
-      if (colSimple) colSimple.style.display = esMesActual ? 'none' : '';
-
-      // números
-      if (informesHoy) informesHoy.textContent = data.informes_hoy ?? 0;
-      if (informesMesA) informesMesA.textContent = data.informes_mes ?? 0;
-      if (informesMesB) informesMesB.textContent = data.informes_mes ?? 0;
-
-      // tabla
-      if (topBody) {
-        const items = Array.isArray(data.top_estudios) ? data.top_estudios : [];
-        if (!items.length) {
-          topBody.innerHTML = '<tr><td colspan="2" class="text-center text-muted">Sin exámenes registrados este mes</td></tr>';
-        } else {
-          let html = '';
-          items.forEach(it => {
-            const nombre = (it.nombre_estudio ?? '').toString()
-              .replaceAll('&','&amp;').replaceAll('<','&lt;').replaceAll('>','&gt;').replaceAll('"','&quot;').replaceAll("'","&#039;");
-            const total = Number(it.total ?? 0);
-            html += '<tr><td>' + nombre + '</td><td class="text-end">' + (Number.isFinite(total) ? total : 0) + '</td></tr>';
-          });
-          topBody.innerHTML = html;
+    fetch(url, {
+        headers: {
+            'X-Requested-With': 'XMLHttpRequest'
         }
-      }
     })
-    .catch(err => {
-      console.error(err);
-      // mantiene la card quieta; solo muestra mensaje en tabla
-      if (topBody) topBody.innerHTML = '<tr><td colspan="2" class="text-center text-danger">Error al cargar estadísticas.</td></tr>';
+    .then(response => {
+        if (!response.ok) {
+            throw new Error(
+                'No fue posible cargar las estadísticas.'
+            );
+        }
+
+        return response.json();
+    })
+    .then(data => {
+        if (!data || !data.ok) {
+            throw new Error(
+                data?.error || 'Respuesta inválida.'
+            );
+        }
+
+        if (label) {
+            label.textContent = data.label || '';
+        }
+
+        if (btnPrev) {
+            btnPrev.disabled = false;
+
+            btnPrev.setAttribute(
+                'onclick',
+                'cargarEstadisticas('
+                + data.mes_anterior
+                + ','
+                + data.anio_anterior
+                + ')'
+            );
+        }
+
+        if (btnNext) {
+            const canNext =
+                String(data.mostrar_siguiente) === '1';
+
+            btnNext.disabled = !canNext;
+
+            btnNext.setAttribute(
+                'onclick',
+                'cargarEstadisticas('
+                + data.mes_siguiente
+                + ','
+                + data.anio_siguiente
+                + ')'
+            );
+        }
+
+        const esMesActual =
+            String(data.es_mes_actual) === '1';
+
+        if (colDoble) {
+            colDoble.style.display =
+                esMesActual ? '' : 'none';
+        }
+
+        if (colSimple) {
+            colSimple.style.display =
+                esMesActual ? 'none' : '';
+        }
+
+        if (informesHoy) {
+            informesHoy.textContent =
+                data.informes_hoy ?? 0;
+        }
+
+        if (informesMesA) {
+            informesMesA.textContent =
+                data.informes_mes ?? 0;
+        }
+
+        if (informesMesB) {
+            informesMesB.textContent =
+                data.informes_mes ?? 0;
+        }
+
+        if (topBody) {
+            const items =
+                Array.isArray(data.top_estudios)
+                    ? data.top_estudios
+                    : [];
+
+            if (!items.length) {
+                topBody.innerHTML =
+                    '<tr>'
+                    + '<td colspan="2" '
+                    + 'class="text-center text-muted">'
+                    + 'Sin exámenes registrados este mes'
+                    + '</td>'
+                    + '</tr>';
+
+                return;
+            }
+
+            let html = '';
+
+            items.forEach(item => {
+                const nombre =
+                    (item.nombre_estudio ?? '')
+                        .toString()
+                        .replaceAll('&', '&amp;')
+                        .replaceAll('<', '&lt;')
+                        .replaceAll('>', '&gt;')
+                        .replaceAll('"', '&quot;')
+                        .replaceAll("'", '&#039;');
+
+                const total =
+                    Number(item.total ?? 0);
+
+                html +=
+                    '<tr>'
+                    + '<td>' + nombre + '</td>'
+                    + '<td class="text-end">'
+                    + (Number.isFinite(total) ? total : 0)
+                    + '</td>'
+                    + '</tr>';
+            });
+
+            topBody.innerHTML = html;
+        }
+    })
+    .catch(error => {
+        console.error(error);
+
+        if (topBody) {
+            topBody.innerHTML =
+                '<tr>'
+                + '<td colspan="2" '
+                + 'class="text-center text-danger">'
+                + 'Error al cargar estadísticas.'
+                + '</td>'
+                + '</tr>';
+        }
     })
     .finally(() => {
-      if (loading) loading.style.display = 'none';
-      if (btnPrev) btnPrev.disabled = false;
+        if (loading) {
+            loading.style.display = 'none';
+        }
 
-      // btnNext depende del estado actual; si falló dejamos habilitado para no “encerrar” al usuario
-      if (btnNext && btnNext.hasAttribute('disabled') === false) {
-        btnNext.disabled = false;
-      }
+        if (btnPrev) {
+            btnPrev.disabled = false;
+        }
     });
 }
 </script>

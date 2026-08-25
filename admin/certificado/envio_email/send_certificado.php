@@ -1,5 +1,7 @@
 <?php
-//admin/certificado/envio_email/send_certificado.php
+
+// admin/certificado/envio_email/send_certificado.php
+
 header('Content-Type: application/json; charset=utf-8');
 
 require_once __DIR__ . '/../../config.php';
@@ -8,8 +10,15 @@ function _vm_slug_filename($text) {
     $text = (string)$text;
     $text = trim($text);
 
-    $t = @iconv('UTF-8', 'ASCII//TRANSLIT//IGNORE', $text);
-    if ($t !== false) $text = $t;
+    $t = @iconv(
+        'UTF-8',
+        'ASCII//TRANSLIT//IGNORE',
+        $text
+    );
+
+    if ($t !== false) {
+        $text = $t;
+    }
 
     $text = strtolower($text);
     $text = preg_replace('/\s+/', '_', $text);
@@ -17,7 +26,9 @@ function _vm_slug_filename($text) {
     $text = preg_replace('/_+/', '_', $text);
     $text = trim($text, '_');
 
-    return $text !== '' ? $text : 'informe';
+    return $text !== ''
+        ? $text
+        : 'informe';
 }
 
 function _vm_slug_codigo($text) {
@@ -42,10 +53,6 @@ function _vm_nombre_adjunto_pdf($paciente, $codigoPaciente = '') {
     }
 
     return $base . '.pdf';
-}
-
-if (session_status() === PHP_SESSION_NONE) {
-    session_start();
 }
 
 try {

@@ -1,18 +1,13 @@
 <?php
+
 // admin/inicio/componentes/inicio_grafico.php
 
-if (session_status() === PHP_SESSION_NONE) {
-  session_start();
-}
+require_once(
+    $_SERVER['DOCUMENT_ROOT']
+    . '/admin/config.php'
+);
 
-require_once($_SERVER['DOCUMENT_ROOT'] . "/funciones/conn/conn.php");
 $mysqli = conn();
-
-$usuario_id = $_SESSION['usuario_id'] ?? 0;
-if (!$usuario_id) {
-  echo '<div class="alert alert-danger">Sesión no válida.</div>';
-  exit;
-}
 
 // color primario
 $color_primario = '#3498db';
@@ -292,8 +287,6 @@ $payload = [
 
 <script>
 (function () {
-  // una sola vez
-  if (!window.__vetmindInicioGraficoBooted) window.__vetmindInicioGraficoBooted = true;
 
   function ensureChartJs(cb) {
     if (window.Chart) return cb();
@@ -378,53 +371,98 @@ $payload = [
   }
 
   function vmDrawWeekendBands(payload, chart, bg, canvas) {
-    const bctx = bg.getContext('2d');
-    bctx.clearRect(0, 0, bg.width, bg.height);
+      const bctx = bg.getContext('2d');
 
-    if (!payload || payload.scope === 'year') return;
+      bctx.clearRect(
+          0,
+          0,
+          bg.width,
+          bg.height
+      );
 
-    const idxs = Array.isArray(payload.weekendIdx) ? payload.weekendIdx : [];
-    if (!idxs.length) return;
+      if (!payload || payload.scope === 'year') {
+          return;
+      }
 
-    const centers = vmGetPointCenters(chart);
-    if (!centers.length) return;
+      const idxs = Array.isArray(payload.weekendIdx)
+          ? payload.weekendIdx
+          : [];
 
-    const area = vmGetArea(chart, bg);
+      if (!idxs.length) {
+          return;
+      }
 
-    bctx.save();
-    bctx.fillStyle = 'rgba(108,117,125,0.10)';
+      const centers = vmGetPointCenters(chart);
 
-    const total = centers.length;
-    idxs.forEach((i) => {
-      if (i < 0 || i >= total) return;
+      if (!centers.length) {
+          return;
+      }
 
-      const c = centers[i];
-      const p = (i > 0) ? centers[i - 1] : null;
-      const n = (i < total - 1) ? centers[i + 1] : null;
+      const area = vmGetArea(chart, bg);
 
-      let left, right;
-      if (p !== null) left = (p + c) / 2;
-      else if (n !== null) left = c - (n - c) / 2;
-      else left = area.left;
+      bctx.save();
 
-      if (n !== null) right = (c + n) / 2;
-      else if (p !== null) right = c + (c - p) / 2;
-      else right = area.right;
+      bctx.fillStyle =
+          'rgba(108,117,125,0.10)';
 
-      left = Math.max(left, area.left);
-      right = Math.min(right, area.right);
+      const total = centers.length;
 
-      bctx.fillRect(left, area.top, (right - left), (area.bottom - area.top));
-    });
+      idxs.forEach((i) => {
 
-    bctx.restore();
+          if (i < 0 || i >= total) {
+              return;
+          }
 
-    // asegurar sizes correctos
-    setTimeout(() => {
-      vmSyncBgCanvasSize(bg, canvas);
-      bctx.clearRect(0, 0, bg.width, bg.height);
-      vmDrawWeekendBands(payload, chart, bg, canvas);
-    }, 0);
+          const c = centers[i];
+
+          const p =
+              i > 0
+                  ? centers[i - 1]
+                  : null;
+
+          const n =
+              i < total - 1
+                  ? centers[i + 1]
+                  : null;
+
+          let left;
+          let right;
+
+          if (p !== null) {
+              left = (p + c) / 2;
+          } else if (n !== null) {
+              left = c - (n - c) / 2;
+          } else {
+              left = area.left;
+          }
+
+          if (n !== null) {
+              right = (c + n) / 2;
+          } else if (p !== null) {
+              right = c + (c - p) / 2;
+          } else {
+              right = area.right;
+          }
+
+          left = Math.max(
+              left,
+              area.left
+          );
+
+          right = Math.min(
+              right,
+              area.right
+          );
+
+          bctx.fillRect(
+              left,
+              area.top,
+              right - left,
+              area.bottom - area.top
+          );
+      });
+
+      bctx.restore();
   }
 
   function readPayloadFromDom() {
@@ -556,33 +594,53 @@ $payload = [
   }
 
   function fetchPayload(scope, anchor) {
-    const loading = document.getElementById('inicioGraficoLoading');
-    const btnPrev = document.querySelector('[data-inicio-graf-nav="prev"]');
-    const btnNext = document.querySelector('[data-inicio-graf-nav="next"]');
-    const scopeBtns = document.querySelectorAll('[data-inicio-graf-scope]');
+      const loading = document.getElementById('inicioGraficoLoading');
+      const btnPrev = document.querySelector('[data-inicio-graf-nav="prev"]');
+      const btnNext = document.querySelector('[data-inicio-graf-nav="next"]');
+      const scopeBtns = document.querySelectorAll('[data-inicio-graf-scope]');
 
-    if (loading) loading.style.display = '';
-    if (btnPrev) btnPrev.disabled = true;
-    if (btnNext) btnNext.disabled = true;
-    scopeBtns.forEach(b => b.disabled = true);
+      if (loading) loading.style.display = '';
+      if (btnPrev) btnPrev.disabled = true;
+      if (btnNext) btnNext.disabled = true;
 
-    const url = 'inicio/componentes/inicio_grafico_data.php?scope=' + encodeURIComponent(scope) + '&anchor=' + encodeURIComponent(anchor);
+      scopeBtns.forEach(btn => {
+          btn.disabled = true;
+      });
 
-    return fetch(url)
-      .then(r => r.json())
-      .then(data => {
-        if (!data || !data.ok) throw new Error((data && data.error) ? data.error : 'Respuesta inválida');
-        return data;
+      const url =
+          'inicio/componentes/inicio_grafico_data.php'
+          + '?scope=' + encodeURIComponent(scope)
+          + '&anchor=' + encodeURIComponent(anchor);
+
+      return fetch(url, {
+          headers: {
+              'X-Requested-With': 'XMLHttpRequest'
+          }
       })
-      .catch(err => {
-        console.error(err);
-        throw err;
+      .then(response => {
+          if (!response.ok) {
+              throw new Error('No fue posible cargar la información.');
+          }
+
+          return response.json();
+      })
+      .then(data => {
+          if (!data || !data.ok) {
+              throw new Error(
+                  data?.error || 'Respuesta inválida.'
+              );
+          }
+
+          return data;
       })
       .finally(() => {
-        if (loading) loading.style.display = 'none';
-        if (btnPrev) btnPrev.disabled = false; // <-- clave: se re-habilita SIEMPRE
-        if (btnNext) btnNext.disabled = false; // luego updateUI() lo deshabilita si corresponde
-        scopeBtns.forEach(b => b.disabled = false);
+          if (loading) loading.style.display = 'none';
+          if (btnPrev) btnPrev.disabled = false;
+          if (btnNext) btnNext.disabled = false;
+
+          scopeBtns.forEach(btn => {
+              btn.disabled = false;
+          });
       });
   }
 
@@ -605,34 +663,86 @@ $payload = [
     return d.toISOString().slice(0,10);
   }
 
-  // Delegación de eventos (card fija)
-  document.addEventListener('click', function(e) {
-    const btnScope = e.target.closest('[data-inicio-graf-scope]');
+  // Delegación de eventos.
+  // Si Inicio se vuelve a cargar por AJAX, eliminamos primero
+  // el listener anterior para no acumular eventos.
+
+  if (window.__vetmindInicioGraficoClickHandler) {
+    document.removeEventListener(
+      'click',
+      window.__vetmindInicioGraficoClickHandler
+    );
+  }
+
+  window.__vetmindInicioGraficoClickHandler = function(e) {
+
+    const btnScope = e.target.closest(
+      '[data-inicio-graf-scope]'
+    );
+
     if (btnScope) {
-      const scope = btnScope.getAttribute('data-inicio-graf-scope');
 
-      const wrap = document.getElementById('inicioGrafico');
-      const anchor = (wrap && wrap.getAttribute('data-anchor')) || getTodayYMD();
+      const scope = btnScope.getAttribute(
+        'data-inicio-graf-scope'
+      );
 
-      fetchPayload(scope, anchor).then(renderChart).catch(console.error);
+      const wrap = document.getElementById(
+        'inicioGrafico'
+      );
+
+      const anchor =
+        (wrap && wrap.getAttribute('data-anchor'))
+        || getTodayYMD();
+
+      fetchPayload(scope, anchor)
+        .then(renderChart)
+        .catch(console.error);
+
       return;
     }
 
-    const btnNav = e.target.closest('[data-inicio-graf-nav]');
+
+    const btnNav = e.target.closest(
+      '[data-inicio-graf-nav]'
+    );
+
     if (btnNav) {
-      if (btnNav.disabled) return;
 
-      const wrap = document.getElementById('inicioGrafico');
-      const scope = (wrap && wrap.getAttribute('data-scope')) || 'week';
-      const anchor = (wrap && wrap.getAttribute('data-anchor')) || getTodayYMD();
+      if (btnNav.disabled) {
+        return;
+      }
 
-      const dir = btnNav.getAttribute('data-inicio-graf-nav');
-      const nextAnchor = (dir === 'prev') ? anchorPrev(scope, anchor) : anchorNext(scope, anchor);
+      const wrap = document.getElementById(
+        'inicioGrafico'
+      );
 
-      fetchPayload(scope, nextAnchor).then(renderChart).catch(console.error);
-      return;
+      const scope =
+        (wrap && wrap.getAttribute('data-scope'))
+        || 'week';
+
+      const anchor =
+        (wrap && wrap.getAttribute('data-anchor'))
+        || getTodayYMD();
+
+      const dir = btnNav.getAttribute(
+        'data-inicio-graf-nav'
+      );
+
+      const nextAnchor =
+        dir === 'prev'
+          ? anchorPrev(scope, anchor)
+          : anchorNext(scope, anchor);
+
+      fetchPayload(scope, nextAnchor)
+        .then(renderChart)
+        .catch(console.error);
     }
-  });
+  };
+
+  document.addEventListener(
+    'click',
+    window.__vetmindInicioGraficoClickHandler
+  );
 
   // render inicial desde payload embebido (sin AJAX)
   const initial = readPayloadFromDom();

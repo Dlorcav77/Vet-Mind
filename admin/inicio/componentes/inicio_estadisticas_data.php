@@ -1,17 +1,12 @@
 <?php
+
+require_once(
+    $_SERVER['DOCUMENT_ROOT']
+    . "/admin/config.php"
+);
+
 header('Content-Type: application/json; charset=utf-8');
 
-if (session_status() === PHP_SESSION_NONE) {
-  session_start();
-}
-
-$usuario_id = $_SESSION['usuario_id'] ?? null;
-if (!$usuario_id) {
-  echo json_encode(['ok' => 0, 'error' => 'Sesión no válida.']);
-  exit;
-}
-
-require_once($_SERVER['DOCUMENT_ROOT'] . "/funciones/conn/conn.php");
 $mysqli = conn();
 
 // mes/año desde URL

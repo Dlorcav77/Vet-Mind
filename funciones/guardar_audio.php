@@ -1,28 +1,51 @@
 <?php
+
 // funciones/guardar_audio.php
 
 error_reporting(E_ALL);
 ini_set('display_errors', 1);
-header('Content-Type: application/json; charset=utf-8');
 
-session_start();
+header(
+    'Content-Type: application/json; charset=utf-8'
+);
 
 $ROOT_DIR = dirname(__DIR__);
 $FUNC_DIR = __DIR__;
-$logDir   = $FUNC_DIR . '/logs';
+
+require_once(
+    $ROOT_DIR
+    . '/funciones/session/funcionesSesion.php'
+);
+
+iniciarSesionSegura();
+
+$logDir = $FUNC_DIR . '/logs';
 
 if (!is_dir($logDir)) {
-    @mkdir($logDir, 0775, true);
+    @mkdir(
+        $logDir,
+        0775,
+        true
+    );
 }
 
-$userId = isset($_SESSION['usuario_id']) ? (int)$_SESSION['usuario_id'] : 0;
+$userId =
+    isset($_SESSION['usuario_id'])
+        ? (int)$_SESSION['usuario_id']
+        : 0;
 
 if ($userId <= 0) {
     http_response_code(401);
-    echo json_encode([
-        'status' => 'error',
-        'message' => 'Sesión no válida. Inicia sesión para grabar.'
-    ], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+
+    echo json_encode(
+        [
+            'status' => 'error',
+            'message' => 'Sesión no válida. Inicia sesión para grabar.'
+        ],
+        JSON_UNESCAPED_UNICODE
+        | JSON_UNESCAPED_SLASHES
+    );
+
     exit;
 }
 

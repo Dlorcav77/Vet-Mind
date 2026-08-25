@@ -1,4 +1,6 @@
 <?php
+// funciones/helpers.php
+
 function tiene_acceso($modulo, $accion = null) {
   if (!isset($_SESSION['acceso_aplicaciones'][$modulo])) return false;
   if ($accion === null) return true;

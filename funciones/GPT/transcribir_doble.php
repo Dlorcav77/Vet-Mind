@@ -15,7 +15,12 @@ require_once(__DIR__ . "/lib/stt_validador.php");
 require_once($ROOT_DIR . "/funciones/conn/conn.php");
 require_once(__DIR__ . "/lib/stt_store.php");
 
-session_start();
+require_once(
+    $ROOT_DIR
+    . "/funciones/session/funcionesSesion.php"
+);
+
+iniciarSesionSegura();
 
 // Motores del doble. A = redactor (original), B = comparador. Cambiar aquí si hace falta.
 const MOTOR_A = 'deepgram';

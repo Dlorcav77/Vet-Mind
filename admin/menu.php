@@ -1,9 +1,18 @@
 <?php
-require_once($_SERVER['DOCUMENT_ROOT'] . "/funciones/helpers.php");
 
-$modulos = obtener_modulos_con_listar($perfil_id);
+require_once(
+    $_SERVER['DOCUMENT_ROOT']
+    . "/funciones/helpers.php"
+);
+
+$perfilIdMenu = (int)($_SESSION['perfil_id'] ?? 0);
+
+$modulos = obtener_modulos_con_listar(
+    $perfilIdMenu
+);
 
 $logo = '';
+
 ?>
 <body data-theme="default" data-layout="fluid" data-sidebar-position="left" data-sidebar-layout="default">
 <div class="wrapper">
@@ -39,8 +48,11 @@ $logo = '';
       </a>
       <ul class="sidebar-nav">
         <li class="sidebar-header">Menu</li>
-        <li class="sidebar-item <?php echo $menu_id === 'menu-inicio' ? 'active' : ''; ?>" id="menu-inicio">
-          <a class="sidebar-link ajax-link" href="inicio/inicio.php" data-appname="inicio.php">
+        <li class="sidebar-item" id="menu-inicio">
+          <a
+            class="sidebar-link ajax-link"
+            href="index.php?p=<?= rawurlencode('inicio/inicio.php') ?>"
+          >
             <i class="fas fa-newspaper align-middle"></i>
             <span class="align-middle">Inicio</span>
           </a>
@@ -51,7 +63,10 @@ $logo = '';
         
           <?php foreach ($items as $modulo): ?>
             <li class="sidebar-item" id="menu-<?php echo $modulo['modulo']; ?>">
-              <a class="sidebar-link ajax-link" href="<?php echo $modulo['modulo'] . '/' . $modulo['archivo_base']; ?>" data-appname="<?php echo $modulo['archivo_base']; ?>">
+              <a
+                class="sidebar-link ajax-link"
+                href="index.php?p=<?= rawurlencode($modulo['modulo'] . '/' . $modulo['archivo_base']) ?>"
+              >
                 <i class="<?php echo $modulo['icono']; ?> align-middle"></i>
                 <span class="align-middle"><?php echo $modulo['nombre']; ?></span>
               </a>

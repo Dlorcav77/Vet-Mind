@@ -4,6 +4,8 @@ require ("../funciones/session/ini_session.php");
 include 'header.php';
 include 'menu.php';
 
+require_once __DIR__ . '/rutas.php';
+
 global $usuario_id;
 
 $mysqli = conn();
@@ -17,17 +19,17 @@ $nombres = $row['nombres'];
 $nombre = explode(' ', $nombres);
 $pNombre = $nombre[0];
 
-
-// $selL ="select logo from logo where codsede='$codsede'";
-// $resL = $mysqli->query($selL);
-// $rowL = $resL->fetch_assoc();
-// $logo = $rowL['logo'];
 $logo = '';
 
+$link = "../logout.php";
 
-$link = "../index.php";
+$rutaSolicitada = $_GET['p'] ?? '';
 
-$forzarInicio = isset($_GET['inicio']) && $_GET['inicio'] === '1';
+$rutaInicial = resolver_ruta_panel(
+    $rutaSolicitada,
+    'inicio/inicio.php'
+);
+
 ?>
 <style>
     .badge-notification-avatar {
@@ -81,13 +83,22 @@ $forzarInicio = isset($_GET['inicio']) && $_GET['inicio'] === '1';
                 <span class="badge-notification-avatar"></span>
             </a>
             <div class="dropdown-menu dropdown-menu-end">
-                <a class="dropdown-item ajax-link" href="infoUsuarios/perfil.php" data-appname="perfil.php">
+                <a
+                    class="dropdown-item ajax-link"
+                    href="index.php?p=<?= rawurlencode('infoUsuarios/perfil.php') ?>"
+                >
                     <i class="fas fa-user me-2"></i> Ver Perfil
                 </a>
-                <a class="dropdown-item ajax-link" href="infoUsuarios/password.php" data-appname="password.php">
+                <a
+                    class="dropdown-item ajax-link"
+                    href="index.php?p=<?= rawurlencode('infoUsuarios/password.php') ?>"
+                >
                     <i class="fa-solid fa-lock me-2"></i> Cambio Contraseña
                 </a>
-                <a class="dropdown-item ajax-link position-relative" href="tickets/lisTickets.php" data-appname="lisTickets.php">
+                <a
+                    class="dropdown-item ajax-link position-relative"
+                    href="index.php?p=<?= rawurlencode('tickets/lisTickets.php') ?>"
+                >
                     <i class="fas fa-tags me-2"></i> Tickets
                     <span class="badge-notification"></span>
                 </a>
@@ -110,265 +121,381 @@ $forzarInicio = isset($_GET['inicio']) && $_GET['inicio'] === '1';
 
 
 <script>
-
-
-
 $(document).ready(function() {
-    const FORCE_HOME = <?= $forzarInicio ? 'true' : 'false' ?>;
 
-    if (typeof FORCE_HOME !== 'undefined' && FORCE_HOME) {
-        try { localStorage.removeItem('lastPage'); } catch (e) {}
-        // Opcional: limpiar el query param ?inicio=1 de la URL actual
-        if (window.history && window.history.replaceState) {
-            const url = new URL(window.location.href);
-            url.searchParams.delete('inicio');
-            const newQ = url.searchParams.toString();
-            window.history.replaceState({}, '', url.pathname + (newQ ? '?' + newQ : ''));
-        }
-    }
+    const RUTA_INICIAL = <?= json_encode(
+        $rutaInicial,
+        JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE
+    ) ?>;
 
-    var lastPage = (typeof FORCE_HOME !== 'undefined' && FORCE_HOME) ? null : localStorage.getItem('lastPage');
-
-    var paginaInicial = lastPage || 'inicio/inicio.php';
-
-    $('#content').css('visibility', 'hidden').load(paginaInicial, function() {
-        const pageId = $('#content').find('[data-page-id]').attr('data-page-id');
-        updateMenuState(pageId);
-
-        setTimeout(function () {
-            $('#content').css('visibility', 'visible');
-        }, 250);
-    });
-
-
-    $(document).on('click', '.sidebar-link, .ajax-link', function(e) {
-        e.preventDefault();
-        var url = $(this).attr('href');
-
-        $.ajax({
-            url: url,
-            method: 'GET',
-            success: function(data) {
-                $('#content').css('visibility', 'hidden').html(data);
-
-                localStorage.setItem('lastPage', url);
-
-                var pageId = $('#content').find('[data-page-id]').attr('data-page-id');
-                updateMenuState(pageId);
-
-                history.pushState({ url: url }, null, window.location.pathname);
-
-                setTimeout(function () {
-                    $('#content').css('visibility', 'visible');
-                }, 250);
-            },
-            error: function() {
-                alert('Error al cargar el contenido.');
-            }
-        });
-    });
-
-
-    window.onpopstate = function(event) {
-        if (event.state && event.state.url) {
-            var url = event.state.url;
-
-            $.ajax({
-                url: url,
-                method: 'GET',
-                success: function(data) {
-                    $('#content').html(data);
-
-                    localStorage.setItem('lastPage', url);
-
-                    var pageId = $('#content').find('[data-page-id]').attr('data-page-id');
-                    updateMenuState(pageId);
-                },
-                error: function() {
-                    alert('Error al cargar el contenido.');
-                }
-            });
-        }
-    };
 
     function updateMenuState(pageId) {
+
         $('.sidebar-item').removeClass('active');
+
         if (pageId) {
             $('#menu-' + pageId).addClass('active');
         }
     }
 
 
+    /*
+     * Convierte un href de la aplicación en una ruta
+     * relativa dentro de /admin.
+     *
+     * Soporta:
+     *
+     * tutor/tutores.php
+     *
+     * certificado/certificados.php?action=modificar&id=10
+     *
+     * index.php?p=tutor/tutores.php
+     */
+    function obtenerRutaPanel(href) {
 
-    function updateMenuStateByUrl(url) {
+        if (!href || href === '#') {
+            return null;
+        }
+
+        try {
+
+            const url = new URL(
+                href,
+                window.location.href
+            );
+
+
+            /*
+             * No permitimos navegar por AJAX hacia
+             * otro dominio.
+             */
+            if (url.origin !== window.location.origin) {
+                return null;
+            }
+
+
+            /*
+             * Enlace del nuevo formato:
+             *
+             * index.php?p=tutor/tutores.php
+             */
+            const rutaParametro =
+                url.searchParams.get('p');
+
+            if (rutaParametro) {
+                return rutaParametro;
+            }
+
+
+            /*
+             * Enlaces actuales:
+             *
+             * tutor/tutores.php
+             * certificado/certificados.php?action=...
+             */
+            const adminBase =
+                new URL('./', window.location.href).pathname;
+
+            if (!url.pathname.startsWith(adminBase)) {
+                return null;
+            }
+
+            const path =
+                url.pathname.substring(adminBase.length);
+
+            if (!path) {
+                return null;
+            }
+
+
+            /*
+             * Conservamos los parámetros propios
+             * de la pantalla.
+             */
+            return path + url.search;
+
+        } catch (error) {
+
+            return null;
+        }
+    }
+
+
+    /*
+     * Actualiza la URL visible sin recargar.
+     *
+     * URLSearchParams codificará automáticamente:
+     *
+     * /  -> %2F
+     * ?  -> %3F
+     * &  -> %26
+     *
+     * Eso es correcto.
+     */
+    function actualizarUrlPanel(ruta, reemplazar = false) {
+
+        const url = new URL(
+            'index.php',
+            window.location.href
+        );
+
+        url.searchParams.set('p', ruta);
+
+        const nuevaUrl =
+            url.pathname + url.search;
+
+        if (reemplazar) {
+
+            history.replaceState(
+                { ruta: ruta },
+                '',
+                nuevaUrl
+            );
+
+            return;
+        }
+
+        history.pushState(
+            { ruta: ruta },
+            '',
+            nuevaUrl
+        );
+    }
+
+
+    /*
+     * Carga una pantalla dentro de #content.
+     */
+    function cargarPagina(
+        ruta,
+        actualizarHistorial = false
+    ) {
+
+        $('#content').css(
+            'visibility',
+            'hidden'
+        );
+
         $.ajax({
-            url: url,
+            url: ruta,
             method: 'GET',
+
             success: function(data) {
+
                 $('#content').html(data);
 
-                var pageId = $('#content').find('[data-page-id]').attr('data-page-id');
+                const pagina =
+                    $('#content')
+                        .find('[data-page-id]')
+                        .first();
+
+                const pageId =
+                    pagina.attr('data-page-id');
 
                 updateMenuState(pageId);
+
+
+                /*
+                 * Solo guardamos la URL si la respuesta
+                 * corresponde a una pantalla de VetMind.
+                 *
+                 * Los módulos actuales ya utilizan
+                 * data-page-id.
+                 */
+                if (
+                    actualizarHistorial &&
+                    pagina.length > 0
+                ) {
+                    actualizarUrlPanel(ruta);
+                }
+
+
+                setTimeout(function() {
+
+                    $('#content').css(
+                        'visibility',
+                        'visible'
+                    );
+
+                }, 250);
             },
-            error: function() {
-                alert('Error al cargar el contenido.');
+
+            error: function(xhr) {
+
+                $('#content').css(
+                    'visibility',
+                    'visible'
+                );
+
+                /*
+                 * El controlador global se encarga
+                 * de una sesión expirada.
+                 */
+                if (xhr.status === 401) {
+                    return;
+                }
+
+                Swal.fire({
+                    icon: 'error',
+                    title: 'Error',
+                    text: 'No fue posible cargar el contenido.'
+                });
             }
         });
     }
-    
 
 
+    /*
+     * Primera carga.
+     *
+     * Puede venir de:
+     *
+     * index.php
+     *
+     * o:
+     *
+     * index.php?p=tutor/tutores.php
+     */
+    cargarPagina(
+        RUTA_INICIAL,
+        false
+    );
 
 
+    /*
+     * Toda pantalla navegable actual utiliza ajax-link.
+     */
+    $(document).on(
+        'click',
+        'a.ajax-link',
+        function(event) {
 
+            const href =
+                $(this).attr('href');
 
+            const ruta =
+                obtenerRutaPanel(href);
 
-
-
-
-
-
-// === CONFIGURACIÓN DEL WATCHDOG DE SESIÓN ===
-const PING_URL = '../funciones/session/ping_sesion.php'; // ajusta si fuera necesario
-const PING_INTERVAL_MS = 1 * 60 * 1000; // cada 2 minutos (ajustable)
-let pingTimer = null;
-let sesionBloqueada = false; // evita mostrar el modal más de una vez
-
-// Crea un overlay para bloquear la UI cuando expire
-function crearOverlayBloqueo() {
-    if ($('#overlay-bloqueo-sesion').length) return;
-    const overlay = `
-      <div id="overlay-bloqueo-sesion" 
-           style="position:fixed; inset:0; background:rgba(255,255,255,0.6); 
-                  z-index: 1040; display:none;">
-      </div>`;
-    $('body').append(overlay);
-}
-
-function bloquearUI() {
-  if (sesionBloqueada) return;
-  sesionBloqueada = true;
-  crearOverlayBloqueo();
-  $('#overlay-bloqueo-sesion').fadeIn(120);
-
-  // Solo lo tuyo:
-  $('main, #content, .sidebar, nav').find(':input, a, button')
-    .prop('disabled', true)
-    .addClass('disabled');
-}
-
-function desbloquearUI() {
-  sesionBloqueada = false;
-  $('#overlay-bloqueo-sesion').fadeOut(100);
-  $('main, #content, .sidebar, nav').find(':input, a, button')
-    .prop('disabled', false)
-    .removeClass('disabled');
-}
-
-// Llamado de ping
-function checkSesion() {
-    // Si ya estamos bloqueados, no sigas spameando
-    if (sesionBloqueada) return;
-
-    $.ajax({
-        url: PING_URL,
-        method: 'GET',
-        cache: false,
-        timeout: 15000, // 15s por si hay red lenta
-        success: function(resp) {
-            // resp.status === 'ok' esperado
-            // Opcional: si quieres distinguir caída de BD
-            // if (resp && resp.db_ok === false) { ... }
-        },
-        statusCode: {
-            401: function(xhr) {
-                // Sesión expirada o inexistente
-                bloquearUI();
-                Swal.fire({
-                    icon: 'warning',
-                    title: 'Sesión expirada',
-                    text: 'Tu sesión terminó por inactividad. Debes volver a iniciar sesión.',
-                    confirmButtonText: 'Ir a login',
-                    allowOutsideClick: false,
-                    allowEscapeKey: false,
-                    allowEnterKey: false
-                }).then(() => {
-                    // Redirige al login (misma lógica que usas en fin_session)
-                    window.top.location.href = '../index.php';
-                });
+            if (!ruta) {
+                return;
             }
-        },
-        error: function() {
-            // Si falla por red/timeout, no bloqueamos de inmediato.
-            // Podrías contar fallos consecutivos y, si exceden N, avisar.
-            // Ej: mostrar un toast suave "Problemas de red, reintentando..."
+
+            event.preventDefault();
+
+            cargarPagina(
+                ruta,
+                true
+            );
         }
-    });
-}
-
-// Arranque del watchdog
-function iniciarWatchdogSesion() {
-    // Llamado inmediato al cargar
-    checkSesion();
-    // Repetición cada N minutos
-    if (pingTimer) clearInterval(pingTimer);
-    pingTimer = setInterval(checkSesion, PING_INTERVAL_MS);
-}
-
-// Iniciar al cargar la app
-iniciarWatchdogSesion();
+    );
 
 
-// === INTERCEPTOR AJAX GLOBAL ===
-// Reutiliza la misma bandera y helpers del Paso 2:
-function mostrarModalSesionExpirada() {
-    if (sesionBloqueada) return;
-    bloquearUI();
-    Swal.fire({
-        icon: 'warning',
-        title: 'Sesión expirada',
-        text: 'Tu sesión terminó por inactividad. Debes volver a iniciar sesión.',
-        confirmButtonText: 'Ir a login',
-        allowOutsideClick: false,
-        allowEscapeKey: false,
-        allowEnterKey: false
-    }).then(() => {
-        window.top.location.href = '../index.php';
-    });
-}
+    /*
+     * Botones atrás / adelante.
+     */
+    window.addEventListener(
+        'popstate',
+        function() {
 
-// Manejo centralizado de códigos
-$.ajaxSetup({
-    statusCode: {
-        401: function() {
-            // No autorizado / sesión expirada
-            mostrarModalSesionExpirada();
-        },
-        419: function() {
-            // (Opcional) Token inválido/expirado (más común en Laravel)
-            mostrarModalSesionExpirada();
+            const url =
+                new URL(window.location.href);
+
+            const ruta =
+                url.searchParams.get('p')
+                || 'inicio/inicio.php';
+
+            cargarPagina(
+                ruta,
+                false
+            );
         }
+    );
+
+
+    // === CONTROL GLOBAL DE SESIÓN EXPIRADA ===
+
+    let sesionBloqueada = false;
+
+
+    function mostrarModalSesionExpirada() {
+
+        if (sesionBloqueada) {
+            return;
+        }
+
+        sesionBloqueada = true;
+
+        Swal.fire({
+            icon: 'warning',
+            title: 'Sesión expirada',
+            text: 'Tu sesión terminó por inactividad. Debes volver a iniciar sesión.',
+            confirmButtonText: 'Ir a login',
+            allowOutsideClick: false,
+            allowEscapeKey: false,
+            allowEnterKey: false
+        }).then(() => {
+
+            window.top.location.href =
+                '../index.php';
+        });
     }
-});
 
-// Por si algún endpoint responde con otro status pero error semántico
-$(document).ajaxError(function(event, jqxhr, settings, thrownError) {
-    // Red segura: algunos servidores devuelven 200 pero incluyen un JSON "expired"
-    try {
-        const ct = jqxhr.getResponseHeader && jqxhr.getResponseHeader('Content-Type');
-        if (ct && ct.indexOf('application/json') >= 0 && jqxhr.responseText) {
-            const data = JSON.parse(jqxhr.responseText);
-            if (data && (data.status === 'expired' || data.status === 'no_session')) {
+
+    $.ajaxSetup({
+        statusCode: {
+
+            401: function() {
                 mostrarModalSesionExpirada();
             }
+
         }
-    } catch (e) { /* noop */ }
-});
+    });
+
+
+    $(document).ajaxError(
+        function(event, jqxhr) {
+
+            try {
+
+                const contentType =
+                    jqxhr.getResponseHeader &&
+                    jqxhr.getResponseHeader(
+                        'Content-Type'
+                    );
+
+                if (
+                    contentType &&
+                    contentType.indexOf(
+                        'application/json'
+                    ) >= 0 &&
+                    jqxhr.responseText
+                ) {
+
+                    const data =
+                        JSON.parse(
+                            jqxhr.responseText
+                        );
+
+                    if (
+                        data &&
+                        (
+                            data.status === 'expired' ||
+                            data.status === 'no_session'
+                        )
+                    ) {
+                        mostrarModalSesionExpirada();
+                    }
+                }
+
+            } catch (e) {
+                // No hacer nada.
+            }
+        }
+    );
 
 });
-
 </script>
+
 <?php include 'footer.php';?> 
 </body>
 </html>

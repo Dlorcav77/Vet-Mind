@@ -7,13 +7,18 @@
 header('Content-Type: application/json; charset=utf-8');
 date_default_timezone_set('America/Santiago');
 
-require_once(dirname(__DIR__, 3) . "/configP.php");
-
-if (session_status() !== PHP_SESSION_ACTIVE) {
-    session_start();
-}
-
 $ROOT_DIR = dirname(__DIR__, 3);
+
+require_once(
+    $ROOT_DIR . "/configP.php"
+);
+
+require_once(
+    $ROOT_DIR
+    . "/funciones/session/funcionesSesion.php"
+);
+
+iniciarSesionSegura();
 
 $logDir = $ROOT_DIR . '/funciones/logs';
 if (!is_dir($logDir)) {

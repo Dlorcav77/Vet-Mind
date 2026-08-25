@@ -1,4 +1,6 @@
 <?php
+// admin/config.php
+
 require_once($_SERVER['DOCUMENT_ROOT'] . "/funciones/session/ini_session.php");
 require_once($_SERVER['DOCUMENT_ROOT'] . "/funciones/funciones.php");
 require_once($_SERVER['DOCUMENT_ROOT'] . "/funciones/funcionesList.php");
