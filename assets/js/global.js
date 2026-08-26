@@ -46,6 +46,15 @@ function initDataTables() {
 
         const $tabla = $(this);
 
+        const columnaExportable = function (indice, data, nodo) {
+            const titulo = $(nodo)
+                .text()
+                .trim()
+                .toLowerCase();
+
+            return titulo !== 'acciones';
+        };
+
         $tabla.find('thead th').each(function (indice) {
             const titulo = $(this).text().trim().toLowerCase();
 
@@ -72,19 +81,30 @@ function initDataTables() {
                     extend: 'excelHtml5',
                     text: '<i class="fas fa-file-excel me-1"></i> Excel',
                     title: document.title || 'Exportación',
-                    exportOptions: { columns: ':visible' }
+
+                    exportOptions: {
+                        columns: columnaExportable
+                    }
                 },
+
                 {
                     extend: 'pdfHtml5',
                     text: '<i class="fas fa-file-pdf me-1"></i> PDF',
                     title: document.title || 'Exportación',
-                    exportOptions: { columns: ':visible' }
+
+                    exportOptions: {
+                        columns: columnaExportable
+                    }
                 },
+
                 {
                     extend: 'print',
                     text: '<i class="fas fa-print me-1"></i> Imprimir',
                     title: document.title || 'Exportación',
-                    exportOptions: { columns: ':visible' }
+
+                    exportOptions: {
+                        columns: columnaExportable
+                    }
                 }
             ],
             language: window.VETMIND_DATATABLE_LANGUAGE

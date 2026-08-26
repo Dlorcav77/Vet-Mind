@@ -1,4 +1,49 @@
 <?php
+function configurarErroresAplicacion(
+    bool $respuestaJson = false
+): void {
+    $entorno = strtolower(
+        trim(
+            (string)(
+                getenv('APP_ENV')
+                ?: ($_ENV['APP_ENV'] ?? '')
+                ?: ($_SERVER['APP_ENV'] ?? '')
+                ?: 'production'
+            )
+        )
+    );
+
+    $esDesarrollo = in_array(
+        $entorno,
+        ['development', 'dev', 'local'],
+        true
+    );
+
+    error_reporting(E_ALL);
+
+    ini_set(
+        'log_errors',
+        '1'
+    );
+
+    /*
+     * En respuestas JSON nunca mostramos errores PHP,
+     * porque un warning rompería la respuesta JSON.
+     */
+    $mostrarErrores =
+        $esDesarrollo
+        && !$respuestaJson;
+
+    ini_set(
+        'display_errors',
+        $mostrarErrores ? '1' : '0'
+    );
+
+    ini_set(
+        'display_startup_errors',
+        $mostrarErrores ? '1' : '0'
+    );
+}
 
 function iniciarSesionSegura(): void
 {
