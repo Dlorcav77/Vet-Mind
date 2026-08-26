@@ -34,6 +34,24 @@ $(document).on('click', '.dropdown-toggle', function (e) {
     dd.toggle();
 });
 
+function initSingleActionButtons() {
+
+    $('.card-header .row.mb-4').each(function () {
+
+        const $fila = $(this);
+
+        const $botones = $fila.find('.btn:visible');
+
+        $fila.removeClass('vm-single-action');
+
+        if ($botones.length === 1) {
+            $fila.addClass('vm-single-action');
+        }
+
+    });
+
+}
+
 // ✅ Inicializa DataTables para todas las tablas con .datatable
 function initDataTables() {
     $('.datatable').each(function () {
@@ -131,10 +149,12 @@ function initDropdowns() {
 $(document).ready(function () {
     initDataTables();
     initDropdowns();
+    initSingleActionButtons();
 });
 $(document).on('ajaxComplete', function () {
     initDataTables();
     initDropdowns();
+    initSingleActionButtons();
 });
 
 function inicializarEditorContenido() {}

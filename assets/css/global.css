@@ -530,6 +530,20 @@ table.dataTable.dtr-inline.collapsed > tbody > tr > th.dtr-control::before {
     }
 }
 
+/* =========================================================
+   ACCIÓN ÚNICA EN ENCABEZADOS DE LISTADOS
+   ========================================================= */
+
+.card-header .row.mb-4.vm-single-action {
+    justify-content: flex-end;
+}
+
+.card-header .row.mb-4.vm-single-action > [class*="col-"] {
+    width: auto;
+    flex: 0 0 auto;
+    margin-left: auto;
+}
+
 .cke_notification_warn,
 .cke_notification {
     display: none !important;

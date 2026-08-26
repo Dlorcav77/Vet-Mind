@@ -86,4 +86,4 @@
 
 <!-- App scripts -->
 <script src="../assets/js/app.js"></script>
-<script src="../assets/js/global.js?v=5"></script>
+<script src="../assets/js/global.js?v=6"></script>
