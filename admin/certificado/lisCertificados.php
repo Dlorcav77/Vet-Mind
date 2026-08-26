@@ -41,23 +41,7 @@ $res = $stmt->get_result();
 ?>
 <link rel="stylesheet" href="certificado/ver/css/ver.css?v=1">
 <style>
-    .dataTables_wrapper .dt-buttons {
-        float: left;
-    }
-    .dataTables_wrapper .dataTables_filter {
-        float: right;
-    }
-    table.dataTable thead th,
-    table.dataTable tfoot th {
-        font-family: Arial, sans-serif;
-        font-size: 14px;
-    }
-    table.dataTable tbody td {
-        font-family: Arial, sans-serif;
-        font-size: 12px;
-        padding-top: 4px;
-        padding-bottom: 4px;
-    }
+
     .cert-numero-wrap {
         display: inline-flex;
         align-items: center;
@@ -129,12 +113,12 @@ $res = $stmt->get_result();
           <div class="row mb-4">
             <div class="col-12 d-flex justify-content-between align-items-center">
               <a href="certificado/subir_informe/subir_informe.php" class="btn btn-outline-primary ajax-link">
-                <i style="width:20px;height:20px;" data-feather="upload"></i> Subir Informe
+                <i class="fas fa-upload me-1"></i> Subir Informe
               </a>
 
               <?php if (in_array('ingresar', $acceso_aplicaciones['certificado'] ?? [])): ?>
                 <a href="certificado/certificados.php" class="btn btn-primary ajax-link">
-                  <i style="width:20px;height:20px;" data-feather="plus"></i> Nuevo Informe
+                  <i class="fas fa-plus me-1"></i> Nuevo Informe
                 </a>
               <?php endif; ?>
             </div>

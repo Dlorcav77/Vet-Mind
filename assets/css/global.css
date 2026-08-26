@@ -68,19 +68,469 @@
   position: relative;
 }
 
-.dataTables_wrapper .dt-buttons {
-    float: none;
-    text-align: center;
-}
-table.dataTable thead th, table.dataTable tfoot th {
-    font-family: Arial, sans-serif;
+/* =========================================================
+   DATATABLES
+   ========================================================= */
+
+.dataTables_wrapper {
+    font-family: "Calibri", "Segoe UI", Arial, sans-serif;
     font-size: 14px;
 }
+
+
+/* =========================================================
+   BARRA SUPERIOR
+   ========================================================= */
+
+.dataTables_wrapper .dt-toolbar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    flex-wrap: wrap;
+    margin-bottom: 12px;
+}
+
+
+/* =========================================================
+   BOTONES DE EXPORTACIÓN
+   ========================================================= */
+
+.dataTables_wrapper .dt-buttons {
+    float: none;
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    flex-wrap: wrap;
+    margin: 0;
+}
+
+.dataTables_wrapper .dt-toolbar .dt-buttons .btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 3px;
+
+    padding: 6px 11px;
+
+    border: 1px solid #d5dbe1;
+    border-radius: 6px;
+
+    background-color: #fff;
+    color: #495057;
+
+    font-size: 12px;
+    font-weight: 500;
+
+    box-shadow: none !important;
+
+    transition:
+        background-color 0.15s ease,
+        border-color 0.15s ease,
+        color 0.15s ease;
+}
+
+/* Excel */
+.dataTables_wrapper .dt-toolbar .buttons-excel {
+    color: #198754 !important;
+}
+
+.dataTables_wrapper .dt-toolbar .buttons-excel:hover {
+    background-color: #eaf7f0 !important;
+    border-color: #a9d5bd !important;
+}
+
+/* PDF */
+.dataTables_wrapper .dt-toolbar .buttons-pdf {
+    color: #dc3545 !important;
+}
+
+.dataTables_wrapper .dt-toolbar .buttons-pdf:hover {
+    background-color: #fcebed !important;
+    border-color: #efb3b9 !important;
+}
+
+/* Imprimir */
+.dataTables_wrapper .dt-toolbar .buttons-print {
+    color: #495057 !important;
+}
+
+.dataTables_wrapper .dt-toolbar .buttons-print:hover {
+    background-color: #f1f3f5 !important;
+    border-color: #c5cbd1 !important;
+}
+
+.dataTables_wrapper .dt-toolbar .dt-button.btn-secondary {
+    background-color: #fff;
+}
+
+
+/* =========================================================
+   BUSCADOR
+   ========================================================= */
+
+.dataTables_wrapper .dt-toolbar .dataTables_filter {
+    float: none !important;
+    margin: 0 0 0 auto;
+}
+
+.dataTables_wrapper .dataTables_filter label {
+    position: relative;
+    display: block;
+    margin: 0;
+}
+
+.dataTables_wrapper .dataTables_filter label::before {
+    content: "\f002";
+
+    position: absolute;
+    left: 11px;
+    top: 50%;
+    transform: translateY(-50%);
+
+    font-family: "Font Awesome 6 Free";
+    font-weight: 900;
+    font-size: 12px;
+
+    color: #8a939d;
+
+    pointer-events: none;
+    z-index: 2;
+}
+
+.dataTables_wrapper .dataTables_filter input {
+    width: 240px;
+    min-width: 240px;
+
+    margin-left: 0 !important;
+    padding: 7px 12px 7px 32px;
+
+    border: 1px solid #d5dbe1;
+    border-radius: 7px;
+
+    background-color: #fff;
+    color: #343a40;
+
+    font-size: 13px;
+
+    outline: none;
+
+    transition:
+        border-color 0.15s ease,
+        box-shadow 0.15s ease,
+        background-color 0.15s ease;
+}
+
+.dataTables_wrapper .dataTables_filter input::placeholder {
+    color: #9aa2aa;
+    opacity: 1;
+}
+
+.dataTables_wrapper .dataTables_filter input:focus {
+    border-color: #86b7fe;
+    box-shadow: 0 0 0 0.2rem rgba(13, 110, 253, 0.15);
+}
+
+
+/* =========================================================
+   CANTIDAD DE REGISTROS
+   ========================================================= */
+
+.dataTables_wrapper .dataTables_length {
+    margin-bottom: 12px;
+}
+
+.dataTables_wrapper .dataTables_length label {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin: 0;
+}
+
+.dataTables_wrapper .dataTables_length select {
+    min-width: 72px;
+    padding: 6px 28px 6px 10px;
+    border-radius: 6px;
+}
+
+
+/* =========================================================
+   TABLA
+   ========================================================= */
+
+table.dataTable {
+    width: 100% !important;
+    border-collapse: separate !important;
+    border-spacing: 0;
+}
+
+table.dataTable thead th,
+table.dataTable tfoot th {
+    font-family: Arial, sans-serif;
+    font-size: 14px;
+    font-weight: 600;
+
+    vertical-align: middle;
+    white-space: nowrap;
+
+    padding: 10px 12px !important;
+
+    background-color: #f6f8fa;
+    color: #2f3742;
+
+    border-top: 1px solid #dee2e6;
+    border-bottom: 1px solid #cfd6dd !important;
+}
+
 table.dataTable tbody td {
     font-family: Arial, sans-serif;
     font-size: 12px;
+
+    vertical-align: middle;
+
+    padding: 4px 12px !important;
 }
 
-.cke_notification_warn, .cke_notification {
+table.dataTable tbody tr {
+    height: auto;
+
+    transition:
+        background-color 0.12s ease;
+}
+
+table.dataTable tbody tr:hover td {
+    background-color: #f4f8fc;
+}
+
+table.dataTable thead th:first-child,
+table.dataTable tbody td:first-child {
+    padding-left: 12px !important;
+}
+
+table.dataTable thead th:last-child,
+table.dataTable tbody td:last-child {
+    padding-right: 12px !important;
+}
+
+
+/* =========================================================
+   ENCABEZADOS Y ORDENAMIENTO
+   ========================================================= */
+
+table.dataTable thead th {
+    position: relative;
+
+    transition:
+        background-color 0.15s ease,
+        color 0.15s ease;
+}
+
+table.dataTable thead th.sorting:hover,
+table.dataTable thead th.sorting_asc:hover,
+table.dataTable thead th.sorting_desc:hover {
+    background-color: #eef3f8;
+}
+
+table.dataTable thead th.sorting_asc,
+table.dataTable thead th.sorting_desc {
+    background-color: #edf4ff;
+    color: #0d6efd;
+}
+
+table.dataTable thead > tr > th.sorting::before,
+table.dataTable thead > tr > th.sorting::after,
+table.dataTable thead > tr > th.sorting_asc::before,
+table.dataTable thead > tr > th.sorting_asc::after,
+table.dataTable thead > tr > th.sorting_desc::before,
+table.dataTable thead > tr > th.sorting_desc::after {
+    opacity: 0.22;
+}
+
+table.dataTable thead > tr > th.sorting_asc::before,
+table.dataTable thead > tr > th.sorting_desc::after {
+    opacity: 0.8;
+}
+
+
+/* =========================================================
+   COLUMNA Y BOTÓN DE ACCIONES
+   ========================================================= */
+
+table.dataTable .dt-col-acciones {
+    width: 1%;
+    min-width: 72px;
+
+    white-space: nowrap;
+    text-align: center !important;
+}
+
+table.dataTable th.dt-col-acciones {
+    text-align: center !important;
+}
+
+table.dataTable td.dt-col-acciones .dropdown {
+    display: inline-block;
+}
+
+table.dataTable .dropdown .btn-outline-info {
+    min-height: 30px;
+
+    padding: 4px 8px;
+
+    font-size: 12px;
+    line-height: 1.2;
+}
+
+/* =========================================================
+   RESPONSIVE DATATABLES
+   ========================================================= */
+
+table.dataTable.dtr-inline.collapsed > tbody > tr > td.dtr-control::before,
+table.dataTable.dtr-inline.collapsed > tbody > tr > th.dtr-control::before {
+    box-shadow: none;
+}
+
+
+/* =========================================================
+   BARRA INFERIOR
+   ========================================================= */
+
+.dataTables_wrapper .dt-footer {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    flex-wrap: wrap;
+
+    margin-top: 12px;
+    padding-top: 10px;
+
+    border-top: 1px solid #eef0f2;
+}
+
+.dataTables_wrapper .dataTables_info {
+    padding: 0 !important;
+    margin: 0;
+
+    font-size: 12px;
+    color: #7a838c;
+}
+
+.dataTables_wrapper .dataTables_paginate {
+    padding: 0 !important;
+    margin: 0;
+}
+
+
+/* =========================================================
+   PAGINACIÓN
+   ========================================================= */
+
+.dataTables_wrapper .dataTables_paginate .pagination {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+
+    margin: 0;
+}
+
+.dataTables_wrapper .dataTables_paginate .page-link {
+    min-width: 32px;
+    height: 32px;
+
+    display: flex;
+    align-items: center;
+    justify-content: center;
+
+    padding: 4px 9px;
+
+    border: 1px solid #dce1e6;
+    border-radius: 6px !important;
+
+    background-color: #fff;
+    color: #5f6872;
+
+    font-size: 12px;
+    font-weight: 500;
+
+    box-shadow: none !important;
+
+    transition:
+        background-color 0.15s ease,
+        border-color 0.15s ease,
+        color 0.15s ease;
+}
+
+.dataTables_wrapper
+.dataTables_paginate
+.page-item:not(.active):not(.disabled)
+.page-link:hover {
+    background-color: #f4f7fa;
+    border-color: #cbd3da;
+    color: #0d6efd;
+}
+
+.dataTables_wrapper
+.dataTables_paginate
+.page-item.active
+.page-link {
+    background-color: #0d6efd;
+    border-color: #0d6efd;
+    color: #fff;
+}
+
+.dataTables_wrapper
+.dataTables_paginate
+.page-item.disabled
+.page-link {
+    background-color: #f8f9fa;
+    border-color: #e5e8eb;
+    color: #adb5bd;
+
+    opacity: 0.8;
+}
+
+
+/* =========================================================
+   MÓVIL
+   ========================================================= */
+
+@media (max-width: 768px) {
+
+    .dataTables_wrapper .dt-toolbar {
+        align-items: stretch;
+    }
+
+    .dataTables_wrapper .dt-toolbar .dt-buttons {
+        width: 100%;
+    }
+
+    .dataTables_wrapper .dt-toolbar .dataTables_filter {
+        width: 100%;
+        margin-left: 0;
+    }
+
+    .dataTables_wrapper .dataTables_filter label {
+        width: 100%;
+    }
+
+    .dataTables_wrapper .dataTables_filter input {
+        width: 100%;
+        min-width: 0;
+    }
+
+    .dataTables_wrapper .dt-footer {
+        flex-direction: column;
+        align-items: stretch;
+    }
+
+    .dataTables_wrapper .dt-footer .dataTables_paginate {
+        display: flex;
+        justify-content: flex-end;
+    }
+}
+
+.cke_notification_warn,
+.cke_notification {
     display: none !important;
 }

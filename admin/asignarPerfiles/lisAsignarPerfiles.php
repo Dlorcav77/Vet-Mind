@@ -28,28 +28,6 @@ $stmt->execute();
 $res = $stmt->get_result();
 
 ?>
-<style>
-  .dataTables_wrapper .dt-buttons {
-    float: none;
-    text-align: center;
-  }
-
-  table.dataTable thead th,
-  table.dataTable tfoot th {
-    font-family: Arial, sans-serif;
-    font-size: 14px;
-  }
-
-  table.dataTable tbody td {
-    font-family: Arial, sans-serif;
-    font-size: 12px;
-  }
-
-  .dataTables_wrapper .dt-buttons {
-    float: none;
-    text-align: center;
-  }
-</style>
 <div id="asignarPerfiles" data-page-id="asignarPerfiles">
   <h1 class="h3 mb-3"><strong>Asignar Perfil</strong></h1>
   <div class="card">
@@ -59,7 +37,7 @@ $res = $stmt->get_result();
           <div class="row mb-4">
             <div class="col-md-5">
               <a href="asignarPerfiles/asignarPerfiles.php" class="btn btn-primary ajax-link">
-                <i style="width:20px;height:20px;" data-feather="plus"></i> Agregar perfil
+                <i class="fas fa-plus me-1"></i> Agregar perfil
               </a>
             </div>
           </div>
@@ -118,8 +96,13 @@ $res = $stmt->get_result();
                     <td><?php print "$estado"?></td>
                     <td align='center'>
                       <div class="dropdown position-relative">
-                        <button class="btn btn-outline-info" type="button" id="dropdownMenuButton" data-bs-toggle="dropdown" aria-expanded="false">
-                          <i class="align-middle" data-feather="more-vertical"></i>
+                        <button
+                            class="btn btn-outline-info dropdown-toggle"
+                            type="button"
+                            data-bs-toggle="dropdown"
+                            aria-expanded="false"
+                        >
+                            <i class="fas fa-ellipsis-v"></i>
                         </button>
                         <div class="dropdown-menu dropdown-menu-end">
                           <a class="dropdown-item ajax-link" href="asignarPerfiles/asignarPerfiles.php?action=modificar&id=<?php echo $id; ?>">Modificar</a>
@@ -139,86 +122,64 @@ $res = $stmt->get_result();
     </div>
   </div>
 </div>
-
 <script>
-  $(document).ready(function() {
-    $('#ventas').DataTable({
-      responsive: true,
-      dom: 'Bfrtip',
-      buttons: [{
-          extend: 'excelHtml5',
-          text: 'Excel',
-          title: 'Perfiles Asignados',
-          exportOptions: {
-            columns: [0, 1, 5, 2, 3, 6, 7, 8]
-          }
-        },
-        {
-          extend: 'pdfHtml5',
-          title: 'Perfiles Asignados',
-          text: 'PDF',
-          exportOptions: {
-            columns: [0, 1, 5, 2, 3, 6, 7, 8]
-          }
-        },
-        {
-          extend: 'print',
-          title: 'Perfiles Asignados',
-          text: 'Imprimir',
-          exportOptions: {
-            columns: [0, 1, 5, 2, 3, 6, 7, 8]
-          }
-        }
-      ],
-      language: {
-        "decimal": "",
-        "emptyTable": "No hay informaci&oacute;n",
-        "info": "Mostrando _START_ a _END_ de _TOTAL_ registros",
-        "infoEmpty": "Mostrando 0 a 0 de 0 registros",
-        "infoFiltered": "(Filtrado de _MAX_ total registros)",
-        "infoPostFix": "",
-        "thousands": ",",
-        "lengthMenu": "Mostrar _MENU_ registros",
-        "loadingRecords": "Cargando...",
-        "processing": "Procesando...",
-        "search": "Buscar:",
-        "zeroRecords": "No se encontraron resultados",
-        "paginate": {
-          "first": "Primero",
-          "last": "Ultimo",
-          "next": "Siguiente",
-          "previous": "Anterior"
-        },
-        "aria": {
-          "sortAscending": ": Activar para ordenar la columna de manera ascendente",
-          "sortDescending": ": Activar para ordenar la columna de manera descendente"
-        },
-        "buttons": {
-          "copy": "Copiar",
-          "colvis": "Visibilidad",
-          "collection": "Coleccion",
-          "colvisRestore": "Restaurar visibilidad",
-          "copyKeys": "Presione ctrl o cmd + C para copiar los datos de la tabla al portapapeles. <br><br>Para cancelar, haga clic en este mensaje o presione escape.",
-          "copySuccess": {
-            "1": "Copiada 1 fila al portapapeles",
-            "_": "Copiadas %d filas al portapapeles"
-          },
-          "copyTitle": "Copiar al portapapeles",
-          "csv": "CSV",
-          "excel": "Excel",
-          "pageLength": {
-            "-1": "Mostrar todas las filas",
-            "_": "Mostrar %d filas"
-          },
-          "pdf": "PDF",
-          "print": "Imprimir"
-        }
-      }
+$(document).ready(function () {
+
+    const $tabla = $('#ventas');
+
+    if ($.fn.DataTable.isDataTable($tabla[0])) {
+        return;
+    }
+
+    $tabla.DataTable({
+        responsive: true,
+
+        dom:
+            '<"dt-toolbar"Bf>'
+            + 'rt'
+            + '<"dt-footer"ip>',
+
+        buttons: [
+            {
+                extend: 'excelHtml5',
+                text: '<i class="fas fa-file-excel me-1"></i> Excel',
+                title: 'Perfiles Asignados',
+                exportOptions: {
+                    columns: [0, 1, 5, 2, 3, 6, 7, 8]
+                }
+            },
+            {
+                extend: 'pdfHtml5',
+                text: '<i class="fas fa-file-pdf me-1"></i> PDF',
+                title: 'Perfiles Asignados',
+                exportOptions: {
+                    columns: [0, 1, 5, 2, 3, 6, 7, 8]
+                }
+            },
+            {
+                extend: 'print',
+                text: '<i class="fas fa-print me-1"></i> Imprimir',
+                title: 'Perfiles Asignados',
+                exportOptions: {
+                    columns: [0, 1, 5, 2, 3, 6, 7, 8]
+                }
+            }
+        ],
+
+        columnDefs: [
+            {
+                targets: -1,
+                className: 'dt-col-acciones',
+                orderable: false
+            }
+        ],
+
+        language: window.VETMIND_DATATABLE_LANGUAGE
     });
-  });
+
+});
 </script>
 <script>
-  feather.replace();
 
   function confirmDelete(id) {
     Swal.fire({

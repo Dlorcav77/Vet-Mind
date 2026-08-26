@@ -77,10 +77,8 @@ $(function () {
       // Solo inicializar si hay al menos un <tr>
       if ($('#tabla_razas tbody tr').length > 0) {
         $('#tabla_razas').DataTable({
-          responsive: true,
-          language: {
-            url: '//cdn.datatables.net/plug-ins/1.13.4/i18n/es-CL.json'
-          }
+            responsive: true,
+            language: window.VETMIND_DATATABLE_LANGUAGE
         });
       }
     });

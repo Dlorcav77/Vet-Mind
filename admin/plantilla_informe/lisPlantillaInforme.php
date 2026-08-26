@@ -20,21 +20,6 @@ $stmt->bind_param('i', $usuario_id);
 $stmt->execute();
 $res = $stmt->get_result();
 ?>
-<style>
-    .dataTables_wrapper .dt-buttons {
-        float: none;
-        text-align: center;
-    }
-    table.dataTable thead th, table.dataTable tfoot th {
-        font-family: Arial, sans-serif;
-        font-size: 14px;
-    }
-    table.dataTable tbody td {
-        font-family: Arial, sans-serif;
-        font-size: 12px;
-    }
-</style>
-
 <div id="plantilla_informe" data-page-id="plantilla_informe">
   <h1 class="h3 mb-3"><strong>Plantillas de Contenido</strong></h1>
   <div class="card">

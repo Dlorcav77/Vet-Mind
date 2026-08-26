@@ -1,3 +1,28 @@
+window.VETMIND_DATATABLE_LANGUAGE = {
+    decimal: "",
+    emptyTable: "No hay información",
+    info: "Mostrando _START_ a _END_ de _TOTAL_ registros",
+    infoEmpty: "Mostrando 0 a 0 de 0 registros",
+    infoFiltered: "(Filtrado de _MAX_ total registros)",
+    lengthMenu: "Mostrar _MENU_ registros",
+    loadingRecords: "Cargando...",
+    processing: "Procesando...",
+    search: "",
+    searchPlaceholder: "Buscar...",
+    zeroRecords: "No se encontraron resultados",
+    paginate: {
+        first: "Primero",
+        last: "Último",
+        next: "Siguiente",
+        previous: "Anterior"
+    },
+    buttons: {
+        excel: "Excel",
+        pdf: "PDF",
+        print: "Imprimir"
+    }
+};
+
 // 🔥 Delegación global para cualquier botón dropdown
 $(document).on('click', '.dropdown-toggle', function (e) {
     e.preventDefault();
@@ -19,52 +44,50 @@ function initDataTables() {
             return;
         }
 
+        const $tabla = $(this);
+
+        $tabla.find('thead th').each(function (indice) {
+            const titulo = $(this).text().trim().toLowerCase();
+
+            if (titulo === 'acciones') {
+                $(this).addClass('dt-col-acciones');
+
+                $tabla.find('tbody tr').each(function () {
+                    $(this)
+                        .children('td')
+                        .eq(indice)
+                        .addClass('dt-col-acciones');
+                });
+            }
+        });
+
         $(this).DataTable({
             responsive: true,
-            dom: 'Bfrtip',
+            dom:
+            '<"dt-toolbar"Bf>'
+            + 'rt'
+            + '<"dt-footer"ip>',
             buttons: [
                 {
                     extend: 'excelHtml5',
-                    text: 'Excel',
+                    text: '<i class="fas fa-file-excel me-1"></i> Excel',
                     title: document.title || 'Exportación',
                     exportOptions: { columns: ':visible' }
                 },
                 {
                     extend: 'pdfHtml5',
-                    text: 'PDF',
+                    text: '<i class="fas fa-file-pdf me-1"></i> PDF',
                     title: document.title || 'Exportación',
                     exportOptions: { columns: ':visible' }
                 },
                 {
                     extend: 'print',
-                    text: 'Imprimir',
+                    text: '<i class="fas fa-print me-1"></i> Imprimir',
                     title: document.title || 'Exportación',
                     exportOptions: { columns: ':visible' }
                 }
             ],
-            language: {
-                decimal: "",
-                emptyTable: "No hay información",
-                info: "Mostrando _START_ a _END_ de _TOTAL_ registros",
-                infoEmpty: "Mostrando 0 a 0 de 0 registros",
-                infoFiltered: "(Filtrado de _MAX_ total registros)",
-                lengthMenu: "Mostrar _MENU_ registros",
-                loadingRecords: "Cargando...",
-                processing: "Procesando...",
-                search: "Buscar:",
-                zeroRecords: "No se encontraron resultados",
-                paginate: {
-                    first: "Primero",
-                    last: "Último",
-                    next: "Siguiente",
-                    previous: "Anterior"
-                },
-                buttons: {
-                    excel: "Excel",
-                    pdf: "PDF",
-                    print: "Imprimir"
-                }
-            }
+            language: window.VETMIND_DATATABLE_LANGUAGE
         });
          // 🩹 Agrega id y name al buscador para evitar warnings
         let $inputBuscar = $(this).closest('.dataTables_wrapper').find('div.dataTables_filter input[type="search"]');

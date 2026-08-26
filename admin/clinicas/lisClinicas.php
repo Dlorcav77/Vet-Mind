@@ -18,13 +18,6 @@ $stmt->bind_param('i', $usuario_id);
 $stmt->execute();
 $res = $stmt->get_result();
 ?>
-<style>
-  .dataTables_wrapper .dt-buttons { float: none; text-align: center; }
-  table.dataTable thead th, table.dataTable tfoot th { font-family: Arial, sans-serif; font-size: 14px; }
-  table.dataTable tbody td { font-family: Arial, sans-serif; font-size: 12px; }
-  .dataTables_wrapper .dt-buttons { float: none; text-align: center; }
-</style>
-
 <div id="clinicas" data-page-id="clinicas">
   <h1 class="h3 mb-3"><strong>Clínicas</strong></h1>
   <div class="card">
@@ -34,7 +27,7 @@ $res = $stmt->get_result();
           <div class="row mb-4">
             <div class="col-md-5">
                 <a href="clinicas/clinicas.php" class="btn btn-primary ajax-link">
-                  <i style="width:20px;height:20px;" data-feather="plus"></i> Agregar Clínica
+                  <i class="fas fa-plus me-1"></i> Agregar Clínica
                 </a>
             </div>
           </div>

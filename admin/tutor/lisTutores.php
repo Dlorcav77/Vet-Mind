@@ -27,7 +27,7 @@ $res = $stmt->get_result();
             <div class="col-md-5">
               <?php if (in_array('ingresar', $acceso_aplicaciones['tutor'] ?? [])): ?>
                 <a href="tutor/tutores.php" class="btn btn-primary ajax-link">
-                  <i style="width:20px;height:20px;" data-feather="plus"></i> Agregar Tutor
+                  <i class="fas fa-plus me-1"></i> Agregar Tutor
                 </a>
               <?php endif; ?>
               <button class="btn btn-outline-secondary ms-2" onclick="abrirBuscador()">

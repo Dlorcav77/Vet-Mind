@@ -80,4 +80,4 @@
 
 <!-- App scripts -->
 <script src="../assets/js/app.js"></script>
-<script src="../assets/js/global.js"></script>
+<script src="../assets/js/global.js?v=3"></script>

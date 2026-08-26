@@ -15,28 +15,6 @@ $stmt->execute();
 $res = $stmt->get_result();
 
 ?>
-<style>
-  .dataTables_wrapper .dt-buttons {
-    float: none;
-    text-align: center;
-  }
-
-  table.dataTable thead th,
-  table.dataTable tfoot th {
-    font-family: Arial, sans-serif;
-    font-size: 14px;
-  }
-
-  table.dataTable tbody td {
-    font-family: Arial, sans-serif;
-    font-size: 12px;
-  }
-
-  .dataTables_wrapper .dt-buttons {
-    float: none;
-    text-align: center;
-  }
-</style>
 <div id="perfil" data-page-id="perfil">
   <h1 class="h3 mb-3"><strong>Perfiles</strong></h1>
   <div class="card">
@@ -48,7 +26,7 @@ $res = $stmt->get_result();
               <?php 
               if (in_array('ingresar', $acceso_aplicaciones['perfil'] ?? [])): ?>
                 <a href="perfil/perfiles.php" class="btn btn-primary ajax-link">
-                  <i style="width:20px;height:20px;" data-feather="plus"></i> Agregar perfil
+                  <i class="fas fa-plus me-1"></i> Agregar perfil
                 </a>
               <?php endif; ?>
             </div>
@@ -61,7 +39,12 @@ $res = $stmt->get_result();
                   <th>Nombre</th>
                   <th>Descripcion</th>
                   <?php if (array_intersect(['modificar', 'eliminar'], $acceso_aplicaciones['perfil'] ?? [])): ?>
-                    <th>Acciones</th>
+                    <th
+                        class="dt-col-acciones"
+                        data-orderable="false"
+                    >
+                        Acciones
+                    </th>
                   <?php endif; ?>
                 </tr>
               </thead>
@@ -83,18 +66,45 @@ $res = $stmt->get_result();
                       <?php echo contenidoMax($descripcion); ?>
                     </td>
                     <?php if (array_intersect(['modificar', 'eliminar'], $acceso_aplicaciones['perfil'] ?? [])): ?>
-                    <td align='center'>
+                    <td class="dt-col-acciones">
                       <div class="dropdown position-relative">
-                        <button  class="btn btn-outline-info dropdown-toggle" type="button" data-bs-toggle="dropdown" aria-expanded="false">
-                          <i class="align-middle" data-feather="more-vertical"></i>
+
+                        <button
+                            class="btn btn-outline-info dropdown-toggle"
+                            type="button"
+                            data-bs-toggle="dropdown"
+                            aria-expanded="false"
+                        >
+                          <i class="fas fa-ellipsis-v"></i>
                         </button>
+
                         <div class="dropdown-menu dropdown-menu-end">
+
                           <?php if (in_array('modificar', $acceso_aplicaciones['perfil'] ?? [])): ?>
-                            <a class="dropdown-item ajax-link" href="perfil/perfiles.php?action=modificar&id=<?php echo $id; ?>">Modificar</a>
-                          <?php endif; if (in_array('eliminar', $acceso_aplicaciones['perfil'] ?? [])): ?>
-                            <a class="dropdown-item" href="#" onclick="confirmDelete('<?php echo $id; ?>')">Eliminar</a>
+
+                            <a
+                                class="dropdown-item ajax-link"
+                                href="perfil/perfiles.php?action=modificar&id=<?php echo $id; ?>"
+                            >
+                              Modificar
+                            </a>
+
                           <?php endif; ?>
+
+                          <?php if (in_array('eliminar', $acceso_aplicaciones['perfil'] ?? [])): ?>
+
+                            <a
+                                class="dropdown-item"
+                                href="#"
+                                onclick="confirmDelete('<?php echo $id; ?>')"
+                            >
+                              Eliminar
+                            </a>
+
+                          <?php endif; ?>
+
                         </div>
+                      </div>
                     </td>
                     <?php endif; ?>
                   </tr>
@@ -136,101 +146,102 @@ $res = $stmt->get_result();
 </script>
 
 
+<script>
+  $(document).ready(function () {
 
-<script>
-  $(document).ready(function() {
-    $('#ventas').DataTable({
-      responsive: true,
-      dom: 'Bfrtip',
-      buttons: [{
-          extend: 'excelHtml5',
-          text: 'Excel',
-          title: 'Perfiles', 
-          exportOptions: {
-            columns: [0, 1, 2],
-            format: {
-              body: function (data, row, column, node) {
-                return $(node).data('content') ? $(node).data('content') : data;
-              }
-            }
-          }
-        },
-        {
-          extend: 'pdfHtml5',
-          title: 'Perfiles', 
-          text: 'PDF',
-          exportOptions: {
-            columns: [0, 1, 2],
-            format: {
-              body: function (data, row, column, node) {
-                return $(node).data('content') ? $(node).data('content') : data;
-              }
-            }
-          }
-        },
-        {
-          extend: 'print',
-          title: 'Perfiles', 
-          text: 'Imprimir',
-          exportOptions: {
-            columns: [0, 1, 2],
-            format: {
-              body: function (data, row, column, node) {
-                return $(node).data('content') ? $(node).data('content') : data;
-              }
-            }
-          }
-        }
-      ],
-      language: {
-        "decimal": "",
-        "emptyTable": "No hay informaci&oacute;n",
-        "info": "Mostrando _START_ a _END_ de _TOTAL_ registros",
-        "infoEmpty": "Mostrando 0 a 0 de 0 registros",
-        "infoFiltered": "(Filtrado de _MAX_ total registros)",
-        "infoPostFix": "",
-        "thousands": ",",
-        "lengthMenu": "Mostrar _MENU_ registros",
-        "loadingRecords": "Cargando...",
-        "processing": "Procesando...",
-        "search": "Buscar:",
-        "zeroRecords": "No se encontraron resultados",
-        "paginate": {
-          "first": "Primero",
-          "last": "Ultimo",
-          "next": "Siguiente",
-          "previous": "Anterior"
-        },
-        "aria": {
-          "sortAscending": ": Activar para ordenar la columna de manera ascendente",
-          "sortDescending": ": Activar para ordenar la columna de manera descendente"
-        },
-        "buttons": {
-          "copy": "Copiar",
-          "colvis": "Visibilidad",
-          "collection": "Coleccion",
-          "colvisRestore": "Restaurar visibilidad",
-          "copyKeys": "Presione ctrl o cmd + C para copiar los datos de la tabla al portapapeles. <br><br>Para cancelar, haga clic en este mensaje o presione escape.",
-          "copySuccess": {
-            "1": "Copiada 1 fila al portapapeles",
-            "_": "Copiadas %d filas al portapapeles"
-          },
-          "copyTitle": "Copiar al portapapeles",
-          "csv": "CSV",
-          "excel": "Excel",
-          "pageLength": {
-            "-1": "Mostrar todas las filas",
-            "_": "Mostrar %d filas"
-          },
-          "pdf": "PDF",
-          "print": "Imprimir"
-        }
+      const $tabla = $('#ventas');
+
+      if (
+          !$tabla.length ||
+          $.fn.DataTable.isDataTable($tabla[0])
+      ) {
+          return;
       }
-    });
+
+      function contenidoExportacion(data, row, column, node) {
+          const contenido = $(node).data('content');
+
+          return (
+              contenido !== undefined &&
+              contenido !== null
+          )
+              ? contenido
+              : data;
+      }
+
+      $tabla.DataTable({
+          responsive: true,
+
+          dom:
+              '<"dt-toolbar"Bf>'
+              + 'rt'
+              + '<"dt-footer"ip>',
+
+          buttons: [
+              {
+                  extend: 'excelHtml5',
+                  text:
+                      '<i class="fas fa-file-excel me-1"></i> Excel',
+                  title: 'Perfiles',
+
+                  exportOptions: {
+                      columns: [0, 1, 2],
+
+                      format: {
+                          body: contenidoExportacion
+                      }
+                  }
+              },
+
+              {
+                  extend: 'pdfHtml5',
+                  text:
+                      '<i class="fas fa-file-pdf me-1"></i> PDF',
+                  title: 'Perfiles',
+
+                  exportOptions: {
+                      columns: [0, 1, 2],
+
+                      format: {
+                          body: contenidoExportacion
+                      }
+                  }
+              },
+
+              {
+                  extend: 'print',
+                  text:
+                      '<i class="fas fa-print me-1"></i> Imprimir',
+                  title: 'Perfiles',
+
+                  exportOptions: {
+                      columns: [0, 1, 2],
+
+                      format: {
+                          body: contenidoExportacion
+                      }
+                  }
+              }
+          ],
+
+          language:
+              window.VETMIND_DATATABLE_LANGUAGE
+      });
+
+      const $inputBuscar =
+          $tabla
+              .closest('.dataTables_wrapper')
+              .find(
+                  '.dataTables_filter input[type="search"]'
+              );
+
+      $inputBuscar.attr({
+          id: 'inputBuscar_perfiles',
+          name: 'inputBuscar_perfiles'
+      });
+
   });
-</script>
-<script>
-  feather.replace();
+
 
   function confirmDelete(id) {
     Swal.fire({

@@ -127,11 +127,11 @@ $(function () {
   let dt = null;
 
   function initDT() {
-    dt = $tabla.DataTable({
-      responsive: true,
-      pageLength: 10,
-      language: { url: '//cdn.datatables.net/plug-ins/1.13.4/i18n/es-CL.json' }
-    });
+      dt = $tabla.DataTable({
+          responsive: true,
+          pageLength: 10,
+          language: window.VETMIND_DATATABLE_LANGUAGE
+      });
   }
 
   function cargarOrganos(especieId = '') {

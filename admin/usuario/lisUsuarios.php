@@ -19,25 +19,6 @@ $stmt->execute();
 $res = $stmt->get_result();
 
 ?>
-<style>
-    .dataTables_wrapper .dt-buttons {
-        float: none;
-        text-align: center;
-    }
-      table.dataTable thead th, table.dataTable tfoot th {
-        font-family: Arial, sans-serif;
-        font-size: 14px;
-    }
-    table.dataTable tbody td {
-        font-family: Arial, sans-serif;
-        font-size: 12px;
-    }
-    .dataTables_wrapper .dt-buttons {
-        float: none;
-        text-align: center;
-    } 
-</style>
-
 <div id="usuario" data-page-id="usuario">
   <h1 class="h3 mb-3"><strong>Usuarios</strong></h1>
   <div class="card">
@@ -48,7 +29,7 @@ $res = $stmt->get_result();
             <div class="col-md-5">
                 <?php if (in_array('ingresar', $acceso_aplicaciones['usuario'] ?? [])): ?>
                   <a href="usuario/usuarios.php" class="btn btn-primary ajax-link">
-                    <i style="width:20px;height:20px;" data-feather="plus"></i> Agregar Usuario
+                    <i class="fas fa-plus me-1"></i> Agregar Usuario
                   </a> 
                 <?php endif; ?> 
             </div>

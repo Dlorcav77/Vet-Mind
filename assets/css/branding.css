@@ -4,6 +4,41 @@
     --sidebar-brand-name-size: 24px;
     --banner-logo-width: 225px;
     --banner-name-size: 60px;
+
+    /* Sidebar VetMind */
+
+    --vm-sidebar-start: #0b2b3a;
+    --vm-sidebar-middle: #0e3b4c;
+    --vm-sidebar-end: #123f46;
+
+    --vm-sidebar-text: #dce8e8;
+    --vm-sidebar-muted: #9fb7b7;
+
+    --vm-sidebar-hover: rgba(126, 190, 184, 0.10);
+    --vm-sidebar-active: rgba(126, 190, 184, 0.18);
+
+    --vm-sidebar-accent: #78aaa6;
+
+    /* =========================================
+       VETMIND - TEMA GLOBAL
+       ========================================= */
+
+    --vm-primary: #0d6efd;
+    --vm-page-background: #f5f7fb;
+    --vm-surface: #ffffff;
+
+    /* Navbar VetMind */
+    --vm-navbar-background: #f4f9f8;
+    --vm-navbar-border: rgba(78, 127, 128, 0.12);
+
+    /* Barra superior */
+    --vm-navbar-padding-y: 0.50rem;
+    --vm-navbar-padding-x: 1.25rem;
+
+    /* Contenido principal */
+    --vm-content-padding-top: 1.35rem;
+    --vm-content-padding-x: 2.5rem;
+    --vm-content-padding-bottom: 1.5rem;
 }
 
 /*
@@ -264,6 +299,16 @@
         );
 }
 
+/* Integra la zona del logo con el fondo del sidebar */
+.sidebar-brand,
+.sidebar-brand:hover,
+.sidebar-brand:focus {
+    background: transparent !important;
+    border: 0 !important;
+    border-bottom: 0 !important;
+    box-shadow: none !important;
+}
+
 @media (max-width: 767.98px) {
     .vetmind-brand--card .vetmind-brand__icon {
         width: 132px;
@@ -306,4 +351,242 @@
     .vetmind-brand--card .vetmind-brand__name {
         font-size: 34px;
     }
+}
+
+
+/* =========================================================
+   VETMIND - LAYOUT GLOBAL
+   ========================================================= */
+
+/*
+ * Barra superior.
+ * Sobrescribe la plantilla sin modificar app.css.
+ */
+.navbar {
+    padding-top: var(--vm-navbar-padding-y) !important;
+    padding-bottom: var(--vm-navbar-padding-y) !important;
+    padding-left: var(--vm-navbar-padding-x) !important;
+    padding-right: var(--vm-navbar-padding-x) !important;
+
+    background-color:
+        var(--vm-navbar-background) !important;
+
+    border-bottom:
+        1px solid
+        var(--vm-navbar-border) !important;
+
+    box-shadow: none !important;
+}
+
+/*
+ * Contenido de cada pantalla.
+ * Reduce el espacio vacío entre navbar y título.
+ */
+.content {
+    padding-top: var(--vm-content-padding-top) !important;
+    padding-left: var(--vm-content-padding-x) !important;
+    padding-right: var(--vm-content-padding-x) !important;
+    padding-bottom: var(--vm-content-padding-bottom) !important;
+}
+
+
+/* =========================================================
+   TABLET / MÓVIL
+   ========================================================= */
+
+@media (max-width: 991.98px) {
+
+    .content {
+        padding-left: 1.25rem !important;
+        padding-right: 1.25rem !important;
+    }
+}
+
+@media (max-width: 767.98px) {
+
+    .content {
+        padding-top: 1rem !important;
+        padding-left: 1rem !important;
+        padding-right: 1rem !important;
+    }
+}
+
+/* =========================================================
+   VETMIND - LINKS DEL SIDEBAR
+   ========================================================= */
+
+
+   /* =========================================================
+   VETMIND - SIDEBAR
+   ========================================================= */
+
+.sidebar {
+    background:
+        var(--vm-sidebar-start) !important;
+}
+
+.sidebar-content {
+    background:
+        linear-gradient(
+            165deg,
+            var(--vm-sidebar-start) 0%,
+            var(--vm-sidebar-middle) 48%,
+            var(--vm-sidebar-end) 100%
+        ) !important;
+}
+
+/*
+ * El menú usa el fondo continuo de sidebar-content.
+ * No reiniciamos el degradado aquí.
+ */
+.sidebar-nav {
+    background: transparent !important;
+}
+
+/* =========================================================
+   LINKS
+   ========================================================= */
+
+.sidebar .sidebar-link,
+.sidebar a.sidebar-link {
+    margin: 2px 8px;
+    padding: 10px 12px;
+
+    border: 0 !important;
+    border-radius: 8px;
+
+    background: transparent !important;
+    color: var(--vm-sidebar-text) !important;
+
+    box-shadow: none !important;
+
+    transition:
+        background-color 0.15s ease,
+        color 0.15s ease,
+        transform 0.15s ease;
+}
+
+
+/* =========================================================
+   ICONOS
+   ========================================================= */
+
+.sidebar .sidebar-link i {
+    color: var(--vm-sidebar-muted) !important;
+
+    transition:
+        color 0.15s ease;
+}
+
+
+/* =========================================================
+   HOVER
+   ========================================================= */
+
+.sidebar .sidebar-link:hover {
+    background-color:
+        rgba(126, 190, 184, 0.10) !important;
+
+    color: #ffffff !important;
+}
+
+.sidebar .sidebar-link:hover i {
+    color: #9fd1cc !important;
+}
+
+
+/* =========================================================
+   ACTIVO
+   ========================================================= */
+
+.sidebar .sidebar-item.active > .sidebar-link {
+    background:
+        linear-gradient(
+            90deg,
+            rgba(126, 190, 184, 0.22),
+            rgba(126, 190, 184, 0.10)
+        ) !important;
+
+    color: #ffffff !important;
+
+    box-shadow:
+        inset 3px 0 0
+        var(--vm-sidebar-accent) !important;
+}
+
+.sidebar .sidebar-item.active > .sidebar-link i {
+    color: #a7d9d4 !important;
+}
+
+
+/* =========================================================
+   TÍTULOS DE SECCIÓN
+   ========================================================= */
+
+.sidebar .sidebar-header {
+    color: var(--vm-sidebar-muted) !important;
+
+    margin-top: 12px;
+    margin-bottom: 5px;
+
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.06em;
+
+    text-transform: uppercase;
+}
+
+
+/* =========================================================
+   SEPARACIÓN ENTRE ITEMS
+   ========================================================= */
+
+.sidebar .sidebar-item {
+    margin-bottom: 1px;
+}
+
+
+/* =========================================================
+   FOCUS
+   ========================================================= */
+
+.sidebar .sidebar-link:focus {
+    outline: none;
+
+    background-color:
+        rgba(126, 190, 184, 0.10) !important;
+
+    box-shadow: none !important;
+}
+
+
+/* =========================================================
+   SCROLLBAR SIDEBAR
+   ========================================================= */
+
+.sidebar-content {
+    scrollbar-width: thin;
+    scrollbar-color:
+        rgba(159, 209, 204, 0.55)
+        transparent;
+}
+
+.sidebar-content::-webkit-scrollbar {
+    width: 6px;
+}
+
+.sidebar-content::-webkit-scrollbar-track {
+    background: transparent;
+}
+
+.sidebar-content::-webkit-scrollbar-thumb {
+    background-color:
+        rgba(159, 209, 204, 0.45);
+
+    border-radius: 10px;
+}
+
+.sidebar-content::-webkit-scrollbar-thumb:hover {
+    background-color:
+        rgba(159, 209, 204, 0.70);
 }

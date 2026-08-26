@@ -15,21 +15,6 @@ $stmt->bind_param('i', $usuario_id);
 $stmt->execute();
 $res = $stmt->get_result();
 ?>
-<style>
-    .dataTables_wrapper .dt-buttons {
-        float: none;
-        text-align: center;
-    }
-    table.dataTable thead th, table.dataTable tfoot th {
-        font-family: Arial, sans-serif;
-        font-size: 14px;
-    }
-    table.dataTable tbody td {
-        font-family: Arial, sans-serif;
-        font-size: 12px;
-    }
-</style>
-
 <div id="examenes" data-page-id="examenes">
   <h1 class="h3 mb-3"><strong>Tipos de Examen</strong></h1>
   <div class="card">
@@ -40,7 +25,7 @@ $res = $stmt->get_result();
             <div class="col-md-5">
               <?php if (in_array('ingresar', $acceso_aplicaciones['examenes'] ?? [])): ?>
                 <a href="examenes/examenes.php" class="btn btn-primary ajax-link">
-                  <i style="width:20px;height:20px;" data-feather="plus"></i> Agregar Tipo de Examen
+                  <i class="fas fa-plus me-1"></i> Agregar Tipo de Examen
                 </a>
               <?php endif; ?>
             </div>

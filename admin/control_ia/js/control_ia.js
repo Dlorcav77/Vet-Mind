@@ -119,11 +119,20 @@
             order: [],
             retrieve: false,
             destroy: true,
-            language: {
-                url: '//cdn.datatables.net/plug-ins/1.13.6/i18n/es-ES.json',
-                emptyTable: 'Sin registros.',
-                zeroRecords: 'Sin registros encontrados.'
-            }
+
+            dom:
+                '<"dt-toolbar"f>'
+                + 'rt'
+                + '<"dt-footer"ip>',
+
+            language: Object.assign(
+                {},
+                window.VETMIND_DATATABLE_LANGUAGE,
+                {
+                    emptyTable: 'Sin registros.',
+                    zeroRecords: 'Sin registros encontrados.'
+                }
+            )
         });
     }
 

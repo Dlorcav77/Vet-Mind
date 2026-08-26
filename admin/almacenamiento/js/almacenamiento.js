@@ -144,6 +144,12 @@
                 data: filas,
                 responsive: true,
                 pageLength: 25,
+
+                dom:
+                    '<"dt-toolbar"f>'
+                    + 'rt'
+                    + '<"dt-footer"ip>',
+
                 order: [[8, 'desc'], [9, 'desc']],
                 columnDefs: [
                     {
@@ -152,9 +158,7 @@
                         searchable: false
                     }
                 ],
-                language: {
-                    url: '//cdn.datatables.net/plug-ins/1.13.6/i18n/es-ES.json'
-                }
+                language: window.VETMIND_DATATABLE_LANGUAGE
             });
             return;
         }

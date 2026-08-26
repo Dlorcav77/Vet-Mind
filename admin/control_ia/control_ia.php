@@ -143,4 +143,4 @@ $puedeEliminar = in_array('eliminar', $acceso_aplicaciones['control_ia'] ?? []);
     eliminar: <?= $puedeEliminar ? 'true' : 'false' ?>
   };
 </script>
-<script src="control_ia/js/control_ia.js?v=13"></script>
+<script src="control_ia/js/control_ia.js?v=14"></script>
