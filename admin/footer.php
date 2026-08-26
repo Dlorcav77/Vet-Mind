@@ -1,4 +1,4 @@
-<footer class="footer mt-auto py-3 bg-light">
+<footer class="footer mt-auto py-1 bg-light">
   <div class="container-fluid">
     <div class="row align-items-center gy-3 text-muted">
 

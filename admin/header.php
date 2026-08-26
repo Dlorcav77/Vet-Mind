@@ -47,7 +47,7 @@ $csrfPanel = tokenCsrf();
   <link href="../assets/css/app.css" rel="stylesheet">
   <link href="../assets/css/global.css?v=9" rel="stylesheet">
   <link
-    href="../assets/css/branding.css?v=8"
+    href="../assets/css/branding.css?v=11"
     rel="stylesheet"
   >
 

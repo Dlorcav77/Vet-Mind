@@ -1,5 +1,5 @@
 :root {
-    --sidebar-brand-width: 145px;
+    --sidebar-brand-width: 155px;
     --sidebar-brand-icon-width: 98px;
     --sidebar-brand-name-size: 24px;
     --banner-logo-width: 225px;
@@ -249,25 +249,28 @@
 
 .vetmind-brand.vetmind-brand--sidebar {
     box-sizing: border-box;
+
     width: var(--sidebar-brand-width);
-    padding: 12px 10px 14px;
-    margin: -10px auto -24px;
-    border: 1px solid rgba(255, 255, 255, 0.08);
-    border-radius: 18px;
+
+    padding: 10px 10px 12px;
+    margin: -6px auto -20px;
+
+    border: 1px solid rgba(159, 209, 204, 0.07);
+    border-radius: 16px;
+
     background:
         radial-gradient(
-            circle at 50% 38%,
-            rgba(216, 237, 232, 0.13),
-            transparent 62%
+            circle at 50% 42%,
+            rgba(159, 209, 204, 0.09),
+            transparent 68%
         ),
-        linear-gradient(
-            160deg,
-            #0b2b3a 0%,
-            #0f465b 100%
-        );
+        rgba(8, 45, 59, 0.22);
+
     box-shadow:
-        0 8px 24px
-        rgba(0, 0, 0, 0.24);
+        0 6px 18px rgba(0, 0, 0, 0.14),
+        inset 0 1px 0 rgba(255, 255, 255, 0.035);
+
+    backdrop-filter: blur(2px);
 }
 
 .vetmind-brand--sidebar .vetmind-brand__icon {
@@ -447,10 +450,16 @@
    LINKS
    ========================================================= */
 
+
+
+
+
+
+
 .sidebar .sidebar-link,
 .sidebar a.sidebar-link {
-    margin: 2px 8px;
-    padding: 10px 12px;
+    margin: 1px 8px;
+    padding: 8px 12px;
 
     border: 0 !important;
     border-radius: 8px;
@@ -461,103 +470,78 @@
     box-shadow: none !important;
 
     transition:
-        background-color 0.15s ease,
-        color 0.15s ease,
-        transform 0.15s ease;
+        background-color .15s ease,
+        color .15s ease,
+        transform .15s ease;
 }
-
-
-/* =========================================================
-   ICONOS
-   ========================================================= */
 
 .sidebar .sidebar-link i {
     color: var(--vm-sidebar-muted) !important;
-
-    transition:
-        color 0.15s ease;
+    transition: color .15s ease;
 }
 
-
-/* =========================================================
-   HOVER
-   ========================================================= */
-
 .sidebar .sidebar-link:hover {
-    background-color:
-        rgba(126, 190, 184, 0.10) !important;
-
-    color: #ffffff !important;
+    background-color: rgba(126, 190, 184, .10) !important;
+    color: #fff !important;
 }
 
 .sidebar .sidebar-link:hover i {
     color: #9fd1cc !important;
 }
 
-
-/* =========================================================
-   ACTIVO
-   ========================================================= */
-
 .sidebar .sidebar-item.active > .sidebar-link {
     background:
         linear-gradient(
             90deg,
-            rgba(126, 190, 184, 0.22),
-            rgba(126, 190, 184, 0.10)
+            rgba(126, 190, 184, .22),
+            rgba(126, 190, 184, .10)
         ) !important;
 
-    color: #ffffff !important;
+    color: #fff !important;
 
     box-shadow:
-        inset 3px 0 0
-        var(--vm-sidebar-accent) !important;
+        inset 3px 0 0 var(--vm-sidebar-accent) !important;
 }
 
 .sidebar .sidebar-item.active > .sidebar-link i {
     color: #a7d9d4 !important;
 }
 
-
-/* =========================================================
-   TÍTULOS DE SECCIÓN
-   ========================================================= */
-
 .sidebar .sidebar-header {
     color: var(--vm-sidebar-muted) !important;
 
-    margin-top: 12px;
-    margin-bottom: 5px;
+    margin-top: 7px;
+    margin-bottom: 2px;
+
+    padding-top: 8px;
+    padding-bottom: 4px;
 
     font-size: 11px;
     font-weight: 600;
-    letter-spacing: 0.06em;
 
+    letter-spacing: .06em;
     text-transform: uppercase;
 }
 
-
-/* =========================================================
-   SEPARACIÓN ENTRE ITEMS
-   ========================================================= */
-
 .sidebar .sidebar-item {
-    margin-bottom: 1px;
+    margin-bottom: 0;
 }
-
-
-/* =========================================================
-   FOCUS
-   ========================================================= */
 
 .sidebar .sidebar-link:focus {
     outline: none;
 
     background-color:
-        rgba(126, 190, 184, 0.10) !important;
+        rgba(126, 190, 184, .10) !important;
 
     box-shadow: none !important;
 }
+
+
+
+
+
+
+
 
 
 /* =========================================================
@@ -589,4 +573,34 @@
 .sidebar-content::-webkit-scrollbar-thumb:hover {
     background-color:
         rgba(159, 209, 204, 0.70);
+}
+
+
+/* =========================================================
+   SCROLL GENERAL DEL SISTEMA
+   ========================================================= */
+
+html {
+    scrollbar-width: thin;
+    scrollbar-color:
+        rgba(76, 111, 122, 0.28)
+        transparent;
+}
+
+html::-webkit-scrollbar {
+    width: 7px;
+    height: 7px;
+}
+
+html::-webkit-scrollbar-track {
+    background: transparent;
+}
+
+html::-webkit-scrollbar-thumb {
+    background-color: rgba(76, 111, 122, 0.22);
+    border-radius: 10px;
+}
+
+html::-webkit-scrollbar-thumb:hover {
+    background-color: rgba(76, 111, 122, 0.38);
 }
