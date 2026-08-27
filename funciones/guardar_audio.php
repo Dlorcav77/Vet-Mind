@@ -49,6 +49,29 @@ if ($userId <= 0) {
     exit;
 }
 
+
+if (
+    ($_SERVER['REQUEST_METHOD'] ?? '')
+    !== 'POST'
+) {
+    http_response_code(405);
+    header('Allow: POST');
+
+    echo json_encode(
+        [
+            'status' => 'error',
+            'message' => 'Método HTTP no permitido.'
+        ],
+        JSON_UNESCAPED_UNICODE
+        | JSON_UNESCAPED_SLASHES
+    );
+
+    exit;
+}
+
+
+validarTokenCsrf();
+
 $baseDir = $ROOT_DIR . '/uploads/tmp/audio';
 
 if (!is_dir($baseDir)) {

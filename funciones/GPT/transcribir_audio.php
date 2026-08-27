@@ -1,72 +1,196 @@
 <?php
 // funciones/GPT/transcribir_audio.php
 
-header('Content-Type: application/json; charset=utf-8');
-date_default_timezone_set('America/Santiago');
+declare(strict_types=1);
+
+header(
+    'Content-Type: application/json; charset=utf-8'
+);
+
+date_default_timezone_set(
+    'America/Santiago'
+);
+
 
 $ROOT_DIR = dirname(__DIR__, 2);
 
+
 require_once(
-    $ROOT_DIR . "/configP.php"
+    $ROOT_DIR
+    . '/configP.php'
 );
 
 require_once(
     $ROOT_DIR
-    . "/funciones/session/funcionesSesion.php"
+    . '/funciones/session/funcionesSesion.php'
 );
 
+
+configurarErroresAplicacion(true);
 iniciarSesionSegura();
 
-/////////////////////////////////////////////////////////////////
-// Motor de transcripción manual para pruebas.
-// Valores:
-// - ''       => usa AssemblyAI en este mismo archivo (comportamiento actual)
-// - 'assembly'=> igual que '' (AssemblyAI)
-// - 'grok'   => deriva a funciones/GPT/transcribir_audio_grok.php
-// $motor_stt = 'deepgram';
+
+/*
+ * Este endpoint solo acepta POST.
+ */
+if (
+    ($_SERVER['REQUEST_METHOD'] ?? '')
+    !== 'POST'
+) {
+    http_response_code(405);
+    header('Allow: POST');
+
+    echo json_encode([
+        'status'  => 'error',
+        'message' => 'Método HTTP no permitido.'
+    ], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+
+    exit;
+}
+
+
+/*
+ * Sesión VetMind real obligatoria.
+ */
+$userId =
+    isset($_SESSION['usuario_id'])
+        ? (int)$_SESSION['usuario_id']
+        : 0;
+
+
+if ($userId <= 0) {
+
+    http_response_code(401);
+
+    echo json_encode([
+        'status'  => 'error',
+        'message' => 'Sesión no válida.'
+    ], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+
+    exit;
+}
+
+
+/*
+ * Toda petición debe pertenecer a la sesión
+ * que la originó.
+ */
+validarTokenCsrf();
+
+
+/*
+ * Motor por defecto.
+ */
 $motor_stt = 'assembly_v3';
-// $motor_stt = 'openai_4o';
-// $motor_stt = '';
-
-$motor_stt = strtolower(trim($motor_stt));
 
 
-// Banco STT: con test_token salta la sesión (userId ficticio) y fuerza el motor.
-if (isset($_POST['test_token']) && hash_equals('gondolengua', (string)$_POST['test_token'])) {
-    $_SESSION['usuario_id'] = 999999;
-    if (!empty($_POST['motor'])) {
-        $motor_stt = strtolower(trim((string)$_POST['motor']));
-    }
-}
+$motoresPermitidos = [
+    'assembly',
+    'assembly_v3',
+    'deepgram',
+    'grok',
+    'openai_4o'
+];
 
-// Flujo doble / autenticado: elegir motor por POST (sin test_token).
-$motoresPermitidos = ['assembly', 'assembly_v3', 'deepgram', 'grok', 'openai_4o'];
+
 if (!empty($_POST['motor'])) {
-    $m = strtolower(trim((string)$_POST['motor']));
-    if (in_array($m, $motoresPermitidos, true)) {
-        $motor_stt = $m;
+
+    $motorSolicitado =
+        strtolower(
+            trim(
+                (string)$_POST['motor']
+            )
+        );
+
+
+    if (
+        !in_array(
+            $motorSolicitado,
+            $motoresPermitidos,
+            true
+        )
+    ) {
+        http_response_code(400);
+
+        echo json_encode([
+            'status'  => 'error',
+            'message' => 'Motor STT no válido.'
+        ], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+
+        exit;
     }
+
+
+    $motor_stt =
+        $motorSolicitado;
 }
+
+
+/*
+ * Los archivos de motores solo pueden ejecutarse
+ * pasando por este dispatcher.
+ */
+define(
+    'VETMIND_STT_DISPATCH',
+    true
+);
+
 
 if ($motor_stt === 'grok') {
-    require_once(__DIR__ . '/transcripciones/transcribir_audio_grok.php');
+
+    require_once(
+        __DIR__
+        . '/transcripciones/transcribir_audio_grok.php'
+    );
+
     exit;
 }
+
+
 if ($motor_stt === 'deepgram') {
-    require_once(__DIR__ . '/transcripciones/transcribir_audio_deepgram.php');
+
+    require_once(
+        __DIR__
+        . '/transcripciones/transcribir_audio_deepgram.php'
+    );
+
     exit;
 }
+
+
 if ($motor_stt === 'openai_4o') {
-    require_once(__DIR__ . '/transcripciones/transcribir_audio_openai_4o.php');
+
+    require_once(
+        __DIR__
+        . '/transcripciones/transcribir_audio_openai_4o.php'
+    );
+
     exit;
 }
+
+
 if ($motor_stt === 'assembly_v3') {
-    require_once(__DIR__ . '/transcripciones/transcribir_audio_assembly_v3.php');
+
+    require_once(
+        __DIR__
+        . '/transcripciones/transcribir_audio_assembly_v3.php'
+    );
+
     exit;
 }
+
+
+/*
+ * "assembly" se mantiene en la lista histórica,
+ * pero actualmente no tiene dispatcher activo.
+ */
+http_response_code(400);
 
 echo json_encode([
     'status'  => 'error',
-    'message' => 'Motor STT no reconocido: ' . $motor_stt
+    'message' =>
+        'Motor STT no reconocido: '
+        . $motor_stt
 ], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+
 exit;

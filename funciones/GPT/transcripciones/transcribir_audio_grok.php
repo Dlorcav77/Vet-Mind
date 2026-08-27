@@ -5,6 +5,24 @@
 // Reusa la sesión, configP y $ROOT_DIR ya definidos NO: este archivo se incluye
 // ANTES de definir $ROOT_DIR, así que define lo suyo igual que el original.
 
+if (
+    !defined('VETMIND_STT_DISPATCH')
+    || VETMIND_STT_DISPATCH !== true
+) {
+    http_response_code(403);
+
+    header(
+        'Content-Type: application/json; charset=utf-8'
+    );
+
+    echo json_encode([
+        'status'  => 'error',
+        'message' => 'Acceso directo no permitido.'
+    ], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+
+    exit;
+}
+
 header('Content-Type: application/json; charset=utf-8');
 date_default_timezone_set('America/Santiago');
 

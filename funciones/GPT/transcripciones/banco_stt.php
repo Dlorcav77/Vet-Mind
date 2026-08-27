@@ -1,16 +1,65 @@
 <?php
 // /funciones/GPT/transcripciones/banco_stt.php
 // Banco de pruebas para motores STT.
-// Elige un audio .ogg de banco_audios/ y los motores a probar.
-// Llama por HTTP a transcribir_audio.php (igual que producción) con un token de prueba.
+// Disponible únicamente en development y con sesión VetMind válida.
+
 declare(strict_types=1);
+
 @set_time_limit(600);
 mb_internal_encoding('UTF-8');
 
-// ===== CONFIG (ajusta si cambia tu dominio/ruta) =====
-const ENDPOINT   = 'https://dev-app.vet-mind.cl/funciones/GPT/transcribir_audio.php';
-const TEST_TOKEN = 'gondolengua'; // debe coincidir con STT_TEST_TOKEN en transcribir_audio.php
-const AUDIO_DIR  = __DIR__ . '/banco_audios';
+
+$ROOT_DIR = dirname(__DIR__, 3);
+
+require_once(
+    $ROOT_DIR
+    . '/funciones/session/funcionesSesion.php'
+);
+
+
+$entorno = strtolower(
+    trim(
+        (string)(
+            getenv('APP_ENV')
+            ?: ($_ENV['APP_ENV'] ?? '')
+            ?: ($_SERVER['APP_ENV'] ?? '')
+            ?: 'production'
+        )
+    )
+);
+
+
+if (
+    !in_array(
+        $entorno,
+        ['development', 'dev', 'local'],
+        true
+    )
+) {
+    http_response_code(404);
+    exit;
+}
+
+
+configurarErroresAplicacion();
+iniciarSesionSegura();
+exigirAutenticacion('/index.php');
+
+
+$csrfToken = tokenCsrf();
+
+$sessionCookie =
+    session_name()
+    . '='
+    . session_id();
+
+
+// ===== CONFIG =====
+const ENDPOINT =
+    'https://dev-app.vet-mind.cl/funciones/GPT/transcribir_audio.php';
+
+const AUDIO_DIR =
+    __DIR__ . '/banco_audios';
 
 // Motores disponibles para probar. Clave = valor que recibe transcribir_audio.php en $_POST['motor'].
 $MOTORES = [
@@ -29,62 +78,207 @@ function listar_audios(): array {
     return array_map('basename', $files);
 }
 
-// ---- Llamar a un motor por HTTP, subiendo el .ogg ----
-function probar_motor(string $audioFile, string $motor): array {
-    $ruta = AUDIO_DIR . '/' . basename($audioFile);
+function probar_motor(
+    string $audioFile,
+    string $motor,
+    string $sessionCookie,
+    string $csrfToken
+): array {
+
+    $ruta =
+        AUDIO_DIR
+        . '/'
+        . basename($audioFile);
+
     if (!is_file($ruta)) {
-        return ['ok' => false, 'texto' => '', 'err' => 'Audio no encontrado', 'ms' => 0, 'audio_tmp' => ''];
+
+        return [
+            'ok'        => false,
+            'texto'     => '',
+            'err'       => 'Audio no encontrado',
+            'ms'        => 0,
+            'audio_tmp' => ''
+        ];
     }
+
 
     $post = [
-        'audio'      => new CURLFile($ruta, 'audio/ogg', basename($ruta)),
-        'test_token' => TEST_TOKEN,
-        'motor'      => $motor,
+        'audio' => new CURLFile(
+            $ruta,
+            'audio/ogg',
+            basename($ruta)
+        ),
+        'motor' => $motor
     ];
 
+
     $t0 = microtime(true);
+
     $ch = curl_init(ENDPOINT);
-    curl_setopt_array($ch, [
-        CURLOPT_RETURNTRANSFER => true,
-        CURLOPT_POST           => true,
-        CURLOPT_POSTFIELDS     => $post,
-        CURLOPT_CONNECTTIMEOUT => 15,
-        CURLOPT_TIMEOUT        => 180,
-    ]);
+
+    curl_setopt_array(
+        $ch,
+        [
+            CURLOPT_RETURNTRANSFER => true,
+            CURLOPT_POST           => true,
+            CURLOPT_POSTFIELDS     => $post,
+            CURLOPT_COOKIE         => $sessionCookie,
+
+            CURLOPT_HTTPHEADER => [
+                'X-CSRF-Token: ' . $csrfToken
+            ],
+
+            CURLOPT_CONNECTTIMEOUT => 15,
+            CURLOPT_TIMEOUT        => 180
+        ]
+    );
+
+
     $resp = curl_exec($ch);
-    $err  = curl_errno($ch) ? curl_error($ch) : '';
-    $http = (int)curl_getinfo($ch, CURLINFO_HTTP_CODE);
+
+    $err =
+        curl_errno($ch)
+            ? curl_error($ch)
+            : '';
+
+    $http =
+        (int)curl_getinfo(
+            $ch,
+            CURLINFO_HTTP_CODE
+        );
+
     curl_close($ch);
-    $ms = (int)round((microtime(true) - $t0) * 1000);
+
+
+    $ms =
+        (int)round(
+            (microtime(true) - $t0)
+            * 1000
+        );
+
 
     if ($err !== '') {
-        return ['ok' => false, 'texto' => '', 'err' => "cURL: $err", 'ms' => $ms, 'audio_tmp' => ''];
+
+        return [
+            'ok'        => false,
+            'texto'     => '',
+            'err'       => 'cURL: ' . $err,
+            'ms'        => $ms,
+            'audio_tmp' => ''
+        ];
     }
-    $j = json_decode((string)$resp, true);
+
+
+    $j =
+        json_decode(
+            (string)$resp,
+            true
+        );
+
+
     if (!is_array($j)) {
-        return ['ok' => false, 'texto' => '', 'err' => "HTTP $http · respuesta no-JSON: " . substr((string)$resp, 0, 300), 'ms' => $ms, 'audio_tmp' => ''];
+
+        return [
+            'ok'        => false,
+            'texto'     => '',
+            'err'       =>
+                'HTTP '
+                . $http
+                . ' · respuesta no-JSON: '
+                . substr(
+                    (string)$resp,
+                    0,
+                    300
+                ),
+            'ms'        => $ms,
+            'audio_tmp' => ''
+        ];
     }
+
+
     return [
-        'ok'        => (($j['status'] ?? '') === 'success'),
-        'texto'     => (string)($j['texto'] ?? ''),
-        'err'       => (string)($j['message'] ?? ''),
-        'ms'        => $ms,
-        'audio_tmp' => (string)($j['audio_tmp'] ?? ''),
+        'ok' =>
+            (($j['status'] ?? '') === 'success'),
+
+        'texto' =>
+            (string)($j['texto'] ?? ''),
+
+        'err' =>
+            (string)($j['message'] ?? ''),
+
+        'ms' =>
+            $ms,
+
+        'audio_tmp' =>
+            (string)($j['audio_tmp'] ?? '')
     ];
 }
 
-// ---- Ejecución ----
-$audios        = listar_audios();
-$audioSel      = $_GET['audio'] ?? '';
-$motoresSel    = $_GET['motores'] ?? [];
-if (!is_array($motoresSel)) $motoresSel = [];
-$resultados    = [];
+$audios =
+    listar_audios();
 
-$run = isset($_GET['run']) && $audioSel !== '' && !empty($motoresSel);
-if ($run && in_array($audioSel, $audios, true)) {
-    foreach ($motoresSel as $m) {
-        if (!isset($MOTORES[$m])) continue;
-        $resultados[$m] = probar_motor($audioSel, $m);
+$audioSel =
+    (string)($_POST['audio'] ?? '');
+
+$motoresSel =
+    $_POST['motores'] ?? [];
+
+if (!is_array($motoresSel)) {
+    $motoresSel = [];
+}
+
+$resultados = [];
+
+
+$run =
+    ($_SERVER['REQUEST_METHOD'] ?? '') === 'POST'
+    && isset($_POST['run'])
+    && $audioSel !== ''
+    && !empty($motoresSel);
+
+
+if ($run) {
+
+    validarTokenCsrf();
+
+
+    /*
+     * Liberamos el lock de sesión antes de llamar
+     * por cURL a otro PHP que utilizará la misma sesión.
+     */
+    if (
+        session_status()
+        === PHP_SESSION_ACTIVE
+    ) {
+        session_write_close();
+    }
+
+
+    if (
+        in_array(
+            $audioSel,
+            $audios,
+            true
+        )
+    ) {
+
+        foreach ($motoresSel as $m) {
+
+            $m =
+                (string)$m;
+
+            if (!isset($MOTORES[$m])) {
+                continue;
+            }
+
+            $resultados[$m] =
+                probar_motor(
+                    $audioSel,
+                    $m,
+                    $sessionCookie,
+                    $csrfToken
+                );
+        }
     }
 }
 
@@ -121,7 +315,13 @@ header('Content-Type: text/html; charset=utf-8');
   <?php if (empty($audios)): ?>
     <div class="panel"><p class="empty">No hay audios en <code><?= e(AUDIO_DIR) ?></code>. Sube tus <code>.ogg</code> ahí.</p></div>
   <?php else: ?>
-    <form class="panel" method="get">
+    <form class="panel" method="post">
+
+    <input
+        type="hidden"
+        name="csrf_token"
+        value="<?= e($csrfToken) ?>"
+    >
       <h2>1 · Elige audio</h2>
       <select name="audio">
         <?php foreach ($audios as $a): ?>
@@ -163,7 +363,10 @@ header('Content-Type: text/html; charset=utf-8');
         <?php endforeach; ?>
       </div>
     </div>
-  <?php elseif (isset($_GET['run'])): ?>
+  <?php elseif (
+        ($_SERVER['REQUEST_METHOD'] ?? '') === 'POST'
+        && isset($_POST['run'])
+    ): ?>
     <div class="panel"><p class="empty">Elige un audio y al menos un motor.</p></div>
   <?php endif; ?>
 

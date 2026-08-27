@@ -1,6 +1,8 @@
 <?php
 require ("../funciones/session/ini_session.php");
 
+$csrfToken = tokenCsrf();
+
 include 'header.php';
 include 'menu.php';
 
@@ -121,6 +123,14 @@ $rutaInicial = resolver_ruta_panel(
 
 
 <script>
+const VETMIND_CSRF_TOKEN = <?= json_encode(
+    $csrfToken,
+    JSON_HEX_TAG
+    | JSON_HEX_AMP
+    | JSON_HEX_APOS
+    | JSON_HEX_QUOT
+) ?>;
+
 $(document).ready(function() {
 
     const RUTA_INICIAL = <?= json_encode(
@@ -441,7 +451,58 @@ $(document).ready(function() {
     }
 
 
+    const METODOS_CON_CSRF = new Set([
+        'POST',
+        'PUT',
+        'PATCH',
+        'DELETE'
+    ]);
+
+
+    /*
+    * CSRF global para $.ajax(), $.post(), etc.
+    *
+    * Solo se envía:
+    * - en operaciones que modifican información;
+    * - al mismo origen de VetMind.
+    */
     $.ajaxSetup({
+
+        beforeSend: function(xhr, settings) {
+
+            const metodo = String(
+                settings.type
+                || settings.method
+                || 'GET'
+            ).toUpperCase();
+
+            if (!METODOS_CON_CSRF.has(metodo)) {
+                return;
+            }
+
+            try {
+
+                const url = new URL(
+                    settings.url || window.location.href,
+                    window.location.href
+                );
+
+                if (url.origin !== window.location.origin) {
+                    return;
+                }
+
+                xhr.setRequestHeader(
+                    'X-CSRF-Token',
+                    VETMIND_CSRF_TOKEN
+                );
+
+            } catch (e) {
+                // Si la URL no puede resolverse,
+                // no agregamos el token.
+            }
+        },
+
+
         statusCode: {
 
             401: function() {
@@ -450,6 +511,180 @@ $(document).ready(function() {
 
         }
     });
+
+
+    /*
+    * CSRF global para formularios POST normales.
+    *
+    * Esto cubre también formularios cargados dinámicamente
+    * dentro de #content.
+    */
+    $(document).on(
+        'submit',
+        'form',
+        function() {
+
+            const formulario = this;
+
+            const metodo = String(
+                formulario.method || 'GET'
+            ).toUpperCase();
+
+            if (metodo !== 'POST') {
+                return;
+            }
+
+            try {
+
+                const action =
+                    formulario.getAttribute('action')
+                    || window.location.href;
+
+                const url = new URL(
+                    action,
+                    window.location.href
+                );
+
+                if (url.origin !== window.location.origin) {
+                    return;
+                }
+
+            } catch (e) {
+                return;
+            }
+
+
+            let inputCsrf =
+                formulario.querySelector(
+                    'input[name="csrf_token"]'
+                );
+
+            if (!inputCsrf) {
+
+                inputCsrf =
+                    document.createElement('input');
+
+                inputCsrf.type = 'hidden';
+                inputCsrf.name = 'csrf_token';
+
+                formulario.appendChild(
+                    inputCsrf
+                );
+            }
+
+            inputCsrf.value =
+                VETMIND_CSRF_TOKEN;
+        }
+    );
+
+
+    /*
+    * CSRF global para fetch().
+    *
+    * Conservamos el fetch original y solo agregamos
+    * el header a peticiones de escritura hacia VetMind.
+    */
+    const vetmindFetchOriginal =
+        window.fetch.bind(window);
+
+
+    window.fetch = function(input, init) {
+
+        const opciones =
+            init
+                ? { ...init }
+                : {};
+
+        const esRequest =
+            typeof Request !== 'undefined'
+            && input instanceof Request;
+
+        const metodo = String(
+            opciones.method
+            || (
+                esRequest
+                    ? input.method
+                    : 'GET'
+            )
+            || 'GET'
+        ).toUpperCase();
+
+
+        if (!METODOS_CON_CSRF.has(metodo)) {
+
+            return vetmindFetchOriginal(
+                input,
+                init
+            );
+        }
+
+
+        let url;
+
+        try {
+
+            url = new URL(
+                esRequest
+                    ? input.url
+                    : String(input),
+                window.location.href
+            );
+
+        } catch (e) {
+
+            return vetmindFetchOriginal(
+                input,
+                init
+            );
+        }
+
+
+        if (url.origin !== window.location.origin) {
+
+            return vetmindFetchOriginal(
+                input,
+                init
+            );
+        }
+
+
+        const headers = new Headers(
+            esRequest
+                ? input.headers
+                : undefined
+        );
+
+
+        if (opciones.headers) {
+
+            new Headers(
+                opciones.headers
+            ).forEach(
+                function(valor, nombre) {
+
+                    headers.set(
+                        nombre,
+                        valor
+                    );
+                }
+            );
+        }
+
+
+        headers.set(
+            'X-CSRF-Token',
+            VETMIND_CSRF_TOKEN
+        );
+
+
+        opciones.headers = headers;
+
+
+        return vetmindFetchOriginal(
+            input,
+            opciones
+        );
+    };
 
 
     $(document).ajaxError(

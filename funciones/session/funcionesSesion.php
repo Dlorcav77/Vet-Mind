@@ -1,4 +1,7 @@
 <?php
+
+require_once __DIR__ . '/csrf.php';
+
 function configurarErroresAplicacion(
     bool $respuestaJson = false
 ): void {
@@ -119,7 +122,9 @@ function cerrarSesionActual(): void
 }
 
 
-function exigirAutenticacion(): void
+function exigirAutenticacion(
+    string $redirectUrl = '../index.php'
+): void
 {
     $inactivo = 2400; // 40 minutos
 
@@ -152,20 +157,21 @@ function exigirAutenticacion(): void
             echo json_encode([
                 'status'       => 'expired',
                 'message'      => 'La sesión expiró.',
-                'redirect_url' => '../index.php'
+                'redirect_url' => $redirectUrl
             ]);
 
             exit;
         }
 
-        header('Location: ../index.php');
+        header(
+            'Location: '
+            . $redirectUrl
+        );
+
         exit;
     }
 
-    $ahora = time();
-
-    $_SESSION['ultimo_uso'] = $ahora;
-
+    $_SESSION['ultimo_uso'] = time();
 }
 
 function credenciales($modulo, $accion = 'listar')

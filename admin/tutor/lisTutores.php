@@ -236,19 +236,69 @@ function confirmDelete(id) {
 
 
   function verPacientes(tutorId) {
-    $('#modalPacientes').modal('show');
-    $('#pacientesContent').html('<div class="text-center"><i class="fas fa-spinner fa-spin"></i> Cargando pacientes...</div>');
-    $.ajax({
-      url: 'paciente/lisPacientes.php',
-      type: 'GET',
-      data: { tutor_id: tutorId },
-      success: function(data) {
-        $('#pacientesContent').html(data);
-      },
-      error: function() {
-        $('#pacientesContent').html('<div class="alert alert-danger">Error al cargar los pacientes.</div>');
+
+      const modalPacientes = document.getElementById('modalPacientes');
+      const content = document.getElementById('content');
+
+      if (!modalPacientes) {
+          Swal.fire(
+              'Error',
+              'No se encontró el modal de mascotas.',
+              'error'
+          );
+          return;
       }
-    });
+
+      /*
+      * El contenido de Tutor se carga dinámicamente dentro de #content.
+      * Movemos temporalmente el modal al <body> para evitar que quede
+      * detrás del backdrop de Bootstrap.
+      */
+      if (modalPacientes.parentElement !== document.body) {
+          document.body.appendChild(modalPacientes);
+      }
+
+      /*
+      * Cuando se cierre, lo devolvemos a #content.
+      * Así no dejamos el modal suelto en <body> al navegar por VetMind.
+      */
+      $('#modalPacientes')
+          .off('hidden.bs.modal.vetmindTutor')
+          .on('hidden.bs.modal.vetmindTutor', function() {
+
+              if (content && this.parentElement === document.body) {
+                  content.appendChild(this);
+              }
+
+          });
+
+      $('#pacientesContent').html(
+          '<div class="text-center">' +
+              '<i class="fas fa-spinner fa-spin"></i> Cargando pacientes...' +
+          '</div>'
+      );
+
+      $('#modalPacientes').modal('show');
+
+      $.ajax({
+          url: 'paciente/lisPacientes.php',
+          type: 'GET',
+          data: {
+              tutor_id: tutorId
+          },
+
+          success: function(data) {
+              $('#pacientesContent').html(data);
+          },
+
+          error: function() {
+              $('#pacientesContent').html(
+                  '<div class="alert alert-danger">' +
+                      'Error al cargar los pacientes.' +
+                  '</div>'
+              );
+          }
+      });
   }
 
   function abrirBuscador() {

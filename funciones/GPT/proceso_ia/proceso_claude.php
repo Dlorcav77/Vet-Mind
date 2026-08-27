@@ -1,6 +1,25 @@
 <?php
 // funciones/GPT/proceso_ia/proceso_claude.php
 declare(strict_types=1);
+
+if (
+    !defined('VETMIND_GPT_DISPATCH')
+    || VETMIND_GPT_DISPATCH !== true
+) {
+    http_response_code(403);
+
+    header(
+        'Content-Type: application/json; charset=utf-8'
+    );
+
+    echo json_encode([
+        'status'  => 'error',
+        'message' => 'Acceso directo no permitido.'
+    ], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+
+    exit;
+}
+
 if (!defined('GPT_SNAPSHOT')) {
     define('GPT_SNAPSHOT', 0);
 }

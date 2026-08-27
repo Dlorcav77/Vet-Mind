@@ -20,21 +20,50 @@ require_once(
     . "/funciones/session/funcionesSesion.php"
 );
 
+configurarErroresAplicacion(true);
 iniciarSesionSegura();
 
-// Motores del doble. A = redactor (original), B = comparador. Cambiar aquí si hace falta.
+if (
+    ($_SERVER['REQUEST_METHOD'] ?? '')
+    !== 'POST'
+) {
+    http_response_code(405);
+    header('Allow: POST');
+
+    echo json_encode([
+        'status' => 'error',
+        'message' => 'Método HTTP no permitido.'
+    ], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+
+    exit;
+}
+
+// Motores del doble. A = redactor (original), B = comparador.
 const MOTOR_A = 'deepgram';
 const MOTOR_B = 'assembly_v3';
 
-// Keyterms para AMBOS motores: '1' = los manda, '0' = no. (Probado: a veces empeora; default '0'.)
+// Keyterms para AMBOS motores.
 const USAR_KEYTERMS = '0';
 
-$userId = isset($_SESSION['usuario_id']) ? (int)$_SESSION['usuario_id'] : 0;
+$userId =
+    isset($_SESSION['usuario_id'])
+        ? (int)$_SESSION['usuario_id']
+        : 0;
+
 if ($userId <= 0) {
     http_response_code(401);
-    echo json_encode(['status'=>'error','message'=>'Sesión no válida.'], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+
+    echo json_encode([
+        'status' => 'error',
+        'message' => 'Sesión no válida.'
+    ], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+
     exit;
 }
+
+validarTokenCsrf();
+
+$csrfToken = tokenCsrf();
 
 // ---- Preparación de audio (convertir 1 vez). Copiado del patrón de los motores. ----
 function dbl_normalizar_ruta($ruta, $userId) {
@@ -113,25 +142,57 @@ $esHttps = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') || $fwd ==
 $scheme = $esHttps ? 'https' : 'https'; // forzamos https: el host no acepta http
 $endpointStt = $scheme . '://' . $_SERVER['HTTP_HOST'] . '/funciones/GPT/transcribir_audio.php';
 
-function dbl_handle(string $url, string $audioTmp, string $motor, string $cookie) {
+function dbl_handle(
+    string $url,
+    string $audioTmp,
+    string $motor,
+    string $cookie,
+    string $csrfToken
+) {
     $ch = curl_init($url);
+
     curl_setopt_array($ch, [
         CURLOPT_RETURNTRANSFER => true,
         CURLOPT_POST           => true,
-        CURLOPT_POSTFIELDS     => ['audio_tmp'=>$audioTmp, 'motor'=>$motor, 'usar_keyterms'=>USAR_KEYTERMS],
-        CURLOPT_COOKIE         => $cookie,
+
+        CURLOPT_POSTFIELDS => [
+            'audio_tmp'      => $audioTmp,
+            'motor'          => $motor,
+            'usar_keyterms'  => USAR_KEYTERMS
+        ],
+
+        CURLOPT_COOKIE => $cookie,
+
+        CURLOPT_HTTPHEADER => [
+            'X-CSRF-Token: ' . $csrfToken
+        ],
+
         CURLOPT_FOLLOWLOCATION => true,
         CURLOPT_POSTREDIR      => 7,
         CURLOPT_CONNECTTIMEOUT => 15,
         CURLOPT_TIMEOUT        => 200,
     ]);
+
     return $ch;
 }
 
 // 4) Dos transcripciones en paralelo.
 $mh = curl_multi_init();
-$chA = dbl_handle($endpointStt, $audioTmp, MOTOR_A, $cookie);
-$chB = dbl_handle($endpointStt, $audioTmp, MOTOR_B, $cookie);
+$chA = dbl_handle(
+    $endpointStt,
+    $audioTmp,
+    MOTOR_A,
+    $cookie,
+    $csrfToken
+);
+
+$chB = dbl_handle(
+    $endpointStt,
+    $audioTmp,
+    MOTOR_B,
+    $cookie,
+    $csrfToken
+);
 curl_multi_add_handle($mh, $chA);
 curl_multi_add_handle($mh, $chB);
 $running = null;

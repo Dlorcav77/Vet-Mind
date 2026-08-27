@@ -4,6 +4,24 @@
 // Se invoca desde transcribir_audio.php cuando $motor_stt === 'openai_4o'.
 // Flujo: recibir/subir audio -> convertir a WAV -> /v1/audio/transcriptions.
 
+if (
+    !defined('VETMIND_STT_DISPATCH')
+    || VETMIND_STT_DISPATCH !== true
+) {
+    http_response_code(403);
+
+    header(
+        'Content-Type: application/json; charset=utf-8'
+    );
+
+    echo json_encode([
+        'status'  => 'error',
+        'message' => 'Acceso directo no permitido.'
+    ], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+
+    exit;
+}
+
 header('Content-Type: application/json; charset=utf-8');
 date_default_timezone_set('America/Santiago');
 

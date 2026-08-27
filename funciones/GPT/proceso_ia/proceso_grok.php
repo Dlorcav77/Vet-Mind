@@ -2,6 +2,24 @@
 // funciones/GPT/proceso_ia/proceso_grok.php
 declare(strict_types=1);
 
+if (
+    !defined('VETMIND_GPT_DISPATCH')
+    || VETMIND_GPT_DISPATCH !== true
+) {
+    http_response_code(403);
+
+    header(
+        'Content-Type: application/json; charset=utf-8'
+    );
+
+    echo json_encode([
+        'status'  => 'error',
+        'message' => 'Acceso directo no permitido.'
+    ], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+
+    exit;
+}
+
 if (!defined('GPT_SNAPSHOT')) {
     define('GPT_SNAPSHOT', 0);
 }
@@ -60,10 +78,53 @@ $system             = $promptData['system'];
 $prompt             = $promptData['prompt'];
 $incluir_conclusion = $promptData['incluir_conclusion'];
 
-// MODO PRUEBA (banco): reemplaza SOLO el system si llega override + token valido.
-// Inerte en produccion: una llamada normal no manda estos campos.
-$sysOverride = (string)($_POST['system_override'] ?? '');
-if ($sysOverride !== '' && (string)($_POST['test_token'] ?? '') === 'gondolengua') {
+/*
+ * MODO PRUEBA.
+ *
+ * system_override solo está permitido en entornos
+ * de desarrollo. Este archivo además únicamente puede
+ * ejecutarse desde proceso_gpt.php, que ya exige:
+ *
+ * - sesión real
+ * - POST
+ * - CSRF
+ */
+$entorno = strtolower(
+    trim(
+        (string)(
+            getenv('APP_ENV')
+            ?: ($_ENV['APP_ENV'] ?? '')
+            ?: ($_SERVER['APP_ENV'] ?? '')
+            ?: 'production'
+        )
+    )
+);
+
+$esDesarrollo =
+    in_array(
+        $entorno,
+        [
+            'development',
+            'dev',
+            'local'
+        ],
+        true
+    );
+
+
+$sysOverride =
+    trim(
+        (string)(
+            $_POST['system_override']
+            ?? ''
+        )
+    );
+
+
+if (
+    $esDesarrollo
+    && $sysOverride !== ''
+) {
     $system = $sysOverride;
 }
 

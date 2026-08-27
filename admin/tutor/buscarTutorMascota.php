@@ -47,7 +47,7 @@ echo "<thead><tr>
 while ($row = $res->fetch_assoc()) {
     echo "<tr>
             <td>".htmlspecialchars($row['tutor_nombre'])."</td>
-            <td>".htmlspecialchars($row['rut'])."</td>
+            <td>".htmlspecialchars($row['rut'] ?? '')."</td>
             <td>".htmlspecialchars($row['mascota_nombre'] ?? '-')."</td>
             <td>".resaltar(htmlspecialchars($row['n_chip'] ?? '-'), $q)."</td>
             <td>".htmlspecialchars($row['especie'] ?? '-')."</td>
@@ -70,9 +70,20 @@ function resaltar($texto, $busqueda) {
 <script>
 // 👉 Abre el modal de Mascotas DESPUÉS de cerrar el buscador
 function abrirMascotasDesdeBusqueda(tutorId) {
+
     $('#modalBuscar').one('hidden.bs.modal', function () {
-        verPacientes(tutorId); // Cuando se cierre, abrir el de mascotas
-    }).modal('hide'); // 🔥 Primero cerrar el buscador
+
+        /*
+         * Dejamos que Bootstrap termine completamente
+         * la limpieza del modal y backdrop del buscador
+         * antes de abrir el modal de mascotas.
+         */
+        setTimeout(function () {
+            verPacientes(tutorId);
+        }, 0);
+
+    }).modal('hide');
+
 }
 
 // ✅ Permitir múltiples modales apilados correctamente

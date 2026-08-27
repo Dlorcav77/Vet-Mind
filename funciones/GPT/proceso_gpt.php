@@ -3,8 +3,55 @@
 declare(strict_types=1);
 const GPT_SNAPSHOT = 0;
 
+$ROOT_DIR = dirname(__DIR__, 2);
+
+require_once(
+    $ROOT_DIR
+    . '/funciones/session/funcionesSesion.php'
+);
+
+configurarErroresAplicacion(true);
+iniciarSesionSegura();
+
+
+if (
+    ($_SERVER['REQUEST_METHOD'] ?? '')
+    !== 'POST'
+) {
+    http_response_code(405);
+    header('Allow: POST');
+    header('Content-Type: application/json; charset=utf-8');
+
+    echo json_encode([
+        'status' => 'error',
+        'message' => 'Método HTTP no permitido.'
+    ], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+
+    exit;
+}
+
+
+$userId =
+    isset($_SESSION['usuario_id'])
+        ? (int)$_SESSION['usuario_id']
+        : 0;
+
+if ($userId <= 0) {
+    http_response_code(401);
+    header('Content-Type: application/json; charset=utf-8');
+
+    echo json_encode([
+        'status' => 'error',
+        'message' => 'Sesión no válida.'
+    ], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+
+    exit;
+}
+
+
+validarTokenCsrf();
+
 // rutas base
-$ROOT_DIR = dirname(__DIR__, 2);   // /
 $FUNC_DIR = dirname(__DIR__);      // /funciones
 $GPT_DIR  = __DIR__;               // /funciones/GPT
 
@@ -29,6 +76,19 @@ $motor = 'gpt';
 
 // Normalizar por seguridad
 $motor = strtolower(trim($motor));
+
+/*
+ * Los motores secundarios solo pueden ejecutarse
+ * pasando por este endpoint principal, que ya validó:
+ *
+ * - sesión
+ * - método POST
+ * - CSRF
+ */
+define(
+    'VETMIND_GPT_DISPATCH',
+    true
+);
 
 if ($motor === 'claude') {
     require_once($GPT_DIR . '/proceso_ia/proceso_claude.php');

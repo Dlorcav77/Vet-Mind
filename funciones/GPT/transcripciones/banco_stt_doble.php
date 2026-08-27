@@ -1,19 +1,95 @@
 <?php
 // /funciones/GPT/transcripciones/banco_stt_doble.php
 // Banco de pruebas DOBLE MOTOR.
-// Sube un audio, elige 2 motores, transcribe con ambos (HTTP a transcribir_audio.php),
-// muestra ambas transcripciones, marca discrepancias y permite enviar a la IA (proceso_gpt.php).
-// No toca producción: transcribir_audio.php, proceso_gpt.php ni el prompt quedan intactos.
+// Disponible únicamente en development y con sesión VetMind válida.
+
 declare(strict_types=1);
+
 @set_time_limit(600);
 mb_internal_encoding('UTF-8');
 
+
+$ROOT_DIR = dirname(__DIR__, 3);
+
+require_once(
+    $ROOT_DIR
+    . '/funciones/session/funcionesSesion.php'
+);
+
+
+$entorno = strtolower(
+    trim(
+        (string)(
+            getenv('APP_ENV')
+            ?: ($_ENV['APP_ENV'] ?? '')
+            ?: ($_SERVER['APP_ENV'] ?? '')
+            ?: 'production'
+        )
+    )
+);
+
+
+if (
+    !in_array(
+        $entorno,
+        ['development', 'dev', 'local'],
+        true
+    )
+) {
+    http_response_code(404);
+    exit;
+}
+
+
+configurarErroresAplicacion();
+iniciarSesionSegura();
+exigirAutenticacion('/index.php');
+
+
+$csrfToken = tokenCsrf();
+
+$sessionCookie =
+    session_name()
+    . '='
+    . session_id();
+
+
+$isPost =
+    ($_SERVER['REQUEST_METHOD'] ?? '')
+    === 'POST';
+
+
+if ($isPost) {
+
+    validarTokenCsrf();
+
+    /*
+     * Las llamadas internas reutilizan esta misma
+     * sesión mediante cURL. Liberamos su lock antes.
+     */
+    if (
+        session_status()
+        === PHP_SESSION_ACTIVE
+    ) {
+        session_write_close();
+    }
+}
+
+
 // ===== CONFIG =====
-const ENDPOINT_STT = 'https://dev-app.vet-mind.cl/funciones/GPT/transcribir_audio.php';
-const ENDPOINT_GPT = 'https://dev-app.vet-mind.cl/funciones/GPT/proceso_gpt.php';
-const ENDPOINT_REVISOR = 'https://dev-app.vet-mind.cl/funciones/GPT/proceso_ia/proceso_revisor.php';
-const TEST_TOKEN   = 'gondolengua'; // debe coincidir con STT_TEST_TOKEN
-const AUDIO_DIR    = __DIR__ . '/banco_audios';
+
+const ENDPOINT_STT =
+    'https://dev-app.vet-mind.cl/funciones/GPT/transcribir_audio.php';
+
+const ENDPOINT_GPT =
+    'https://dev-app.vet-mind.cl/funciones/GPT/proceso_gpt.php';
+
+const ENDPOINT_REVISOR =
+    'https://dev-app.vet-mind.cl/funciones/GPT/proceso_ia/proceso_revisor.php';
+
+
+const AUDIO_DIR =
+    __DIR__ . '/banco_audios';
 
 // Motores disponibles. Clave = valor que recibe transcribir_audio.php en $_POST['motor'].
 $MOTORES = [
@@ -32,40 +108,140 @@ function listar_audios(): array {
     return array_map('basename', $files);
 }
 
-// ---- Llamar a un motor por HTTP (sube el .ogg) ----
-function probar_motor(string $audioFile, string $motor): array {
-    $ruta = AUDIO_DIR . '/' . basename($audioFile);
-    if (!is_file($ruta)) {
-        return ['ok' => false, 'texto' => '', 'err' => 'Audio no encontrado', 'ms' => 0];
-    }
-    $post = [
-        'audio'      => new CURLFile($ruta, 'audio/ogg', basename($ruta)),
-        'test_token' => TEST_TOKEN,
-        'motor'      => $motor,
-    ];
-    $t0 = microtime(true);
-    $ch = curl_init(ENDPOINT_STT);
-    curl_setopt_array($ch, [
-        CURLOPT_RETURNTRANSFER => true,
-        CURLOPT_POST           => true,
-        CURLOPT_POSTFIELDS     => $post,
-        CURLOPT_CONNECTTIMEOUT => 15,
-        CURLOPT_TIMEOUT        => 180,
-    ]);
-    $resp = curl_exec($ch);
-    $err  = curl_errno($ch) ? curl_error($ch) : '';
-    $http = (int)curl_getinfo($ch, CURLINFO_HTTP_CODE);
-    curl_close($ch);
-    $ms = (int)round((microtime(true) - $t0) * 1000);
+function probar_motor(
+    string $audioFile,
+    string $motor,
+    string $sessionCookie,
+    string $csrfToken
+): array {
 
-    if ($err !== '') return ['ok' => false, 'texto' => '', 'err' => "cURL: $err", 'ms' => $ms];
-    $j = json_decode((string)$resp, true);
-    if (!is_array($j)) return ['ok' => false, 'texto' => '', 'err' => "HTTP $http · no-JSON: " . substr((string)$resp, 0, 200), 'ms' => $ms];
+    $ruta =
+        AUDIO_DIR
+        . '/'
+        . basename($audioFile);
+
+
+    if (!is_file($ruta)) {
+
+        return [
+            'ok'    => false,
+            'texto' => '',
+            'err'   => 'Audio no encontrado',
+            'ms'    => 0
+        ];
+    }
+
+
+    $post = [
+        'audio' => new CURLFile(
+            $ruta,
+            'audio/ogg',
+            basename($ruta)
+        ),
+        'motor' => $motor
+    ];
+
+
+    $t0 = microtime(true);
+
+    $ch =
+        curl_init(
+            ENDPOINT_STT
+        );
+
+
+    curl_setopt_array(
+        $ch,
+        [
+            CURLOPT_RETURNTRANSFER => true,
+            CURLOPT_POST           => true,
+            CURLOPT_POSTFIELDS     => $post,
+            CURLOPT_COOKIE         => $sessionCookie,
+
+            CURLOPT_HTTPHEADER => [
+                'X-CSRF-Token: '
+                . $csrfToken
+            ],
+
+            CURLOPT_CONNECTTIMEOUT => 15,
+            CURLOPT_TIMEOUT        => 180
+        ]
+    );
+
+
+    $resp =
+        curl_exec($ch);
+
+    $err =
+        curl_errno($ch)
+            ? curl_error($ch)
+            : '';
+
+    $http =
+        (int)curl_getinfo(
+            $ch,
+            CURLINFO_HTTP_CODE
+        );
+
+    curl_close($ch);
+
+
+    $ms =
+        (int)round(
+            (microtime(true) - $t0)
+            * 1000
+        );
+
+
+    if ($err !== '') {
+
+        return [
+            'ok'    => false,
+            'texto' => '',
+            'err'   => 'cURL: ' . $err,
+            'ms'    => $ms
+        ];
+    }
+
+
+    $j =
+        json_decode(
+            (string)$resp,
+            true
+        );
+
+
+    if (!is_array($j)) {
+
+        return [
+            'ok'    => false,
+            'texto' => '',
+            'err'   =>
+                'HTTP '
+                . $http
+                . ' · no-JSON: '
+                . substr(
+                    (string)$resp,
+                    0,
+                    200
+                ),
+            'ms' => $ms
+        ];
+    }
+
+
     return [
-        'ok'    => (($j['status'] ?? '') === 'success'),
-        'texto' => (string)($j['texto'] ?? ''),
-        'err'   => (string)($j['message'] ?? ''),
-        'ms'    => $ms,
+        'ok' =>
+            (($j['status'] ?? '') === 'success'),
+
+        'texto' =>
+            (string)($j['texto'] ?? ''),
+
+        'err' =>
+            (string)($j['message'] ?? ''),
+
+        'ms' =>
+            $ms
     ];
 }
 
@@ -198,8 +374,14 @@ function armar_dictado(string $modo, array $resA, array $resB, string $bloqueDis
     return $base . $bloqueDisc;
 }
 
-// Llama a proceso_gpt.php igual que banco.php (mismos campos del POST).
-function llamar_proceso_gpt(string $dictado, string $plantilla, string $systemOverride = ''): array {
+function llamar_proceso_gpt(
+    string $dictado,
+    string $plantilla,
+    string $sessionCookie,
+    string $csrfToken,
+    string $systemOverride = ''
+): array {
+
     $post = [
         'paciente'       => 'banco_doble',
         'especie'        => '',
@@ -210,61 +392,216 @@ function llamar_proceso_gpt(string $dictado, string $plantilla, string $systemOv
         'motivo'         => '',
         'plantilla_base' => $plantilla,
         'texto'          => $dictado,
-        'plantilla_id'   => 0,
+        'plantilla_id'   => 0
     ];
+
+
     if ($systemOverride !== '') {
-        $post['system_override'] = $systemOverride;
-        $post['test_token']      = TEST_TOKEN;
+
+        $post['system_override'] =
+            $systemOverride;
     }
-    $ch = curl_init(ENDPOINT_GPT);
-    curl_setopt_array($ch, [
-        CURLOPT_RETURNTRANSFER => true,
-        CURLOPT_POST           => true,
-        CURLOPT_POSTFIELDS     => $post,
-        CURLOPT_CONNECTTIMEOUT => 15,
-        CURLOPT_TIMEOUT        => 180,
-    ]);
-    $resp = curl_exec($ch);
-    $err  = curl_errno($ch) ? curl_error($ch) : '';
+
+
+    $ch =
+        curl_init(
+            ENDPOINT_GPT
+        );
+
+
+    curl_setopt_array(
+        $ch,
+        [
+            CURLOPT_RETURNTRANSFER => true,
+            CURLOPT_POST           => true,
+            CURLOPT_POSTFIELDS     => $post,
+            CURLOPT_COOKIE         => $sessionCookie,
+
+            CURLOPT_HTTPHEADER => [
+                'X-CSRF-Token: '
+                . $csrfToken
+            ],
+
+            CURLOPT_CONNECTTIMEOUT => 15,
+            CURLOPT_TIMEOUT        => 180
+        ]
+    );
+
+
+    $resp =
+        curl_exec($ch);
+
+    $err =
+        curl_errno($ch)
+            ? curl_error($ch)
+            : '';
+
+    $http =
+        (int)curl_getinfo(
+            $ch,
+            CURLINFO_HTTP_CODE
+        );
+
     curl_close($ch);
-    if ($err !== '') return ['ok'=>false, 'content'=>'', 'err'=>$err];
-    $j = json_decode((string)$resp, true);
-    if (!is_array($j)) return ['ok'=>false, 'content'=>'', 'err'=>'JSON inválido del endpoint'];
+
+
+    if ($err !== '') {
+
+        return [
+            'ok'      => false,
+            'content' => '',
+            'err'     => $err
+        ];
+    }
+
+
+    $j =
+        json_decode(
+            (string)$resp,
+            true
+        );
+
+
+    if (!is_array($j)) {
+
+        return [
+            'ok'      => false,
+            'content' => '',
+            'err'     =>
+                'Respuesta no válida de GPT (HTTP '
+                . $http
+                . ')'
+        ];
+    }
+
+
     return [
-        'ok'      => (($j['status'] ?? '') === 'success'),
-        'content' => (string)($j['content'] ?? ''),
-        'err'     => (string)($j['message'] ?? ''),
+        'ok' =>
+            (($j['status'] ?? '') === 'success'),
+
+        'content' =>
+            (string)($j['content'] ?? ''),
+
+        'err' =>
+            (string)($j['message'] ?? '')
     ];
 }
 
-// Llama a la IA revisora: compara dictado enviado vs informe generado.
-function llamar_revisor(string $dictado, string $informeHtml, string $plantilla = ''): array {
-    $post = ['dictado'=>$dictado, 'informe'=>$informeHtml, 'plantilla'=>$plantilla];
-    $ch = curl_init(ENDPOINT_REVISOR);
-    curl_setopt_array($ch, [
-        CURLOPT_RETURNTRANSFER => true,
-        CURLOPT_POST           => true,
-        CURLOPT_POSTFIELDS     => $post,
-        CURLOPT_CONNECTTIMEOUT => 15,
-        CURLOPT_TIMEOUT        => 120,
-    ]);
-    $resp = curl_exec($ch);
-    $err  = curl_errno($ch) ? curl_error($ch) : '';
-    $http = (int)curl_getinfo($ch, CURLINFO_HTTP_CODE);
+function llamar_revisor(
+    string $dictado,
+    string $informeHtml,
+    string $plantilla,
+    string $sessionCookie,
+    string $csrfToken
+): array {
+
+    $post = [
+        'dictado'   => $dictado,
+        'informe'   => $informeHtml,
+        'plantilla' => $plantilla
+    ];
+
+
+    $ch =
+        curl_init(
+            ENDPOINT_REVISOR
+        );
+
+
+    curl_setopt_array(
+        $ch,
+        [
+            CURLOPT_RETURNTRANSFER => true,
+            CURLOPT_POST           => true,
+            CURLOPT_POSTFIELDS     => $post,
+            CURLOPT_COOKIE         => $sessionCookie,
+
+            CURLOPT_HTTPHEADER => [
+                'X-CSRF-Token: '
+                . $csrfToken
+            ],
+
+            CURLOPT_CONNECTTIMEOUT => 15,
+            CURLOPT_TIMEOUT        => 120
+        ]
+    );
+
+
+    $resp =
+        curl_exec($ch);
+
+    $err =
+        curl_errno($ch)
+            ? curl_error($ch)
+            : '';
+
+    $http =
+        (int)curl_getinfo(
+            $ch,
+            CURLINFO_HTTP_CODE
+        );
+
     curl_close($ch);
-    if ($err !== '') return ['ok'=>false,'items'=>[],'err'=>'cURL: '.$err,'usage'=>[],'raw'=>''];
-    $j = json_decode((string)$resp, true);
-    if (!is_array($j)) {
-        return ['ok'=>false,'items'=>[],
-            'err'=>'Respuesta no-JSON del revisor (HTTP '.$http.'): '.substr((string)$resp, 0, 600),
-            'usage'=>[],'raw'=>(string)$resp];
+
+
+    if ($err !== '') {
+
+        return [
+            'ok'    => false,
+            'items' => [],
+            'err'   => 'cURL: ' . $err,
+            'usage' => [],
+            'raw'   => ''
+        ];
     }
+
+
+    $j =
+        json_decode(
+            (string)$resp,
+            true
+        );
+
+
+    if (!is_array($j)) {
+
+        return [
+            'ok'    => false,
+            'items' => [],
+            'err'   =>
+                'Respuesta no-JSON del revisor (HTTP '
+                . $http
+                . '): '
+                . substr(
+                    (string)$resp,
+                    0,
+                    600
+                ),
+            'usage' => [],
+            'raw'   => (string)$resp
+        ];
+    }
+
+
     return [
-        'ok'    => (($j['status'] ?? '')==='success'),
-        'items' => is_array($j['items'] ?? null) ? $j['items'] : [],
-        'err'   => (string)($j['message'] ?? ''),
-        'usage' => is_array($j['usage'] ?? null) ? $j['usage'] : [],
-        'raw'   => (string)($j['raw'] ?? ''),
+        'ok' =>
+            (($j['status'] ?? '') === 'success'),
+
+        'items' =>
+            is_array($j['items'] ?? null)
+                ? $j['items']
+                : [],
+
+        'err' =>
+            (string)($j['message'] ?? ''),
+
+        'usage' =>
+            is_array($j['usage'] ?? null)
+                ? $j['usage']
+                : [],
+
+        'raw' =>
+            (string)($j['raw'] ?? '')
     ];
 }
 
@@ -428,18 +765,61 @@ function concepto_validar(string $a, string $b, array $conceptos): array {
 }
 
 
-// ---- Ejecución ----
-$audios   = listar_audios();
-$audioSel = $_GET['audio'] ?? '';
-$motorA   = $_GET['motor_a'] ?? 'deepgram';
-$motorB   = $_GET['motor_b'] ?? 'assembly_v3';
+$audios =
+    listar_audios();
+
+$audioSel =
+    (string)($_POST['audio'] ?? '');
+
+$motorA =
+    (string)($_POST['motor_a'] ?? 'deepgram');
+
+$motorB =
+    (string)($_POST['motor_b'] ?? 'assembly_v3');
+
 $resA = null;
 $resB = null;
 
-$run = isset($_GET['run']) && $audioSel !== '' && $motorA !== '' && $motorB !== '';
-if ($run && in_array($audioSel, $audios, true)) {
-    if (isset($MOTORES[$motorA])) $resA = probar_motor($audioSel, $motorA);
-    if (isset($MOTORES[$motorB])) $resB = probar_motor($audioSel, $motorB);
+
+$run =
+    $isPost
+    && isset($_POST['run'])
+    && $audioSel !== ''
+    && $motorA !== ''
+    && $motorB !== '';
+
+
+if (
+    $run
+    && in_array(
+        $audioSel,
+        $audios,
+        true
+    )
+) {
+
+    if (isset($MOTORES[$motorA])) {
+
+        $resA =
+            probar_motor(
+                $audioSel,
+                $motorA,
+                $sessionCookie,
+                $csrfToken
+            );
+    }
+
+
+    if (isset($MOTORES[$motorB])) {
+
+        $resB =
+            probar_motor(
+                $audioSel,
+                $motorB,
+                $sessionCookie,
+                $csrfToken
+            );
+    }
 }
 
 // Discrepancias (solo si ambas transcripciones salieron OK)
@@ -481,11 +861,24 @@ if (isset($_POST['enviar_ia'])) {
     $bloqueDisc = construir_bloque_discrepancias($discParaIA);  // solo las NO resueltas
     $dictado    = armar_dictado($modoIA ?: 'A', ['texto'=>$txtA], ['texto'=>$txtB], $bloqueRes . $bloqueDisc, $cualC);
     $plant    = cargar_plantilla_neutral();
-    $informeIA = llamar_proceso_gpt($dictado, $plant);
+    $informeIA =
+      llamar_proceso_gpt(
+          $dictado,
+          $plant,
+          $sessionCookie,
+          $csrfToken
+      );
     $informeIA['dictado_enviado'] = $dictado;
     $revision = null;
     if ($informeIA['ok']) {
-        $revision = llamar_revisor($dictado, $informeIA['content'], $plant);
+        $revision =
+          llamar_revisor(
+              $dictado,
+              $informeIA['content'],
+              $plant,
+              $sessionCookie,
+              $csrfToken
+          );
     }
 
     // Comparacion con prompt de prueba (system_override). No toca produccion.
@@ -494,10 +887,24 @@ if (isset($_POST['enviar_ia'])) {
     $informeTest  = null;
     $revisionTest = null;
     if ($comparar) {
-        $informeTest = llamar_proceso_gpt($dictado, $plant, $systemTest);
+        $informeTest =
+          llamar_proceso_gpt(
+              $dictado,
+              $plant,
+              $sessionCookie,
+              $csrfToken,
+              $systemTest
+          );
         $informeTest['dictado_enviado'] = $dictado;
         if ($informeTest['ok']) {
-            $revisionTest = llamar_revisor($dictado, $informeTest['content'], $plant);
+            $revisionTest =
+              llamar_revisor(
+                  $dictado,
+                  $informeTest['content'],
+                  $plant,
+                  $sessionCookie,
+                  $csrfToken
+              );
         }
     }
 }
@@ -547,7 +954,13 @@ header('Content-Type: text/html; charset=utf-8');
   <?php if (empty($audios)): ?>
     <div class="panel"><p class="empty">No hay audios en <code><?= e(AUDIO_DIR) ?></code>. Sube tus <code>.ogg</code> ahí.</p></div>
   <?php else: ?>
-    <form class="panel" method="get">
+    <form class="panel" method="post">
+
+      <input
+          type="hidden"
+          name="csrf_token"
+          value="<?= e($csrfToken) ?>"
+      >
       <h2>1 · Elige audio</h2>
       <select name="audio">
         <?php foreach ($audios as $a): ?>
@@ -660,6 +1073,11 @@ header('Content-Type: text/html; charset=utf-8');
       <div class="panel">
         <h2>Enviar a la IA (proceso_gpt)</h2>
         <form method="post" style="margin:0">
+          <input
+              type="hidden"
+              name="csrf_token"
+              value="<?= e($csrfToken) ?>"
+          >
           <input type="hidden" name="txt_a" value="<?= e($txtA_val) ?>">
           <input type="hidden" name="txt_b" value="<?= e($txtB_val) ?>">
           <input type="hidden" name="motor_a" value="<?= e($motorA) ?>">
@@ -702,7 +1120,10 @@ header('Content-Type: text/html; charset=utf-8');
       <?= render_revisor_html($revisionTest ?? null) ?>
     <?php endif; ?>
 
-  <?php elseif (isset($_GET['run'])): ?>
+  <?php elseif (
+      $isPost
+      && isset($_POST['run'])
+  ): ?>
     <div class="panel"><p class="empty">Elige un audio y 2 motores.</p></div>
   <?php endif; ?>
 

@@ -8,6 +8,52 @@ $ROOT_DIR = dirname(__DIR__, 3);   // /
 $FUNC_DIR = dirname(__DIR__, 2);   // /funciones
 $GPT_DIR  = dirname(__DIR__, 1);   // /funciones/GPT
 
+require_once(
+    $ROOT_DIR
+    . '/funciones/session/funcionesSesion.php'
+);
+
+configurarErroresAplicacion(true);
+iniciarSesionSegura();
+
+
+if (
+    ($_SERVER['REQUEST_METHOD'] ?? '')
+    !== 'POST'
+) {
+    http_response_code(405);
+    header('Allow: POST');
+    header('Content-Type: application/json; charset=utf-8');
+
+    echo json_encode([
+        'status' => 'error',
+        'message' => 'Método HTTP no permitido.'
+    ], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+
+    exit;
+}
+
+
+$userId =
+    isset($_SESSION['usuario_id'])
+        ? (int)$_SESSION['usuario_id']
+        : 0;
+
+if ($userId <= 0) {
+    http_response_code(401);
+    header('Content-Type: application/json; charset=utf-8');
+
+    echo json_encode([
+        'status' => 'error',
+        'message' => 'Sesión no válida.'
+    ], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+
+    exit;
+}
+
+
+validarTokenCsrf();
+
 require_once($FUNC_DIR . "/conn/conn.php");
 require_once($ROOT_DIR . "/configP.php");
 require_once($FUNC_DIR . "/logs/logger.php");

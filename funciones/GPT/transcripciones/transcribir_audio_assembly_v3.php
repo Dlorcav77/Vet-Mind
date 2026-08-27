@@ -4,6 +4,24 @@
 // Se invoca desde transcribir_audio.php cuando $motor_stt === 'assembly_v3'.
 // Flujo: subir audio -> /v2/upload -> /v2/transcript -> polling hasta completed.
 
+if (
+    !defined('VETMIND_STT_DISPATCH')
+    || VETMIND_STT_DISPATCH !== true
+) {
+    http_response_code(403);
+
+    header(
+        'Content-Type: application/json; charset=utf-8'
+    );
+
+    echo json_encode([
+        'status'  => 'error',
+        'message' => 'Acceso directo no permitido.'
+    ], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+
+    exit;
+}
+
 header('Content-Type: application/json; charset=utf-8');
 date_default_timezone_set('America/Santiago');
 
