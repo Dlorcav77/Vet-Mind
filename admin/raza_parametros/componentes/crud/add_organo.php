@@ -1,4 +1,5 @@
 <?php
+// admin/raza_parametros/componentes/crud/add_organo.php
 declare(strict_types=1);
 
 require_once("../../../../funciones/conn/conn.php");

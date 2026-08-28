@@ -1,4 +1,5 @@
 <?php
+// admin/raza_parametros/componentes/crud/delete_raza.php
 require_once("../../../../funciones/conn/conn.php");
 $mysqli = conn();
 
