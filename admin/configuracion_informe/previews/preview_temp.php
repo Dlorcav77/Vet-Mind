@@ -8,18 +8,51 @@ $mysqli = conn();
 
 header('Content-Type: application/json; charset=utf-8');
 
-$usuario_id = $_SESSION['usuario_id'] ?? 0;
-
-if ($usuario_id <= 0) {
+if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
+    http_response_code(405);
     echo json_encode([
         'status' => 'error',
-        'message' => 'Sesión no válida.'
-    ]);
+        'message' => 'Método no permitido.'
+    ], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
     exit;
 }
 
-$action = $_POST['action'] ?? 'ingresar';
-$id = isset($_POST['id']) ? (int)$_POST['id'] : 0;
+validarTokenCsrf();
+
+$usuario_id = (int)($_SESSION['usuario_id'] ?? 0);
+
+if ($usuario_id <= 0) {
+    http_response_code(401);
+    echo json_encode([
+        'status' => 'error',
+        'message' => 'Sesión no válida.'
+    ], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+    exit;
+}
+
+$action = trim((string)($_POST['action'] ?? 'ingresar'));
+
+if (!in_array($action, ['ingresar', 'modificar'], true)) {
+    echo json_encode([
+        'status' => 'error',
+        'message' => 'Acción no válida.'
+    ], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+    exit;
+}
+
+credenciales('configuracion_informe', $action);
+
+$id = $action === 'modificar'
+    ? (int)($_POST['id'] ?? 0)
+    : 0;
+
+if ($action === 'modificar' && $id <= 0) {
+    echo json_encode([
+        'status' => 'error',
+        'message' => 'Configuración inválida.'
+    ], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+    exit;
+}
 
 $fila_base = obtenerFilaBasePreview($mysqli, $usuario_id, $action, $id);
 
@@ -44,6 +77,13 @@ try {
         'html' => $html
     ]);
 } catch (Throwable $e) {
+    error_log(
+        '[preview_temp] ' .
+        $e->getMessage() .
+        ' | archivo: ' . $e->getFile() .
+        ' | línea: ' . $e->getLine()
+    );
+
     echo json_encode([
         'status' => 'error',
         'message' => 'No se pudo generar la vista previa.'
@@ -53,54 +93,62 @@ try {
 exit;
 
 function obtenerFilaBasePreview($mysqli, $usuario_id, $action, $id) {
-    if ($action === 'modificar' && $id > 0) {
-        $stmt = $mysqli->prepare("
-            SELECT *
-            FROM configuracion_informes
-            WHERE id = ? AND veterinario_id = ?
-            LIMIT 1
-        ");
-        $stmt->bind_param("ii", $id, $usuario_id);
-        $stmt->execute();
-        $res = $stmt->get_result();
-        $fila = $res->fetch_assoc();
+    if ($action === 'modificar') {
+        $stmt = $mysqli->prepare(
+            "SELECT *
+             FROM configuracion_informes
+             WHERE id = ? AND veterinario_id = ?
+             LIMIT 1"
+        );
 
-        if ($fila) {
-            return $fila;
+        if (!$stmt) {
+            error_log('[preview_temp][config][prepare] ' . $mysqli->error);
+            return null;
         }
 
-        return null;
+        $stmt->bind_param('ii', $id, $usuario_id);
+
+        if (!$stmt->execute()) {
+            error_log('[preview_temp][config][execute] ' . $stmt->error);
+            $stmt->close();
+            return null;
+        }
+
+        $fila = $stmt->get_result()->fetch_assoc();
+        $stmt->close();
+
+        return $fila ?: null;
     }
 
     return [
-        'id'                    => 0,
-        'nombre_plantilla'      => 'Nueva plantilla',
-        'logo_url'              => '',
-        'logo_position'         => 'center',
-        'logo_size'             => 'medium',
-        'marca_agua_url'        => '',
-        'marca_agua_size'       => 'medium',
-        'mostrar_marca_agua'    => 0,
-        'color_primario'        => '#3498db',
-        'color_secundario'      => '#2ecc71',
-        'firma_nombre'          => '',
-        'firma_titulo'          => '',
-        'firma_subtitulo'       => null,
-        'firma_align'           => 'center',
-        'firma_imagen_url'      => '',
-        'mostrar_firma_imagen'  => 0,
-        'footer_texto'          => '',
-        'footer_align'          => 'center',
-        'mostrar_fecha'         => 1,
-        'formato_fecha'         => '{{day}} de {{month}} del {{year}}',
-        'lugar_fecha'           => '',
-        'fecha_align'           => 'right',
-        'imagenes_por_fila'     => 2,
-        'titulo_informe'        => 'INFORME ECOGRÁFICO',
-        'subtitulo'             => '',
-        'subtitulo_align'       => 'center',
-        'layout_tipo'           => 'clasico',
-        'layout_config_json'    => null
+        'id' => 0,
+        'nombre_plantilla' => 'Nueva plantilla',
+        'logo_url' => '',
+        'logo_position' => 'center',
+        'logo_size' => 'medium',
+        'marca_agua_url' => '',
+        'marca_agua_size' => 'medium',
+        'mostrar_marca_agua' => 0,
+        'color_primario' => '#3498db',
+        'color_secundario' => '#2ecc71',
+        'firma_nombre' => '',
+        'firma_titulo' => '',
+        'firma_subtitulo' => null,
+        'firma_align' => 'center',
+        'firma_imagen_url' => '',
+        'mostrar_firma_imagen' => 0,
+        'footer_texto' => '',
+        'footer_align' => 'center',
+        'mostrar_fecha' => 1,
+        'formato_fecha' => '{{day}} de {{month}} del {{year}}',
+        'lugar_fecha' => '',
+        'fecha_align' => 'right',
+        'imagenes_por_fila' => 2,
+        'titulo_informe' => 'INFORME ECOGRÁFICO',
+        'subtitulo' => '',
+        'subtitulo_align' => 'center',
+        'layout_tipo' => 'clasico',
+        'layout_config_json' => null
     ];
 }
 
@@ -115,7 +163,21 @@ function armarFilaTemporalDesdePost() {
         $firma_subtitulos = [];
     }
 
-    $firma_subtitulos = array_filter(array_map('trim', $firma_subtitulos));
+    $firma_subtitulos_limpios = [];
+
+    foreach ($firma_subtitulos as $valor) {
+        if (!is_scalar($valor)) {
+            continue;
+        }
+
+        $valor = trim((string)$valor);
+
+        if ($valor !== '') {
+            $firma_subtitulos_limpios[] = $valor;
+        }
+    }
+
+    $firma_subtitulos = $firma_subtitulos_limpios;
     $firma_subtitulo = !empty($firma_subtitulos)
         ? json_encode(array_values($firma_subtitulos), JSON_UNESCAPED_UNICODE)
         : null;

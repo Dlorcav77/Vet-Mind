@@ -5,34 +5,79 @@ require_once("../config.php");
 
 $mysqli = conn();
 
+$veterinarioId = (int)($usuario_id ?? 0);
 $action = $_GET['action'] ?? 'ingresar';
 
-if ($action == "modificar") {
-  credenciales('tutor', 'modificar');
-  $accion = "Modificar";
+if (!in_array($action, ['ingresar', 'modificar'], true)) {
+    echo "<div class='alert alert-danger'>Acción no válida.</div>";
+    exit;
+}
 
-  $id = intval($_GET['id']);
-  $sel = "SELECT * FROM pacientes WHERE id = ?";
-  $stmt = $mysqli->prepare($sel);
-  $stmt->bind_param('i', $id);
-  $stmt->execute();
-  $res = $stmt->get_result();
-  $fila = $res->fetch_assoc();
+if ($action === "modificar") {
+    credenciales('tutor', 'modificar');
+    $accion = "Modificar";
+
+    $id = (int)($_GET['id'] ?? 0);
+
+    if ($id <= 0) {
+        echo "<div class='alert alert-danger'>Paciente no válido.</div>";
+        exit;
+    }
+
+    $sel = "SELECT *
+            FROM pacientes
+            WHERE id = ? AND veterinario_id = ?
+            LIMIT 1";
+
+    $stmt = $mysqli->prepare($sel);
+    $stmt->bind_param('ii', $id, $veterinarioId);
+    $stmt->execute();
+    $res = $stmt->get_result();
+    $fila = $res->fetch_assoc();
+    $stmt->close();
+
+    if (!$fila) {
+        echo "<div class='alert alert-danger'>Paciente no encontrado o no autorizado.</div>";
+        exit;
+    }
 } else {
-  credenciales('tutor', 'ingresar');
-  $accion = "Ingresar";
+    credenciales('tutor', 'ingresar');
+    $accion = "Ingresar";
 
-  $tutor_id = intval($_GET['tutor_id']); // importante: recibe tutor_id
-  $fila = [
-    'nombre' => '',
-    'codigo_paciente' => '',
-    'especie' => '',
-    'raza' => '',
-    'edad' => '',
-    'n_chip' => '',
-    'sexo' => '',
-    'fecha_nacimiento' => ''
-  ];
+    $tutor_id = (int)($_GET['tutor_id'] ?? 0);
+
+    if ($tutor_id <= 0) {
+        echo "<div class='alert alert-danger'>Tutor no válido.</div>";
+        exit;
+    }
+
+    $stmt = $mysqli->prepare(
+        "SELECT id
+         FROM tutores
+         WHERE id = ? AND veterinario_id = ?
+         LIMIT 1"
+    );
+    $stmt->bind_param('ii', $tutor_id, $veterinarioId);
+    $stmt->execute();
+    $resTutor = $stmt->get_result();
+    $tutorValido = $resTutor->num_rows > 0;
+    $stmt->close();
+
+    if (!$tutorValido) {
+        echo "<div class='alert alert-danger'>Tutor no encontrado o no autorizado.</div>";
+        exit;
+    }
+
+    $fila = [
+        'nombre' => '',
+        'codigo_paciente' => '',
+        'especie' => '',
+        'raza' => '',
+        'edad' => '',
+        'n_chip' => '',
+        'sexo' => '',
+        'fecha_nacimiento' => ''
+    ];
 }
 
 $sexos = [
@@ -43,7 +88,6 @@ $sexos = [
   // 'Otro' => 'Otro'
 ];
 
-global $usuario_id;
 ?>
 <style>
   #modalPacientes .select2-container { width: 22rem !important; }

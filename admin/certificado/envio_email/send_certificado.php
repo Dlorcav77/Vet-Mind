@@ -57,10 +57,14 @@ function _vm_nombre_adjunto_pdf($paciente, $codigoPaciente = '') {
 
 try {
     if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
+        http_response_code(405);
         throw new Exception('Método no permitido.');
     }
 
-    $usuario_id     = $_SESSION['usuario_id'] ?? 0;
+    validarTokenCsrf();
+    credenciales('certificado', 'listar');
+
+    $usuario_id = (int)($_SESSION['usuario_id'] ?? 0);
     $certificado_id = isset($_POST['certificado_id']) ? (int)$_POST['certificado_id'] : 0;
     $destinatarios  = $_POST['destinatarios'] ?? [];
 

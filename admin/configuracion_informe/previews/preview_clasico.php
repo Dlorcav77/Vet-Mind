@@ -19,7 +19,17 @@ function renderVistaPreviaPlantillaClasico($mysqli, $fila) {
     $campos = [];
 
     if (!empty($fila['_preview_campos']) && is_array($fila['_preview_campos'])) {
-        $campos = array_values(array_filter(array_map('trim', $fila['_preview_campos'])));
+        foreach ($fila['_preview_campos'] as $campoPreview) {
+            if (is_array($campoPreview)) {
+                $etiqueta = trim((string)($campoPreview['etiqueta'] ?? ''));
+            } else {
+                $etiqueta = trim((string)$campoPreview);
+            }
+
+            if ($etiqueta !== '') {
+                $campos[] = $etiqueta;
+            }
+        }
     } else {
         $stmt_campos = $mysqli->prepare("
             SELECT cp.etiqueta

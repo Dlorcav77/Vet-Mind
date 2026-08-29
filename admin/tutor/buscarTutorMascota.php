@@ -1,30 +1,45 @@
 <?php
 // admin/tutor/buscarTutorMascota.php
+
 require_once("../config.php");
+credenciales('tutor', 'listar');
+
 $mysqli = conn();
 
-$q = trim($_GET['q'] ?? '');
+$veterinarioId = (int)($usuario_id ?? 0);
+
+$q = trim((string)($_GET['q'] ?? ''));
+
 if (strlen($q) < 3) {
     echo "<p class='text-danger'>Debe ingresar al menos 3 caracteres.</p>";
     exit;
 }
 
 // Buscar tutores o mascotas que coincidan
-$query = "SELECT t.id as tutor_id, t.nombre_completo as tutor_nombre, t.rut, 
-                p.id as paciente_id, p.nombre as mascota_nombre, p.especie, p.n_chip
+$query = "SELECT
+                t.id AS tutor_id,
+                t.nombre_completo AS tutor_nombre,
+                t.rut,
+                p.id AS paciente_id,
+                p.nombre AS mascota_nombre,
+                p.especie,
+                p.n_chip
           FROM tutores t
-          LEFT JOIN pacientes p ON t.id = p.tutor_id
-          WHERE(p.veterinario_id = ?) 
-            AND (t.rut LIKE CONCAT('%', ?, '%')
-            OR t.nombre_completo LIKE CONCAT('%', ?, '%')
-            OR p.nombre LIKE CONCAT('%', ?, '%')
-            OR p.n_chip LIKE CONCAT('%', ?, '%'))
+          LEFT JOIN pacientes p
+            ON p.tutor_id = t.id
+           AND p.veterinario_id = ?
+          WHERE t.veterinario_id = ?
+            AND (
+                t.rut LIKE CONCAT('%', ?, '%')
+                OR t.nombre_completo LIKE CONCAT('%', ?, '%')
+                OR p.nombre LIKE CONCAT('%', ?, '%')
+                OR p.n_chip LIKE CONCAT('%', ?, '%')
+            )
           ORDER BY t.nombre_completo, p.nombre
-          LIMIT 20
-        ";
+          LIMIT 20";
 
 $stmt = $mysqli->prepare($query);
-$stmt->bind_param("issss", $usuario_id, $q, $q, $q, $q);
+$stmt->bind_param("iissss", $veterinarioId, $veterinarioId, $q, $q, $q, $q);
 $stmt->execute();
 $res = $stmt->get_result();
 

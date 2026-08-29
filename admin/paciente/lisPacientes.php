@@ -5,24 +5,39 @@ credenciales('tutor', 'listar');
 ###########################################
 
 $mysqli = conn();
-global $acceso_aplicaciones;
+global $usuario_id, $acceso_aplicaciones;
 
-// Obtener el tutor_id recibido por GET
-$tutor_id = intval($_GET['tutor_id'] ?? 0);
+$veterinarioId = (int)($usuario_id ?? 0);
+$tutor_id = (int)($_GET['tutor_id'] ?? 0);
 
-if ($tutor_id <= 0) {
+if ($veterinarioId <= 0 || $tutor_id <= 0) {
     echo "<div class='alert alert-danger'>Tutor no válido.</div>";
     exit;
 }
 
-// Consultar pacientes asociados a este tutor
+$stmtTutor = $mysqli->prepare(
+    "SELECT id FROM tutores
+     WHERE id = ? AND veterinario_id = ?
+     LIMIT 1"
+);
+$stmtTutor->bind_param("ii", $tutor_id, $veterinarioId);
+$stmtTutor->execute();
+$resTutor = $stmtTutor->get_result();
+$existeTutor = $resTutor->num_rows > 0;
+$stmtTutor->close();
+
+if (!$existeTutor) {
+    echo "<div class='alert alert-danger'>Tutor no encontrado o no autorizado.</div>";
+    exit;
+}
+
 $query = "SELECT id, nombre, codigo_paciente, n_chip, especie, sexo, raza, fecha_nacimiento, created_at
           FROM pacientes
-          WHERE tutor_id = ?
+          WHERE tutor_id = ? AND veterinario_id = ?
           ORDER BY id DESC";
 
 $stmt = $mysqli->prepare($query);
-$stmt->bind_param("i", $tutor_id);
+$stmt->bind_param("ii", $tutor_id, $veterinarioId);
 $stmt->execute();
 $result = $stmt->get_result();
 ?>
