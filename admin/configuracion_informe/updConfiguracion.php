@@ -24,7 +24,7 @@ $action = trim((string)($_POST['action'] ?? ''));
 $id = isset($_POST['id']) ? (int)$_POST['id'] : 0;
 $veterinarioId = (int)$usuario_id;
 
-if (!in_array($action, ['ingresar', 'modificar'], true)) {
+if (!in_array($action, ['ingresar', 'modificar', 'eliminar'], true)) {
     jexit('error', 'Acción no válida.');
 }
 
@@ -32,27 +32,95 @@ if ($action === 'ingresar') {
     credenciales('configuracion_informe', 'ingresar');
 }
 
-if ($action === 'modificar') {
-    credenciales('configuracion_informe', 'modificar');
+$configuracionActual = null;
+
+if ($action === 'modificar' || $action === 'eliminar') {
+    credenciales(
+        'configuracion_informe',
+        $action === 'modificar' ? 'modificar' : 'eliminar'
+    );
 
     if ($id <= 0) {
         jexit('error', 'Configuración inválida.');
     }
 
     $stmtOwner = $mysqli->prepare(
-        "SELECT id
+        "SELECT id, logo_url, marca_agua_url, firma_imagen_url
          FROM configuracion_informes
          WHERE id = ? AND veterinario_id = ?
          LIMIT 1"
     );
+
+    if (!$stmtOwner) {
+        error_log('[updConfiguracion][owner][prepare] ' . $mysqli->error);
+        jexit('error', 'No se pudo validar la configuración.');
+    }
+
     $stmtOwner->bind_param('ii', $id, $veterinarioId);
-    $stmtOwner->execute();
-    $resOwner = $stmtOwner->get_result();
+
+    if (!$stmtOwner->execute()) {
+        error_log('[updConfiguracion][owner][execute] ' . $stmtOwner->error);
+        $stmtOwner->close();
+        jexit('error', 'No se pudo validar la configuración.');
+    }
+
+    $configuracionActual = $stmtOwner->get_result()->fetch_assoc();
     $stmtOwner->close();
 
-    if ($resOwner->num_rows === 0) {
-        jexit('error', 'No tienes permiso para modificar esta configuración.');
+    if (!$configuracionActual) {
+        jexit('error', 'Configuración no encontrada o sin permisos.');
     }
+}
+
+if ($action === 'eliminar') {
+    $stmt = $mysqli->prepare(
+        "DELETE FROM configuracion_informes
+         WHERE id = ? AND veterinario_id = ?"
+    );
+
+    if (!$stmt) {
+        error_log('[updConfiguracion][eliminar][prepare] ' . $mysqli->error);
+        jexit('error', 'No se pudo preparar la eliminación.');
+    }
+
+    $stmt->bind_param('ii', $id, $veterinarioId);
+
+    if (!$stmt->execute()) {
+        error_log('[updConfiguracion][eliminar][execute] ' . $stmt->error);
+        $stmt->close();
+        jexit('error', 'No se pudo eliminar la configuración.');
+    }
+
+    if ($stmt->affected_rows === 0) {
+        $stmt->close();
+        jexit('error', 'Configuración no encontrada o sin permisos.');
+    }
+
+    $stmt->close();
+
+    eliminarArchivoConfiguracionSeguro(
+        $mysqli,
+        $configuracionActual['logo_url'] ?? null,
+        'logo_url',
+        'logos'
+    );
+
+    eliminarArchivoConfiguracionSeguro(
+        $mysqli,
+        $configuracionActual['marca_agua_url'] ?? null,
+        'marca_agua_url',
+        'marcas_agua'
+    );
+
+    eliminarArchivoConfiguracionSeguro(
+        $mysqli,
+        $configuracionActual['firma_imagen_url'] ?? null,
+        'firma_imagen_url',
+        'firmas'
+    );
+
+    logg("Eliminación de configuración ID $id para veterinario ID $veterinarioId");
+    jexit('success', 'Diseño de informe eliminado correctamente.');
 }
 
 $nombre_plantilla = trim((string)($_POST['nombre_plantilla'] ?? 'Plantilla principal'));
@@ -562,6 +630,68 @@ function generarNombreCampo($etiqueta) {
     $etiqueta = preg_replace('/[^a-z0-9\s]/', '', $etiqueta);   // solo letras y números
     $etiqueta = preg_replace('/\s+/', '_', $etiqueta);          // espacios a _
     return trim($etiqueta, '_');                                // limpia bordes
+}
+
+function eliminarArchivoConfiguracionSeguro(mysqli $mysqli, ?string $ruta, string $campo, string $directorio): void
+{
+    $ruta = trim((string)$ruta);
+
+    if ($ruta === '') {
+        return;
+    }
+
+    $camposPermitidos = ['logo_url', 'marca_agua_url', 'firma_imagen_url'];
+    $directoriosPermitidos = ['logos', 'marcas_agua', 'firmas'];
+
+    if (
+        !in_array($campo, $camposPermitidos, true) ||
+        !in_array($directorio, $directoriosPermitidos, true)
+    ) {
+        return;
+    }
+
+    $stmt = $mysqli->prepare(
+        "SELECT id FROM configuracion_informes
+         WHERE $campo = ?
+         LIMIT 1"
+    );
+
+    if ($stmt) {
+        $stmt->bind_param('s', $ruta);
+        $stmt->execute();
+        $enUso = $stmt->get_result()->num_rows > 0;
+        $stmt->close();
+
+        if ($enUso) {
+            return;
+        }
+    }
+
+    $rutaNormalizada = str_replace('\\', '/', $ruta);
+    $prefijoPermitido = 'uploads/' . $directorio . '/';
+
+    if (strpos($rutaNormalizada, $prefijoPermitido) !== 0) {
+        return;
+    }
+
+    $baseDir = realpath(__DIR__ . '/../../uploads/' . $directorio);
+
+    if ($baseDir === false) {
+        return;
+    }
+
+    $archivo = $baseDir . DIRECTORY_SEPARATOR . basename($rutaNormalizada);
+    $archivoReal = realpath($archivo);
+
+    if (
+        $archivoReal !== false &&
+        is_file($archivoReal) &&
+        strpos($archivoReal, $baseDir . DIRECTORY_SEPARATOR) === 0
+    ) {
+        if (!@unlink($archivoReal)) {
+            error_log('[updConfiguracion][eliminar_archivo] No se pudo eliminar: ' . $archivoReal);
+        }
+    }
 }
 
 

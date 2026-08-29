@@ -5,14 +5,23 @@ require_once("../../config.php");
 
 header('Content-Type: application/json; charset=utf-8');
 
+if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
+    http_response_code(405);
+    echo json_encode([
+        'status' => 'error',
+        'message' => 'Método no permitido.'
+    ], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+    exit;
+}
+
+validarTokenCsrf();
 credenciales('certificado', 'eliminar');
 
 $mysqli = conn();
-global $usuario_id;
-
-$usuarioActual = (int)($usuario_id ?? ($_SESSION['usuario_id'] ?? 0));
+$usuarioActual = (int)$usuario_id;
 
 if ($usuarioActual <= 0) {
+    http_response_code(401);
     echo json_encode([
         'status' => 'error',
         'message' => 'Sesión inválida.'
@@ -102,7 +111,10 @@ function limpiar_resolver_archivo(string $baseProyecto, string $ruta): array
 
     $rutaFisica = realpath($rutaFisicaIntento);
 
-    if (!$rutaFisica || strpos($rutaFisica, $baseProyecto) !== 0) {
+    if (
+        !$rutaFisica ||
+        strpos($rutaFisica, $baseProyecto . DIRECTORY_SEPARATOR) !== 0
+    ) {
         return $info;
     }
 
@@ -127,7 +139,7 @@ if (!$baseProyecto) {
     ]);
 }
 
-$veterinarioId = (int)($_POST['usuario_id'] ?? $_GET['usuario_id'] ?? $usuarioActual);
+$veterinarioId = (int)($_POST['usuario_id'] ?? $usuarioActual);
 
 // Seguridad para esta prueba: solo limpiar el usuario logueado.
 // Si necesitas limpiar otro usuario desde admin, lo habilitamos después con una validación real de administrador.
@@ -138,8 +150,8 @@ if ($veterinarioId !== $usuarioActual) {
     ]);
 }
 
-$dryRun = (int)($_POST['dry_run'] ?? $_GET['dry_run'] ?? 1) === 1;
-$confirmar = trim((string)($_POST['confirmar'] ?? $_GET['confirmar'] ?? ''));
+$dryRun = (int)($_POST['dry_run'] ?? 1) === 1;
+$confirmar = trim((string)($_POST['confirmar'] ?? ''));
 
 if (!$dryRun && $confirmar !== 'ELIMINAR_USUARIO_' . $veterinarioId) {
     limpiar_json_out([
@@ -162,10 +174,11 @@ $sql = "
 $stmt = $mysqli->prepare($sql);
 
 if (!$stmt) {
+    error_log('[limpiar_usuario_informes][select][prepare] ' . $mysqli->error);
+
     limpiar_json_out([
         'status' => 'error',
-        'message' => 'Error preparando consulta.',
-        'mysql_error' => $mysqli->error
+        'message' => 'Error preparando consulta.'
     ]);
 }
 
@@ -255,6 +268,9 @@ foreach ($patronesHuerfanos as $dirRel => $prefijo) {
 }
 
 $archivos = [];
+$archivosFisicosAEliminar = [];
+$indicesArchivos = [];
+
 $resumen = [
     'usuario_id' => $veterinarioId,
     'dry_run' => $dryRun,
@@ -288,6 +304,8 @@ foreach ($rutasAEliminar as $ruta => $meta) {
         'error' => ''
     ];
 
+    $indicesArchivos[$ruta] = count($archivos);
+
     if (!$info['permitida']) {
         $resumen['archivos_no_permitidos']++;
         $archivos[] = $item;
@@ -303,58 +321,100 @@ foreach ($rutasAEliminar as $ruta => $meta) {
     $resumen['archivos_existentes']++;
     $resumen['bytes_detectados'] += $info['size_bytes'];
 
-    if (!$dryRun) {
-        if (@unlink($info['ruta_fisica'])) {
-            $item['eliminado'] = true;
-            $resumen['archivos_eliminados']++;
-            $resumen['bytes_eliminados'] += $info['size_bytes'];
-        } else {
-            $item['error'] = 'No se pudo eliminar el archivo físico.';
-            $resumen['errores_eliminacion']++;
-        }
-    }
+    $archivosFisicosAEliminar[$ruta] = [
+        'ruta_fisica' => $info['ruta_fisica'],
+        'size_bytes' => $info['size_bytes']
+    ];
 
     $archivos[] = $item;
 }
 
 $resumen['bytes_detectados_label'] = limpiar_format_bytes((int)$resumen['bytes_detectados']);
-$resumen['bytes_eliminados_label'] = limpiar_format_bytes((int)$resumen['bytes_eliminados']);
 
 if (!$dryRun) {
     $mysqli->begin_transaction();
 
     try {
-        $stmtBor = $mysqli->prepare("DELETE FROM certificados_borradores WHERE veterinario_id = ?");
+        $stmtBor = $mysqli->prepare(
+            "DELETE FROM certificados_borradores
+             WHERE veterinario_id = ?"
+        );
+
         if (!$stmtBor) {
-            throw new Exception('Error preparando borrado de borradores: ' . $mysqli->error);
+            throw new RuntimeException('No se pudo preparar el borrado de borradores.');
         }
 
         $stmtBor->bind_param('i', $veterinarioId);
-        $stmtBor->execute();
-        $resumen['borradores_eliminados'] = $stmtBor->affected_rows;
 
-        $stmtDel = $mysqli->prepare("DELETE FROM certificados WHERE veterinario_id = ?");
+        if (!$stmtBor->execute()) {
+            error_log('[limpiar_usuario_informes][borradores][execute] ' . $stmtBor->error);
+            $stmtBor->close();
+            throw new RuntimeException('No se pudieron eliminar los borradores.');
+        }
+
+        $resumen['borradores_eliminados'] = $stmtBor->affected_rows;
+        $stmtBor->close();
+
+        $stmtDel = $mysqli->prepare(
+            "DELETE FROM certificados
+             WHERE veterinario_id = ?"
+        );
+
         if (!$stmtDel) {
-            throw new Exception('Error preparando borrado de certificados: ' . $mysqli->error);
+            throw new RuntimeException('No se pudo preparar el borrado de certificados.');
         }
 
         $stmtDel->bind_param('i', $veterinarioId);
-        $stmtDel->execute();
+
+        if (!$stmtDel->execute()) {
+            error_log('[limpiar_usuario_informes][certificados][execute] ' . $stmtDel->error);
+            $stmtDel->close();
+            throw new RuntimeException('No se pudieron eliminar los certificados.');
+        }
+
         $resumen['certificados_eliminados'] = $stmtDel->affected_rows;
+        $stmtDel->close();
 
         $mysqli->commit();
     } catch (Throwable $e) {
         $mysqli->rollback();
 
+        error_log('[limpiar_usuario_informes][transaction] ' . $e->getMessage());
+
         limpiar_json_out([
             'status' => 'error',
-            'message' => 'Se eliminaron archivos físicos, pero falló el borrado en BD. Revisa manualmente.',
-            'error' => $e->getMessage(),
+            'message' => 'No se pudo completar la limpieza. No se eliminaron los archivos físicos.',
             'resumen' => $resumen,
             'archivos' => $archivos
         ]);
     }
+
+    foreach ($archivosFisicosAEliminar as $ruta => $archivoFisico) {
+        $indice = $indicesArchivos[$ruta] ?? null;
+
+        if (@unlink($archivoFisico['ruta_fisica'])) {
+            $resumen['archivos_eliminados']++;
+            $resumen['bytes_eliminados'] += $archivoFisico['size_bytes'];
+
+            if ($indice !== null) {
+                $archivos[$indice]['eliminado'] = true;
+            }
+        } else {
+            $resumen['errores_eliminacion']++;
+
+            if ($indice !== null) {
+                $archivos[$indice]['error'] = 'No se pudo eliminar el archivo físico.';
+            }
+
+            error_log(
+                '[limpiar_usuario_informes][archivo] No se pudo eliminar: ' .
+                $archivoFisico['ruta_fisica']
+            );
+        }
+    }
 }
+
+$resumen['bytes_eliminados_label'] = limpiar_format_bytes((int)$resumen['bytes_eliminados']);
 
 limpiar_json_out([
     'status' => 'success',

@@ -90,7 +90,7 @@ $destacado_titulo_inicial = trim(
                 </div>
                 <div class="w-100 w-md-auto" style="max-width: 320px;">
                     <select name="configuracion_informe_id" id="configuracion_informe_id" class="form-select">
-                        <option value="">Plantilla de diseño</option>
+                        <!-- <option value="">Plantilla de diseño</option> -->
                         <?php foreach ($plantillas_diseno as $plantillaDiseno): ?>
                             <option value="<?= (int)$plantillaDiseno['id'] ?>"
                                 <?= $configuracion_informe_id_actual === (int)$plantillaDiseno['id'] ? 'selected' : '' ?>>

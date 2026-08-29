@@ -5,7 +5,27 @@ require_once("../config.php");
 header('Content-Type: application/json; charset=utf-8');
 
 $mysqli = conn();
-$action = $_POST['action'] ?? $_GET['action'] ?? '';
+
+if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
+    http_response_code(405);
+    echo json_encode([
+        'status' => 'error',
+        'message' => 'Método no permitido.'
+    ], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+    exit;
+}
+
+validarTokenCsrf();
+
+$action = trim((string)($_POST['action'] ?? ''));
+
+if ($action === '') {
+    echo json_encode([
+        'status' => 'error',
+        'message' => 'Acción no válida.'
+    ], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+    exit;
+}
 
 function control_ia_where_created_at(string $rango): string
 {
@@ -214,36 +234,76 @@ if ($action === 'eliminar_grupo') {
         exit;
     }
 
-    if ($certificado_id > 0) {
-        $stmtReq = $mysqli->prepare("DELETE FROM ia_requests WHERE certificado_id = ?");
-        $stmtReq->bind_param('i', $certificado_id);
+    $mysqli->begin_transaction();
 
-        $stmtTr = $mysqli->prepare("DELETE FROM ia_transcripciones WHERE certificado_id = ?");
-        $stmtTr->bind_param('i', $certificado_id);
+    try {
+        if ($certificado_id > 0) {
+            $stmtReq = $mysqli->prepare(
+                "DELETE FROM ia_requests WHERE certificado_id = ?"
+            );
 
-        $logTxt = "certificado #$certificado_id";
-    } else {
-        $stmtReq = $mysqli->prepare("DELETE FROM ia_requests WHERE flujo_id = ?");
-        $stmtReq->bind_param('s', $flujo_id);
+            $stmtTr = $mysqli->prepare(
+                "DELETE FROM ia_transcripciones WHERE certificado_id = ?"
+            );
 
-        $stmtTr = $mysqli->prepare("DELETE FROM ia_transcripciones WHERE flujo_id = ?");
-        $stmtTr->bind_param('s', $flujo_id);
+            if (!$stmtReq || !$stmtTr) {
+                throw new RuntimeException('No se pudo preparar la eliminación.');
+            }
 
-        $logTxt = "flujo $flujo_id";
-    }
+            $stmtReq->bind_param('i', $certificado_id);
+            $stmtTr->bind_param('i', $certificado_id);
 
-    $okReq = $stmtReq->execute();
-    $stmtReq->close();
+            $logTxt = "certificado #$certificado_id";
+        } else {
+            $stmtReq = $mysqli->prepare(
+                "DELETE FROM ia_requests WHERE flujo_id = ?"
+            );
 
-    $okTr = $stmtTr->execute();
-    $stmtTr->close();
+            $stmtTr = $mysqli->prepare(
+                "DELETE FROM ia_transcripciones WHERE flujo_id = ?"
+            );
 
-    if ($okReq && $okTr) {
+            if (!$stmtReq || !$stmtTr) {
+                throw new RuntimeException('No se pudo preparar la eliminación.');
+            }
+
+            $stmtReq->bind_param('s', $flujo_id);
+            $stmtTr->bind_param('s', $flujo_id);
+
+            $logTxt = "flujo $flujo_id";
+        }
+
+        if (!$stmtReq->execute()) {
+            throw new RuntimeException('No se pudieron eliminar los registros IA.');
+        }
+
+        $stmtReq->close();
+
+        if (!$stmtTr->execute()) {
+            throw new RuntimeException('No se pudieron eliminar las transcripciones.');
+        }
+
+        $stmtTr->close();
+
+        $mysqli->commit();
+
         logg("Control IA: eliminado grupo IA del $logTxt");
-        echo json_encode(['status'=>'success','message'=>'Grupo eliminado.']);
-    } else {
-        echo json_encode(['status'=>'error','message'=>'Error al eliminar grupo.']);
+
+        echo json_encode([
+            'status' => 'success',
+            'message' => 'Grupo eliminado.'
+        ]);
+    } catch (Throwable $e) {
+        $mysqli->rollback();
+
+        error_log('[updControlIa][eliminar_grupo] ' . $e->getMessage());
+
+        echo json_encode([
+            'status' => 'error',
+            'message' => 'Error al eliminar grupo.'
+        ]);
     }
+
     exit;
 }
 
