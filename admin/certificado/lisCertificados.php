@@ -271,13 +271,13 @@ $res = $stmt->get_result();
                             <i class="fas fa-download me-2 text-primary"></i>Descargar PDF
                           </a>
                           <div class="dropdown-divider"></div>
-                          <a class="dropdown-item" href="#"
-                              onclick="abrirModalCorreo(this, <?= (int)$fila['id'] ?>)"
-                              data-id="<?= (int)$fila['id'] ?>"
-                              data-paciente="<?= htmlspecialchars($paciente) ?>"
-                              data-propietario="<?= htmlspecialchars($propietario) ?>"
-                              data-tipo_examen="<?= htmlspecialchars($fila['tipo_examen'] ?? '-') ?>"
-                              data-email="<?= htmlspecialchars($fila['email'] ?? '') ?>">
+                            <a class="dropdown-item" href="javascript:void(0)"
+                                onclick="event.preventDefault(); event.stopPropagation(); abrirModalCorreo(this, <?= (int)$fila['id'] ?>); return false;"
+                                data-id="<?= (int)$fila['id'] ?>"
+                                data-paciente="<?= htmlspecialchars($paciente, ENT_QUOTES, 'UTF-8') ?>"
+                                data-propietario="<?= htmlspecialchars($propietario, ENT_QUOTES, 'UTF-8') ?>"
+                                data-tipo_examen="<?= htmlspecialchars($fila['tipo_examen'] ?? '-', ENT_QUOTES, 'UTF-8') ?>"
+                                data-email="<?= htmlspecialchars($fila['email'] ?? '', ENT_QUOTES, 'UTF-8') ?>">
                             <i class="fas fa-envelope me-2 text-success"></i> Enviar por correo
                           </a>
                           <a class="dropdown-item" href="#" onclick="confirmDelete(<?= (int)$fila['id'] ?>, '<?= htmlspecialchars($tipo_ingreso, ENT_QUOTES) ?>')">
