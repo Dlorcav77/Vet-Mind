@@ -489,16 +489,34 @@ $csrf = tokenCsrf();
     <script>
         $(document).ready(function () {
             var $loginForm = $('#loginForm');
+            var $submitButton = $loginForm.find('button[type="submit"]');
+            var $processingMessage = $('#processingMessage');
 
-            var $submitButton =
-                $loginForm.find('button[type="submit"]');
+            function obtenerMensajeError(xhr, fallback) {
+                if (
+                    xhr &&
+                    xhr.responseJSON &&
+                    xhr.responseJSON.message
+                ) {
+                    return xhr.responseJSON.message;
+                }
 
-            var $processingMessage =
-                $('#processingMessage');
+                if (xhr && xhr.responseText) {
+                    try {
+                        var data = JSON.parse(xhr.responseText);
 
-            $loginForm.on('submit', function (event) {
-                event.preventDefault();
+                        if (data && data.message) {
+                            return data.message;
+                        }
+                    } catch (error) {
+                        // Respuesta no JSON.
+                    }
+                }
 
+                return fallback;
+            }
+
+            function enviarLogin(reintentoCsrf) {
                 $processingMessage.show();
                 $submitButton.prop('disabled', true);
 
@@ -506,55 +524,74 @@ $csrf = tokenCsrf();
                     url: 'validar.php',
                     type: 'POST',
                     data: $loginForm.serialize(),
+                    dataType: 'json',
 
-                    success: function (response) {
+                    success: function (data) {
                         $processingMessage.hide();
 
-                        try {
-                            var data =
-                                typeof response === 'string'
-                                    ? JSON.parse(response)
-                                    : response;
-
-                            if (data.status === 'success') {
-
-                                window.location.href =
-                                    data.redirect_url;
-
-                                return;
-                            }
-
-                            Swal.fire(
-                                'Error',
-                                data.message ||
-                                    'No fue posible iniciar sesión.',
-                                'error'
-                            );
-
-                            $submitButton.prop('disabled', false);
-                        } catch (error) {
-                            Swal.fire(
-                                'Error',
-                                'Respuesta inesperada del servidor.',
-                                'error'
-                            );
-
-                            $submitButton.prop('disabled', false);
+                        if (data && data.status === 'success') {
+                            window.location.href = data.redirect_url;
+                            return;
                         }
+
+                        Swal.fire(
+                            'Error',
+                            (data && data.message)
+                                ? data.message
+                                : 'No fue posible iniciar sesión.',
+                            'error'
+                        );
+
+                        $submitButton.prop('disabled', false);
                     },
 
-                    error: function () {
+                    error: function (xhr) {
+                        var respuesta =
+                            xhr && xhr.responseJSON
+                                ? xhr.responseJSON
+                                : null;
+
+                        /*
+                        * La página quedó abierta con un CSRF perteneciente
+                        * a una sesión que ya expiró.
+                        *
+                        * El servidor inició una sesión nueva y devolvió
+                        * su nuevo CSRF. Lo actualizamos y reintentamos
+                        * exactamente una vez.
+                        */
+                        if (
+                            !reintentoCsrf &&
+                            respuesta &&
+                            respuesta.code === 'csrf_expired' &&
+                            respuesta.csrf_token
+                        ) {
+                            $loginForm
+                                .find('input[name="csrf_token"]')
+                                .val(respuesta.csrf_token);
+
+                            enviarLogin(true);
+                            return;
+                        }
+
                         $processingMessage.hide();
 
                         Swal.fire(
                             'Error',
-                            'Hubo un problema con la solicitud.',
+                            obtenerMensajeError(
+                                xhr,
+                                'Hubo un problema con la solicitud.'
+                            ),
                             'error'
                         );
 
                         $submitButton.prop('disabled', false);
                     }
                 });
+            }
+
+            $loginForm.on('submit', function (event) {
+                event.preventDefault();
+                enviarLogin(false);
             });
         });
     </script>

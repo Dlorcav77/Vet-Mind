@@ -17,18 +17,23 @@ function validarTokenCsrf(?string $token = null): void
         ?? ($_POST['csrf_token'] ?? null)
         ?? ($_SERVER['HTTP_X_CSRF_TOKEN'] ?? null);
 
+    $tokenActual = tokenCsrf();
+
     if (
         !is_string($recibido)
-        || !hash_equals(tokenCsrf(), $recibido)
+        || !hash_equals($tokenActual, $recibido)
     ) {
-        http_response_code(419);
+        http_response_code(403);
 
         header('Content-Type: application/json; charset=utf-8');
+        header('Cache-Control: no-store, no-cache, must-revalidate, max-age=0');
 
         echo json_encode([
-            'status'  => 'error',
-            'message' => 'La sesión del formulario expiró. Recarga la página e intenta nuevamente.'
-        ]);
+            'status'     => 'error',
+            'code'       => 'csrf_expired',
+            'message'    => 'La sesión del formulario expiró.',
+            'csrf_token' => $tokenActual
+        ], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
 
         exit;
     }
