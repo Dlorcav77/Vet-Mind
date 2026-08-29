@@ -131,7 +131,6 @@ function aplicarCamposVisiblesFormulario(camposVisibles) {
     if (visible) {
       $item.stop(true, true).slideDown(150);
     } else {
-      limpiarCampoContenedor($item);
       $item.stop(true, true).slideUp(150);
     }
   });
@@ -152,7 +151,6 @@ function aplicarCamposVisiblesFormulario(camposVisibles) {
     if (visible) {
       $item.stop(true, true).show();
     } else {
-      limpiarCampoContenedor($item);
       $item.stop(true, true).hide();
     }
   });

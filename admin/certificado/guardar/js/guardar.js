@@ -847,17 +847,14 @@ $('#btnGuardarCertificado')
         Promise.resolve(prepararBorrador)
             .then(function () {
 
-                /*
-                 * Importante:
-                 * FormData se crea DESPUÉS de esperar
-                 * el borrador, para tomar el borrador_id
-                 * más reciente.
-                 */
-                let form =
-                    $('#formCertificado')[0];
+                let form = $('#formCertificado')[0];
 
-                let formData =
-                    new FormData(form);
+                let formData = new FormData(form);
+
+                formData.set(
+                    'configuracion_informe_id',
+                    configuracionInformeId
+                );
 
                 if (
                     $('#guardarMascota').is(':checked')
