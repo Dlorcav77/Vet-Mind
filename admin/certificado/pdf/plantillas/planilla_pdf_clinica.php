@@ -570,7 +570,7 @@ $filas_campos_clinica = agruparCamposPdfClinicaPorOrden($campos);
         }
 
         .descripcion {
-            font-size: 14px;
+            font-size: 13px;
             line-height: 1.22;
             color: #000000;
             margin-top: 12px;

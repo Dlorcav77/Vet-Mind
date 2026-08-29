@@ -517,12 +517,149 @@ const XxFaltanteMark = Node.create({
       return;
     }
 
-    if (!value || value === '13px') {
-      editor.chain().focus().unsetFontSize().run();
+    const { empty } = editor.state.selection;
+
+    /*
+    * Si existe una selección manual:
+    * se mantiene el comportamiento normal de Tiptap.
+    *
+    * Esto permite modificar incluso títulos si el usuario
+    * los seleccionó explícitamente.
+    */
+    if (!empty) {
+      if (!value || value === '13px') {
+        editor
+          .chain()
+          .focus()
+          .unsetFontSize()
+          .run();
+      } else {
+        editor
+          .chain()
+          .focus()
+          .setFontSize(value)
+          .run();
+      }
+
       return;
     }
 
-    editor.chain().focus().setFontSize(value).run();
+    /*
+    * Sin selección:
+    * aplicar el tamaño globalmente solo al contenido
+    * de párrafos.
+    *
+    * Los heading h1/h2/h3 quedan fuera.
+    */
+    const state = editor.state;
+    const textStyleType = state.schema.marks.textStyle;
+
+    if (!textStyleType) {
+      return;
+    }
+
+    const fontSize =
+      !value || value === '13px'
+        ? null
+        : value;
+
+    const tr = state.tr;
+
+    state.doc.descendants(function (
+      node,
+      pos,
+      parent
+    ) {
+      /*
+      * El texto normal del informe vive dentro
+      * de nodos paragraph.
+      *
+      * Los títulos viven dentro de heading,
+      * por lo que quedan excluidos.
+      */
+      if (
+        !node.isText ||
+        !parent ||
+        parent.type.name !== 'paragraph'
+      ) {
+        return;
+      }
+
+      const textStyleActual =
+        node.marks.find(function (mark) {
+          return mark.type === textStyleType;
+        }) || null;
+
+      const fontSizeActual =
+        textStyleActual
+          ? textStyleActual.attrs.fontSize || null
+          : null;
+
+      /*
+      * Si ya tiene el tamaño solicitado,
+      * no hacemos nada.
+      */
+      if (fontSizeActual === fontSize) {
+        return;
+      }
+
+      const from = pos;
+      const to = pos + node.nodeSize;
+
+      /*
+      * Quitamos únicamente el textStyle actual
+      * para poder reconstruirlo preservando
+      * atributos como color.
+      */
+      if (textStyleActual) {
+        tr.removeMark(
+          from,
+          to,
+          textStyleActual
+        );
+      }
+
+      const attrs = {
+        ...(textStyleActual
+          ? textStyleActual.attrs
+          : {}),
+        fontSize: fontSize
+      };
+
+      /*
+      * Si volvemos a 13px y había otros atributos
+      * de textStyle, por ejemplo color, los
+      * conservamos.
+      */
+      const tieneOtrosAtributos =
+        Object.entries(attrs).some(
+          function ([key, attrValue]) {
+            return (
+              key !== 'fontSize' &&
+              attrValue !== null &&
+              attrValue !== undefined &&
+              attrValue !== ''
+            );
+          }
+        );
+
+      if (
+        fontSize !== null ||
+        tieneOtrosAtributos
+      ) {
+        tr.addMark(
+          from,
+          to,
+          textStyleType.create(attrs)
+        );
+      }
+    });
+
+    if (tr.docChanged) {
+      editor.view.dispatch(tr);
+    }
+
+    editor.commands.focus();
   }
 
   function applyLineHeight(editor, value) {

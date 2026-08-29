@@ -128,8 +128,8 @@ function calcularEdadPdfClasico($fechaNacimientoValor) {
     <meta charset="utf-8">
     <style>
         body {
-            font-family: 'Times New Roman', Arial, sans-serif;
-            color: #333;
+            font-family: Calibri, Arial, Helvetica, sans-serif;
+            color: #111111;
             background: #fff;
             margin: 0;
             padding: 0;
@@ -193,6 +193,8 @@ function calcularEdadPdfClasico($fechaNacimientoValor) {
         }
 
         .descripcion {
+            font-size: 13px;
+            color: #000000;
             margin-top: 8px;
         }
 

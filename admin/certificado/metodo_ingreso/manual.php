@@ -33,10 +33,13 @@ $contenidoInforme = isset($fila['contenido_html']) ? (string)$fila['contenido_ht
                 >
                     <option value="10px">10</option>
                     <option value="11px">11</option>
+                    <option value="11.5px">11.5</option>
                     <option value="12px">12</option>
+                    <option value="12.5px">12.5</option>
                     <option value="13px" selected>13</option>
                     <option value="13.5px">13.5</option>
                     <option value="14px">14</option>
+                    <option value="14.5px">14.5</option>
                     <option value="16px">16</option>
                     <option value="18px">18</option>
                     <option value="20px">20</option>
