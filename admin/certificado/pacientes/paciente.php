@@ -35,7 +35,7 @@ if (!empty($fila['paciente_label'])) {
         (isset($fila['propietario']) ? ' - Tutor: ' . $fila['propietario'] : '');
 }
 ?>
-<link rel="stylesheet" href="certificado/pacientes/css/paciente.css?v=6">
+<link rel="stylesheet" href="certificado/pacientes/css/paciente.css?v=7">
 <div class="row g-2 mb-3">
     <div class="col-md-9">
         <span class="form-label fw-bold">Datos del Paciente</span>
@@ -104,4 +104,4 @@ window.MANUAL_DATA = <?php
     }
 ?>;
 </script>
-<script src="certificado/pacientes/js/paciente.js?v=16"></script>
+<script src="certificado/pacientes/js/paciente.js?v=17"></script>

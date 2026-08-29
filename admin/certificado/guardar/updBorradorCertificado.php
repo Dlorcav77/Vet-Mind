@@ -130,6 +130,7 @@ foreach ($_POST as $k => $v) {
 $payload = [
     'paciente_id' => (int)($_POST['paciente_id'] ?? 0),
     'paciente_label' => trim((string)($_POST['paciente_label'] ?? '')),
+    'tutor_existente_id' => (int)($_POST['tutor_existente_id'] ?? 0),
     'fecha_examen' => trim((string)($_POST['fecha_examen'] ?? '')),
     'motivo_examen' => trim((string)($_POST['motivo_examen'] ?? '')),
     'medico_solicitante' => trim((string)($_POST['medico_solicitante'] ?? '')),
@@ -147,7 +148,6 @@ $payload = [
     'es_destacado' => isset($_POST['es_destacado']) && (string)$_POST['es_destacado'] === '1' ? 1 : 0,
     'destacado_titulo' => trim((string)($_POST['destacado_titulo'] ?? ''))
 ];
-
 $payloadJson = json_encode($payload, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
 
 if ($payloadJson === false) {

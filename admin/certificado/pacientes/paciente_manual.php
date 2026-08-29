@@ -10,6 +10,7 @@
 
 // admin/certificado/pacientes/paciente_manual.php
 $manualDataInicial = $manualDataInicial ?? [];
+$tutorExistenteIdInicial = (int)($fila['tutor_existente_id'] ?? 0);
 
 function manual_value(array $data, string $key): string {
     return htmlspecialchars((string)($data[$key] ?? ''), ENT_QUOTES, 'UTF-8');
@@ -239,7 +240,7 @@ foreach ($camposCatalogo as $campoCat) {
                     </div>
 
                     <?php elseif ($campoInterno === 'propietario'): ?>
-                    <div class="manual-propietario-wrap position-relative">
+                    <div class="manual-propietario-wrap position-relative<?= $tutorExistenteIdInicial > 0 ? ' manual-tutor-seleccionado' : '' ?>">
                         <input
                             type="text"
                             class="form-control campo-requerido-manual"
@@ -255,7 +256,7 @@ foreach ($camposCatalogo as $campoCat) {
                             type="hidden"
                             name="tutor_existente_id"
                             id="tutor_existente_id"
-                            value=""
+                            value="<?= $tutorExistenteIdInicial > 0 ? $tutorExistenteIdInicial : '' ?>"
                         >
 
                         <div

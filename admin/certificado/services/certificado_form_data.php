@@ -11,6 +11,7 @@ if (!function_exists('certificado_get_form_data')) {
         $fila = [
             'paciente_id'               => '',
             'paciente_label'            => '',
+            'tutor_existente_id'        => 0,
             'tipo_estudio'              => '',
             'fecha_examen'              => date('Y-m-d'),
             'contenido_html'            => '',
@@ -177,6 +178,41 @@ if (!function_exists('certificado_get_form_data')) {
                             $payload['manual_data'],
                             JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES
                         );
+                    }
+
+                    if (array_key_exists('tutor_existente_id', $payload)) {
+                        $tutorExistenteIdDraft = (int)$payload['tutor_existente_id'];
+
+                        if ($tutorExistenteIdDraft > 0) {
+                            $stmtTutorDraft = $mysqli->prepare("
+                                SELECT id
+                                FROM tutores
+                                WHERE id = ?
+                                AND veterinario_id = ?
+                                LIMIT 1
+                            ");
+
+                            if ($stmtTutorDraft) {
+                                $stmtTutorDraft->bind_param(
+                                    "ii",
+                                    $tutorExistenteIdDraft,
+                                    $usuario_id
+                                );
+
+                                if ($stmtTutorDraft->execute()) {
+                                    $tutorDraft = $stmtTutorDraft
+                                        ->get_result()
+                                        ->fetch_assoc();
+
+                                    if ($tutorDraft) {
+                                        $fila['tutor_existente_id'] =
+                                            (int)$tutorDraft['id'];
+                                    }
+                                }
+
+                                $stmtTutorDraft->close();
+                            }
+                        }
                     }
 
                     if (array_key_exists('rid_ia', $payload)) {

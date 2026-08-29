@@ -771,6 +771,28 @@ if (
   window.CERT_PACIENTE_MANUAL_STATE.tutorSeleccionadoId = 0;
 }
 
+(function restaurarTutorExistenteManual() {
+  const $input = getManualPropietarioInput();
+
+  if (!$input.length) {
+    return;
+  }
+
+  const $wrap = $input.closest('.manual-propietario-wrap');
+  const tutorId = parseInt(
+    $wrap.find('[id="tutor_existente_id"]').first().val(),
+    10
+  ) || 0;
+
+  if (tutorId <= 0) {
+    return;
+  }
+
+  window.CERT_PACIENTE_MANUAL_STATE.tutorSeleccionadoId = tutorId;
+
+  $wrap.addClass('manual-tutor-seleccionado');
+})();
+
 if (
   typeof window.CERT_PACIENTE_MANUAL_STATE.codigoRequest === 'undefined'
 ) {

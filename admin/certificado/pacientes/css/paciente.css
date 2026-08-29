@@ -232,12 +232,24 @@
     white-space: nowrap;
 }
 
-.manual-tutor-seleccionado {
+.manual-propietario-wrap.manual-tutor-seleccionado #manual_propietario {
+    background: rgba(23, 162, 184, 0.08);
     border-color: #17a2b8;
+    padding-right: 38px;
+    box-shadow: 0 0 0 0.12rem rgba(23, 162, 184, 0.08);
 }
 
-.manual-tutor-seleccionado .manual-tutor-info {
-    background: rgba(23, 162, 184, 0.06);
+.manual-propietario-wrap.manual-tutor-seleccionado::after {
+    content: '✓';
+    position: absolute;
+    top: 50%;
+    right: 13px;
+    transform: translateY(-50%);
+    color: #17a2b8;
+    font-size: 17px;
+    font-weight: 700;
+    line-height: 1;
+    pointer-events: none;
 }
 
 .manual-tutor-resultados::-webkit-scrollbar {
