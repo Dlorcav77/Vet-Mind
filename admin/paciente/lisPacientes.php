@@ -100,6 +100,44 @@ function calcular_edad($fecha_nacimiento) {
 }
 ?>
 <script>
+  $(document)
+  .off('submit.vetmindPaciente', '#formPaciente')
+  .on('submit.vetmindPaciente', '#formPaciente', function(e) {
+    e.preventDefault();
+
+    const $form = $(this);
+    const tutorId = $form.find('[name="tutor_id"]').val();
+
+    $.ajax({
+      url: $form.attr('action'),
+      type: 'POST',
+      data: $form.serialize(),
+      success: function(response) {
+        let json;
+
+        try {
+          json = JSON.parse(response);
+        } catch (e) {
+          Swal.fire('Error', 'Respuesta inválida del servidor.', 'error');
+          return;
+        }
+
+        if (json.status === 'success') {
+          Swal.fire('¡Éxito!', json.message, 'success').then(() => {
+            $('#modalPacientes .modal-body').load(
+              'paciente/lisPacientes.php?tutor_id=' + tutorId
+            );
+          });
+        } else {
+          Swal.fire('Error', json.message || 'No se pudo guardar la mascota.', 'error');
+        }
+      },
+      error: function() {
+        Swal.fire('Error', 'Hubo un problema al guardar la mascota.', 'error');
+      }
+    });
+  });
+  
 function agregarPaciente(tutorId) {
   $.ajax({
     url: 'paciente/pacientes.php',

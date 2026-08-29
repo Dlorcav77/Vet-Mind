@@ -73,27 +73,22 @@ $res = $stmt->get_result();
                   $estado          = $fila['estado'];
 
 
-                  if ($fecha_actual >= $fecha_inicio && (is_null($fecha_termino) || $fecha_actual <= $fecha_termino)) {
-                    // $estado = "Activo";
-                  } else {
-                    $upd = "UPDATE usuarios_perfiles SET estado = 'inactivo' WHERE id = ?";
-                    $stmtU = $mysqli->prepare($upd);
-                    $stmtU->bind_param('i', $id);
-                    $stmtU->execute();
-                    $stmtU->close();
+                  $estadoMostrado = $estado;
+
+                  if ($fecha_actual < $fecha_inicio || (!is_null($fecha_termino) && $fecha_actual > $fecha_termino)) {
+                      $estadoMostrado = 'inactivo';
                   }
 
                 ?>
                   <tr>
-                    <td><?php print "$i"?></td>
-                    <td><?php print "$rut"?></td>
-                    <td><?php print "$email"?></td>
-                    <td><?php print "$nombres"?></td>
-                    <td><?php print "$apellidos"?></td>
-                    <td><?php echo   $perfil_nombre; ?></td>
-                    <td><?php print "$fecha_inicio"?></td>
-                    <td><?php print "$fecha_termino"?></td>
-                    <td><?php print "$estado"?></td>
+                    <td><?= htmlspecialchars((string)$rut, ENT_QUOTES, 'UTF-8'); ?></td>
+                    <td><?= htmlspecialchars((string)$email, ENT_QUOTES, 'UTF-8'); ?></td>
+                    <td><?= htmlspecialchars((string)$nombres, ENT_QUOTES, 'UTF-8'); ?></td>
+                    <td><?= htmlspecialchars((string)$apellidos, ENT_QUOTES, 'UTF-8'); ?></td>
+                    <td><?= htmlspecialchars((string)$perfil_nombre, ENT_QUOTES, 'UTF-8'); ?></td>
+                    <td><?= htmlspecialchars((string)$fecha_inicio, ENT_QUOTES, 'UTF-8'); ?></td>
+                    <td><?= htmlspecialchars((string)$fecha_termino, ENT_QUOTES, 'UTF-8'); ?></td>
+                    <td><?= htmlspecialchars($estadoMostrado, ENT_QUOTES, 'UTF-8'); ?></td>
                     <td align='center'>
                       <div class="dropdown position-relative">
                         <button

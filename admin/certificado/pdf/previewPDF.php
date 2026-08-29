@@ -233,7 +233,7 @@ try {
     $pdf->setPaper('A4', 'portrait');
     $pdf->render();
 
-    $tmpFile = $previewDir . uniqid('preview_', true) . '.pdf';
+    $tmpFile = $previewDir . 'preview_' . $veterinario . '_' . bin2hex(random_bytes(12)) . '.pdf';
     file_put_contents($tmpFile, $pdf->output());
 
     $pdfUrl = '/uploads/tmp/informe/' . basename($tmpFile);

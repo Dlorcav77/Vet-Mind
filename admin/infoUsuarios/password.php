@@ -58,7 +58,7 @@ $(document).ready(function() {
         console.log(response);
         let jsonResponse = JSON.parse(response);
         if (jsonResponse.status === 'success') {
-          $('#content').load('noticias/noticiasInicio.php');
+          $('#content').load('inicio/inicio.php');
           Swal.fire({
             icon: 'success',
             title: '¡Éxito!',

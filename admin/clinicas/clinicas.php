@@ -44,7 +44,7 @@ if ($action === "modificar") {
             <div class="col-md-6 mb-2">
               <label for="correo" class="form-label">Correo</label>
               <input type="email" class="form-control" id="correo" name="correo"
-                     maxlength="150" value="<?php echo htmlspecialchars($fila['correo'] ?? '', ENT_QUOTES, 'UTF-8'); ?>" required>
+                     maxlength="150" value="<?php echo htmlspecialchars($fila['correo'] ?? '', ENT_QUOTES, 'UTF-8'); ?>">
             </div>
 
             <div class="col-md-6 mb-2">

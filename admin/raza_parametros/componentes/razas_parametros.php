@@ -201,11 +201,11 @@ $(function () {
 
   function updateTamanoColumn(espId) {
     if (!dt) return;
-    const show = shouldShowTamanoColumn(espId);
-    dt.column(2).visible(show);     // 2 = columna "Tamaño"
-    dt.columns().adjust().responsive.recalc();
-  }
 
+    const show = shouldShowTamanoColumn(espId);
+    dt.column(2).visible(show);
+    dt.columns.adjust().responsive.recalc();
+  }
 
   // ---------- INIT ----------
   const inicial = $filtro.val() || '';

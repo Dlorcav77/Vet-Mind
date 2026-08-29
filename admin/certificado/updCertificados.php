@@ -14,6 +14,99 @@ header('Content-Type: application/json; charset=utf-8');
 $pdfDir = "../../uploads/certificados/informes/";
 $mysqli = conn();
 
+if (!$mysqli) {
+    echo json_encode([
+        'status' => 'error',
+        'message' => 'No se pudo conectar a la base de datos.'
+    ], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+    exit;
+}
+
+if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
+    http_response_code(405);
+    echo json_encode([
+        'status' => 'error',
+        'message' => 'Método no permitido.'
+    ], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+    exit;
+}
+
+validarTokenCsrf();
+
+$action = trim((string)($_POST['action'] ?? ''));
+$id = (int)($_POST['id'] ?? 0);
+$veterinario = (int)($_SESSION['usuario_id'] ?? 0);
+
+if ($veterinario <= 0) {
+    http_response_code(401);
+    echo json_encode([
+        'status' => 'error',
+        'message' => 'Sesión inválida.'
+    ], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+    exit;
+}
+
+if (!in_array($action, ['ingresar', 'modificar', 'eliminar'], true)) {
+    echo json_encode([
+        'status' => 'error',
+        'message' => 'Acción no válida.'
+    ], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+    exit;
+}
+
+switch ($action) {
+    case 'ingresar':
+        credenciales('certificado', 'ingresar');
+        break;
+    case 'modificar':
+        credenciales('certificado', 'modificar');
+        break;
+    case 'eliminar':
+        credenciales('certificado', 'eliminar');
+        break;
+}
+
+if ($action === 'modificar' || $action === 'eliminar') {
+    if ($id <= 0) {
+        echo json_encode([
+            'status' => 'error',
+            'message' => 'Certificado inválido.'
+        ], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+        exit;
+    }
+
+    $stmtOwner = $mysqli->prepare(
+        "SELECT id
+         FROM certificados
+         WHERE id = ?
+           AND veterinario_id = ?
+         LIMIT 1"
+    );
+
+    if (!$stmtOwner) {
+        error_log('[updCertificados][ownership] ' . $mysqli->error);
+        echo json_encode([
+            'status' => 'error',
+            'message' => 'No se pudo validar el certificado.'
+        ], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+        exit;
+    }
+
+    $stmtOwner->bind_param('ii', $id, $veterinario);
+    $stmtOwner->execute();
+    $resOwner = $stmtOwner->get_result();
+    $stmtOwner->close();
+
+    if ($resOwner->num_rows === 0) {
+        http_response_code(403);
+        echo json_encode([
+            'status' => 'error',
+            'message' => 'Certificado no encontrado o sin permisos.'
+        ], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+        exit;
+    }
+}
+
 $transaccionActiva = false;
 
 function rollbackCertificadoSiActivo($mysqli, &$transaccionActiva)
@@ -172,6 +265,17 @@ function eliminarImagenCertificadoFisica($ruta)
     }
 
     return @unlink($archivo);
+}
+
+function limpiarArchivosNuevosCertificado(array $imagenesNuevas, ?string $pdfFisico = null): void
+{
+    foreach ($imagenesNuevas as $imagen) {
+        eliminarImagenCertificadoFisica($imagen);
+    }
+
+    if ($pdfFisico !== null && is_file($pdfFisico)) {
+        @unlink($pdfFisico);
+    }
 }
 
 function normalizarRutaAudioTmpCertificado($ruta, $veterinario)
@@ -401,103 +505,356 @@ function moverAudioTemporalCertificado($rutaAudioTmp, $veterinario, $certId)
     ];
 }
 
-if (!$mysqli) {
-    echo json_encode([
-        'status' => 'error',
-        'message' => 'No se pudo conectar a la base de datos.'
-    ], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
-    exit;
-}
 
-if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'eliminar') {
-    $id = intval($_POST['id'] ?? 0);
-    $usuario_id = intval($_SESSION['usuario_id'] ?? 0);
+if ($action === 'eliminar') {
+    /*
+     * Primero obtenemos las rutas de los archivos,
+     * pero todavía NO eliminamos nada físicamente.
+     */
+    $sel = $mysqli->prepare(
+        "SELECT archivo_pdf, imagenes_json
+         FROM certificados
+         WHERE id = ?
+           AND veterinario_id = ?
+         LIMIT 1"
+    );
 
-    $sel = $mysqli->prepare("SELECT archivo_pdf, imagenes_json FROM certificados WHERE id = ? AND veterinario_id = ?");
     if (!$sel) {
+        error_log(
+            '[updCertificados][eliminar][select_prepare] ' .
+            $mysqli->error
+        );
+
         echo json_encode([
             'status' => 'error',
-            'message' => 'Error preparando eliminación.',
-            'mysql_error' => $mysqli->error
+            'message' => 'Error preparando eliminación.'
         ], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
         exit;
     }
 
-    $sel->bind_param("ii", $id, $usuario_id);
-    $sel->execute();
-    $res = $sel->get_result();
-    $cert = $res->fetch_assoc();
+    $sel->bind_param(
+        'ii',
+        $id,
+        $veterinario
+    );
 
-    if ($cert) {
-        if (!empty($cert['archivo_pdf'])) {
-            $pdfPath = realpath("../../" . $cert['archivo_pdf']);
-            if ($pdfPath && file_exists($pdfPath)) {
-                @unlink($pdfPath);
-            }
-        }
+    if (!$sel->execute()) {
+        error_log(
+            '[updCertificados][eliminar][select_execute] ' .
+            $sel->error
+        );
 
-        if (!empty($cert['imagenes_json'])) {
-            $imagenes = json_decode($cert['imagenes_json'], true);
-            if (is_array($imagenes)) {
-                foreach ($imagenes as $img) {
-                    $imgPath = realpath("../../" . $img);
-                    if ($imgPath && file_exists($imgPath)) {
-                        @unlink($imgPath);
-                    }
-                }
-            }
-        }
+        $sel->close();
 
-        eliminarAudiosCertificadoFisicos($usuario_id, $id);
+        echo json_encode([
+            'status' => 'error',
+            'message' => 'No se pudo preparar la eliminación.'
+        ], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+        exit;
+    }
 
-        $del = $mysqli->prepare("DELETE FROM certificados WHERE id = ? AND veterinario_id = ?");
-        if (!$del) {
-            echo json_encode([
-                'status' => 'error',
-                'message' => 'Error preparando borrado.',
-                'mysql_error' => $mysqli->error
-            ], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
-            exit;
-        }
+    $cert = $sel
+        ->get_result()
+        ->fetch_assoc();
 
-        $del->bind_param("ii", $id, $usuario_id);
+    $sel->close();
 
-        if ($del->execute()) {
-            echo json_encode([
-                'status' => 'success',
-                'message' => 'Certificado eliminado correctamente.'
-            ], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
-        } else {
-            echo json_encode([
-                'status' => 'error',
-                'message' => 'No se pudo eliminar el certificado (DB).',
-                'mysql_error' => $del->error
-            ], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
-        }
-    } else {
+    if (!$cert) {
         echo json_encode([
             'status' => 'error',
             'message' => 'Certificado no encontrado o sin permisos.'
         ], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+        exit;
     }
+
+    /*
+     * Primero eliminamos el registro de BD.
+     * Si esto falla, conservamos todos los archivos.
+     */
+    $del = $mysqli->prepare(
+        "DELETE FROM certificados
+         WHERE id = ?
+           AND veterinario_id = ?"
+    );
+
+    if (!$del) {
+        error_log(
+            '[updCertificados][eliminar][delete_prepare] ' .
+            $mysqli->error
+        );
+
+        echo json_encode([
+            'status' => 'error',
+            'message' => 'Error preparando borrado.'
+        ], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+        exit;
+    }
+
+    $del->bind_param(
+        'ii',
+        $id,
+        $veterinario
+    );
+
+    if (!$del->execute()) {
+        error_log(
+            '[updCertificados][eliminar][delete_execute] ' .
+            $del->error
+        );
+
+        $del->close();
+
+        echo json_encode([
+            'status' => 'error',
+            'message' => 'No se pudo eliminar el certificado.'
+        ], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+        exit;
+    }
+
+    if ($del->affected_rows === 0) {
+        $del->close();
+
+        echo json_encode([
+            'status' => 'error',
+            'message' => 'Certificado no encontrado o sin permisos.'
+        ], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+        exit;
+    }
+
+    $del->close();
+
+    /*
+     * La BD ya confirmó la eliminación.
+     * Recién ahora limpiamos los archivos físicos.
+     */
+
+    if (!empty($cert['archivo_pdf'])) {
+        $basePdf = realpath($pdfDir);
+
+        $pdfPath = realpath(
+            "../../" . ltrim((string)$cert['archivo_pdf'], '/')
+        );
+
+        if (
+            $basePdf !== false &&
+            $pdfPath !== false &&
+            is_file($pdfPath) &&
+            strpos(
+                $pdfPath,
+                $basePdf . DIRECTORY_SEPARATOR
+            ) === 0
+        ) {
+            if (!@unlink($pdfPath)) {
+                error_log(
+                    '[updCertificados][eliminar][pdf] No se pudo eliminar: ' .
+                    $pdfPath
+                );
+            }
+        }
+    }
+
+    if (!empty($cert['imagenes_json'])) {
+        $imagenesEliminar = json_decode(
+            $cert['imagenes_json'],
+            true
+        );
+
+        if (is_array($imagenesEliminar)) {
+            foreach ($imagenesEliminar as $img) {
+                eliminarImagenCertificadoFisica($img);
+            }
+        }
+    }
+
+    $resultadoAudios = eliminarAudiosCertificadoFisicos(
+        $veterinario,
+        $id
+    );
+
+    if (($resultadoAudios['errores'] ?? 0) > 0) {
+        error_log(
+            '[updCertificados][eliminar][audio] ' .
+            'No se pudieron eliminar todos los audios del certificado ID ' .
+            $id
+        );
+    }
+
+    echo json_encode([
+        'status' => 'success',
+        'message' => 'Certificado eliminado correctamente.'
+    ], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
 
     exit;
 }
 
-$action                  = $_POST['action'] ?? '';
-$id                      = intval($_POST['id'] ?? 0);
-$veterinario             = intval($_SESSION['usuario_id'] ?? 0);
 $paciente_id             = intval($_POST['paciente_id'] ?? 0);
-$fecha_examen            = $_POST['fecha_examen'] ?? date('Y-m-d');
+$fecha_examen            = trim((string)($_POST['fecha_examen'] ?? date('Y-m-d')));
 $descripcion             = trim($_POST['contenido_html'] ?? '');
 $medico_solicitante      = trim($_POST['medico_solicitante'] ?? '');
 $motivo                  = trim($_POST['motivo_examen'] ?? '');
 $plantilla_informe_id    = intval($_POST['plantilla_informe_id'] ?? 0);
 $configuracion_informe_id = intval($_POST['configuracion_informe_id'] ?? 0);
 $modo_manual             = isset($_POST['toggle_manual']) && $_POST['toggle_manual'] == '1';
-$borrador_id             = (int)($_POST['borrador_id'] ?? 0);
-$borrador_scope_key      = trim((string)($_POST['borrador_scope_key'] ?? (($action === 'modificar' && $id > 0) ? 'modificar:' . $id : 'nuevo')));
-$audio_tmp               = trim((string)($_POST['audio_tmp'] ?? ''));
+$borrador_id = (int)($_POST['borrador_id'] ?? 0);
+
+$borrador_scope_key = (
+    $action === 'modificar' && $id > 0
+)
+    ? 'modificar:' . $id
+    : 'nuevo';
+
+$audio_tmp = trim((string)($_POST['audio_tmp'] ?? ''));
+
+$fechaExamenDt = DateTime::createFromFormat(
+    'Y-m-d',
+    $fecha_examen
+);
+
+if (
+    !$fechaExamenDt ||
+    $fechaExamenDt->format('Y-m-d') !== $fecha_examen
+) {
+    echo json_encode([
+        'status' => 'error',
+        'message' => 'La fecha del examen no es válida.'
+    ], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+    exit;
+}
+
+validar_length(
+    "Médico solicitante",
+    $medico_solicitante,
+    255,
+    true
+);
+
+validar_length(
+    "Motivo",
+    $motivo,
+    255,
+    true
+);
+
+
+if (!$modo_manual) {
+    if ($paciente_id <= 0) {
+        echo json_encode([
+            'status' => 'error',
+            'message' => 'Debes seleccionar un paciente válido.'
+        ], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+        exit;
+    }
+
+    $stmtPaciente = $mysqli->prepare(
+        "SELECT id
+         FROM pacientes
+         WHERE id = ?
+           AND veterinario_id = ?
+         LIMIT 1"
+    );
+
+    if (!$stmtPaciente) {
+        error_log('[updCertificados][paciente] ' . $mysqli->error);
+
+        echo json_encode([
+            'status' => 'error',
+            'message' => 'No se pudo validar el paciente.'
+        ], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+        exit;
+    }
+
+    $stmtPaciente->bind_param('ii', $paciente_id, $veterinario);
+    $stmtPaciente->execute();
+    $resPaciente = $stmtPaciente->get_result();
+    $stmtPaciente->close();
+
+    if ($resPaciente->num_rows === 0) {
+        echo json_encode([
+            'status' => 'error',
+            'message' => 'El paciente no existe o no pertenece al veterinario actual.'
+        ], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+        exit;
+    }
+}
+
+if ($plantilla_informe_id <= 0) {
+    echo json_encode([
+        'status' => 'error',
+        'message' => 'Debes seleccionar un tipo de examen válido.'
+    ], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+    exit;
+}
+
+$stmtPlantilla = $mysqli->prepare(
+    "SELECT id
+     FROM plantilla_informe
+     WHERE id = ?
+       AND veterinario_id = ?
+       AND deleted_at IS NULL
+     LIMIT 1"
+);
+
+if (!$stmtPlantilla) {
+    error_log('[updCertificados][plantilla] ' . $mysqli->error);
+
+    echo json_encode([
+        'status' => 'error',
+        'message' => 'No se pudo validar el tipo de examen.'
+    ], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+    exit;
+}
+
+$stmtPlantilla->bind_param('ii', $plantilla_informe_id, $veterinario);
+$stmtPlantilla->execute();
+$resPlantilla = $stmtPlantilla->get_result();
+$stmtPlantilla->close();
+
+if ($resPlantilla->num_rows === 0) {
+    echo json_encode([
+        'status' => 'error',
+        'message' => 'El tipo de examen no existe o no pertenece al veterinario actual.'
+    ], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+    exit;
+}
+
+if ($configuracion_informe_id <= 0) {
+    echo json_encode([
+        'status' => 'error',
+        'message' => 'Debes seleccionar una plantilla de diseño válida.'
+    ], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+    exit;
+}
+
+$stmtConfiguracion = $mysqli->prepare(
+    "SELECT id
+     FROM configuracion_informes
+     WHERE id = ?
+       AND veterinario_id = ?
+     LIMIT 1"
+);
+
+if (!$stmtConfiguracion) {
+    error_log('[updCertificados][configuracion] ' . $mysqli->error);
+
+    echo json_encode([
+        'status' => 'error',
+        'message' => 'No se pudo validar la plantilla de diseño.'
+    ], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+    exit;
+}
+
+$stmtConfiguracion->bind_param('ii', $configuracion_informe_id, $veterinario);
+$stmtConfiguracion->execute();
+$resConfiguracion = $stmtConfiguracion->get_result();
+$stmtConfiguracion->close();
+
+if ($resConfiguracion->num_rows === 0) {
+    echo json_encode([
+        'status' => 'error',
+        'message' => 'La plantilla de diseño no existe o no pertenece al veterinario actual.'
+    ], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+    exit;
+}
 
 $es_destacado = (
     isset($_POST['es_destacado']) &&
@@ -508,6 +865,10 @@ $destacado_titulo = trim((string)($_POST['destacado_titulo'] ?? ''));
 
 if ($es_destacado !== 1 || $destacado_titulo === '') {
     $destacado_titulo = null;
+}
+
+if ($destacado_titulo !== null) {
+    validar_length("Título destacado", $destacado_titulo, 255, true);
 }
 
 $recinto                 = trim($_POST['recinto'] ?? '');
@@ -531,34 +892,12 @@ if ($recinto === '' && $configuracion_informe_id > 0) {
     }
 }
 
-if ($veterinario <= 0) {
-    echo json_encode([
-        'status' => 'error',
-        'message' => 'Sesión inválida o veterinario no recibido.'
-    ], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
-    exit;
-}
+validar_length("Recinto", $recinto, 255, true);
 
 if ($descripcion === '') {
     echo json_encode([
         'status' => 'error',
         'message' => 'Faltan datos obligatorios.'
-    ], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
-    exit;
-}
-
-if ($configuracion_informe_id <= 0) {
-    echo json_encode([
-        'status' => 'error',
-        'message' => 'Debes seleccionar una plantilla de diseño.'
-    ], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
-    exit;
-}
-
-if ($plantilla_informe_id <= 0) {
-    echo json_encode([
-        'status' => 'error',
-        'message' => 'Debes seleccionar un tipo de examen.'
     ], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
     exit;
 }
@@ -596,6 +935,14 @@ if ($modo_manual) {
         ], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
         exit;
     }
+
+    validar_length("Propietario", $manualPropietario, 150);
+    validar_length("Paciente", $manualPaciente, 100);
+    validar_length("Código paciente", $manual['codigo_paciente'] ?? '', 30, true);
+    validar_length("Chip", $manual['n_chip'] ?? '', 30, true);
+    validar_length("Especie", $manual['especie'] ?? '', 20, true);
+    validar_length("Raza", $manual['raza'] ?? '', 100, true);
+    validar_length("Sexo", $manual['sexo'] ?? '', 20, true);
 }
 
 $prev_manual_data = null;
@@ -617,10 +964,14 @@ $manual_data = !empty($manual_extra_data)
 
 if ($modo_manual && $guardarMascota && !empty($manual)) {
     if (!$mysqli->begin_transaction()) {
+        error_log(
+            '[updCertificados][transaccion][begin] ' .
+            $mysqli->error
+        );
+
         echo json_encode([
             'status' => 'error',
-            'message' => 'No se pudo iniciar la transacción de guardado.',
-            'mysql_error' => $mysqli->error
+            'message' => 'No se pudo iniciar la transacción de guardado.'
         ], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
         exit;
     }
@@ -656,10 +1007,14 @@ if ($modo_manual && $guardarMascota && !empty($manual)) {
                 $transaccionActiva
             );
 
+            error_log(
+                '[updCertificados][tutor_existente][prepare] ' .
+                $mysqli->error
+            );
+
             echo json_encode([
                 'status' => 'error',
-                'message' => 'Error preparando validación del tutor seleccionado.',
-                'mysql_error' => $mysqli->error
+                'message' => 'Error preparando validación del tutor seleccionado.'
             ], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
             exit;
         }
@@ -676,10 +1031,14 @@ if ($modo_manual && $guardarMascota && !empty($manual)) {
                 $transaccionActiva
             );
 
+            error_log(
+                '[updCertificados][tutor_existente][execute] ' .
+                $stmtTutorExistente->error
+            );
+
             echo json_encode([
                 'status' => 'error',
-                'message' => 'No se pudo validar el tutor seleccionado.',
-                'mysql_error' => $stmtTutorExistente->error
+                'message' => 'No se pudo validar el tutor seleccionado.'
             ], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
             exit;
         }
@@ -728,10 +1087,14 @@ if ($modo_manual && $guardarMascota && !empty($manual)) {
                 $transaccionActiva
             );
 
+            error_log(
+                '[updCertificados][tutor_nuevo][prepare] ' .
+                $mysqli->error
+            );
+
             echo json_encode([
                 'status' => 'error',
-                'message' => 'Error preparando creación de tutor.',
-                'mysql_error' => $mysqli->error
+                'message' => 'Error preparando creación de tutor.'
             ], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
             exit;
         }
@@ -748,10 +1111,14 @@ if ($modo_manual && $guardarMascota && !empty($manual)) {
                 $transaccionActiva
             );
 
+            error_log(
+                '[updCertificados][tutor_nuevo][execute] ' .
+                $stmtTutorNuevo->error
+            );
+
             echo json_encode([
                 'status' => 'error',
-                'message' => 'No se pudo crear el tutor.',
-                'mysql_error' => $stmtTutorNuevo->error
+                'message' => 'No se pudo crear el tutor.'
             ], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
             exit;
         }
@@ -822,10 +1189,14 @@ if ($modo_manual && $guardarMascota && !empty($manual)) {
             $transaccionActiva
         );
 
+        error_log(
+            '[updCertificados][paciente_nuevo][prepare] ' .
+            $mysqli->error
+        );
+
         echo json_encode([
             'status' => 'error',
-            'message' => 'Error preparando creación de paciente.',
-            'mysql_error' => $mysqli->error
+            'message' => 'Error preparando creación de paciente.'
         ], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
         exit;
     }
@@ -849,10 +1220,14 @@ if ($modo_manual && $guardarMascota && !empty($manual)) {
             $transaccionActiva
         );
 
+        error_log(
+            '[updCertificados][paciente_nuevo][execute] ' .
+            $stmt->error
+        );
+
         echo json_encode([
             'status' => 'error',
-            'message' => 'No se pudo crear el paciente.',
-            'mysql_error' => $stmt->error
+            'message' => 'No se pudo crear el paciente.'
         ], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
         exit;
     }
@@ -892,36 +1267,268 @@ if ($modo_manual && $guardarMascota && !empty($manual)) {
     );
 }
 
+$imagenesNuevas = [];
 $imagenes = [];
 
-if (!empty($_POST['imagenes_antiguas'])) {
-    $imgsAntiguas = json_decode($_POST['imagenes_antiguas'], true);
+if (
+    $action === 'modificar' &&
+    $id > 0 &&
+    !empty($_POST['imagenes_antiguas'])
+) {
+    $imgsSolicitadas = json_decode(
+        (string)$_POST['imagenes_antiguas'],
+        true
+    );
 
-    if (is_array($imgsAntiguas)) {
-        $imagenes = normalizarListaImagenesCertificado($imgsAntiguas);
+    if (is_array($imgsSolicitadas)) {
+        $imgsSolicitadas = normalizarListaImagenesCertificado(
+            $imgsSolicitadas
+        );
+
+        $stmtImgs = $mysqli->prepare(
+            "SELECT imagenes_json
+             FROM certificados
+             WHERE id = ?
+               AND veterinario_id = ?
+             LIMIT 1"
+        );
+
+        if (!$stmtImgs) {
+            error_log(
+                '[updCertificados][imagenes_antiguas] ' .
+                $mysqli->error
+            );
+
+            echo json_encode([
+                'status' => 'error',
+                'message' => 'No se pudieron validar las imágenes existentes.'
+            ], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+            exit;
+        }
+
+        $stmtImgs->bind_param(
+            'ii',
+            $id,
+            $veterinario
+        );
+
+        $stmtImgs->execute();
+
+        $rowImgs = $stmtImgs
+            ->get_result()
+            ->fetch_assoc();
+
+        $stmtImgs->close();
+
+        $imgsGuardadas = [];
+
+        if (
+            is_array($rowImgs) &&
+            !empty($rowImgs['imagenes_json'])
+        ) {
+            $imgsGuardadasRaw = json_decode(
+                $rowImgs['imagenes_json'],
+                true
+            );
+
+            if (is_array($imgsGuardadasRaw)) {
+                $imgsGuardadas = normalizarListaImagenesCertificado(
+                    $imgsGuardadasRaw
+                );
+            }
+        }
+
+        $imagenes = array_values(
+            array_intersect(
+                $imgsSolicitadas,
+                $imgsGuardadas
+            )
+        );
     }
 }
 
-if (!empty($_FILES['imagenes']['name'][0])) {
+if (
+    isset($_FILES['imagenes']) &&
+    isset($_FILES['imagenes']['name']) &&
+    is_array($_FILES['imagenes']['name']) &&
+    !empty($_FILES['imagenes']['name'][0])
+) {
     $imgDir = "../../uploads/certificados/img/";
 
     if (!is_dir($imgDir)) {
-        mkdir($imgDir, 0777, true);
+        if (!mkdir($imgDir, 0775, true) && !is_dir($imgDir)) {
+            rollbackCertificadoSiActivo(
+                $mysqli,
+                $transaccionActiva
+            );
+
+            error_log(
+                '[updCertificados][imagenes] No se pudo crear el directorio: ' .
+                $imgDir
+            );
+
+            echo json_encode([
+                'status' => 'error',
+                'message' => 'No se pudo preparar el directorio de imágenes.'
+            ], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+            exit;
+        }
     }
 
+    $maxBytesImagen = 20 * 1024 * 1024; // 20 MB
+    $maxPixelesImagen = 25000000;       // 25 megapíxeles
+
     foreach ($_FILES['imagenes']['tmp_name'] as $key => $tmpName) {
-        if (!empty($tmpName) && is_uploaded_file($tmpName)) {
-            $nombreArchivo = "img_{$veterinario}_" . uniqid() . basename($_FILES['imagenes']['name'][$key]);
-            $rutaDestino = $imgDir . $nombreArchivo;
+        $uploadError = (int)($_FILES['imagenes']['error'][$key] ?? UPLOAD_ERR_NO_FILE);
 
-            if (move_uploaded_file($tmpName, $rutaDestino)) {
-                $rutaFinal = comprimirImagenCertificado($rutaDestino);
-                $rutaImagenNueva = normalizarRutaImagenCertificado("uploads/certificados/img/" . basename($rutaFinal));
+        if ($uploadError === UPLOAD_ERR_NO_FILE) {
+            continue;
+        }
 
-                if ($rutaImagenNueva !== null) {
-                    $imagenes[] = $rutaImagenNueva;
-                }
-            }
+        if ($uploadError !== UPLOAD_ERR_OK) {
+            rollbackCertificadoSiActivo(
+                $mysqli,
+                $transaccionActiva
+            );
+
+            echo json_encode([
+                'status' => 'error',
+                'message' => 'Una de las imágenes no pudo ser subida correctamente.'
+            ], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+            exit;
+        }
+
+        if (
+            empty($tmpName) ||
+            !is_uploaded_file($tmpName)
+        ) {
+            rollbackCertificadoSiActivo(
+                $mysqli,
+                $transaccionActiva
+            );
+
+            echo json_encode([
+                'status' => 'error',
+                'message' => 'Se recibió una imagen inválida.'
+            ], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+            exit;
+        }
+
+        $tamanoArchivo = (int)($_FILES['imagenes']['size'][$key] ?? 0);
+
+        if (
+            $tamanoArchivo <= 0 ||
+            $tamanoArchivo > $maxBytesImagen
+        ) {
+            rollbackCertificadoSiActivo(
+                $mysqli,
+                $transaccionActiva
+            );
+
+            echo json_encode([
+                'status' => 'error',
+                'message' => 'Cada imagen debe pesar como máximo 20 MB.'
+            ], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+            exit;
+        }
+
+        $infoImagen = @getimagesize($tmpName);
+
+        if ($infoImagen === false) {
+            rollbackCertificadoSiActivo(
+                $mysqli,
+                $transaccionActiva
+            );
+
+            echo json_encode([
+                'status' => 'error',
+                'message' => 'Uno de los archivos enviados no es una imagen válida.'
+            ], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+            exit;
+        }
+
+        $anchoImagen = (int)($infoImagen[0] ?? 0);
+        $altoImagen = (int)($infoImagen[1] ?? 0);
+        $tipoImagen = (int)($infoImagen[2] ?? 0);
+
+        if (
+            $anchoImagen <= 0 ||
+            $altoImagen <= 0 ||
+            ($anchoImagen * $altoImagen) > $maxPixelesImagen
+        ) {
+            rollbackCertificadoSiActivo(
+                $mysqli,
+                $transaccionActiva
+            );
+
+            echo json_encode([
+                'status' => 'error',
+                'message' => 'La imagen tiene dimensiones demasiado grandes.'
+            ], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+            exit;
+        }
+
+        $extensionesPermitidas = [
+            IMAGETYPE_JPEG => 'jpg',
+            IMAGETYPE_PNG  => 'png',
+            IMAGETYPE_WEBP => 'webp',
+        ];
+
+        if (!isset($extensionesPermitidas[$tipoImagen])) {
+            rollbackCertificadoSiActivo(
+                $mysqli,
+                $transaccionActiva
+            );
+
+            echo json_encode([
+                'status' => 'error',
+                'message' => 'Solo se permiten imágenes JPG, PNG o WebP.'
+            ], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+            exit;
+        }
+
+        $extension = $extensionesPermitidas[$tipoImagen];
+
+        $nombreArchivo =
+            "img_{$veterinario}_" .
+            bin2hex(random_bytes(12)) .
+            "." .
+            $extension;
+
+        $rutaDestino = $imgDir . $nombreArchivo;
+
+        if (!move_uploaded_file($tmpName, $rutaDestino)) {
+            rollbackCertificadoSiActivo(
+                $mysqli,
+                $transaccionActiva
+            );
+
+            error_log(
+                '[updCertificados][imagenes] No se pudo mover imagen a: ' .
+                $rutaDestino
+            );
+
+            echo json_encode([
+                'status' => 'error',
+                'message' => 'No se pudo guardar una de las imágenes.'
+            ], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+            exit;
+        }
+
+        @chmod($rutaDestino, 0644);
+
+        $rutaFinal = comprimirImagenCertificado(
+            $rutaDestino
+        );
+
+        $rutaImagenNueva = normalizarRutaImagenCertificado(
+            "uploads/certificados/img/" .
+            basename($rutaFinal)
+        );
+
+        if ($rutaImagenNueva !== null) {
+            $imagenes[] = $rutaImagenNueva;
+            $imagenesNuevas[] = $rutaImagenNueva;
         }
     }
 }
@@ -930,34 +1537,117 @@ $imagenes = array_values(array_unique($imagenes));
 $imagenesJson = json_encode($imagenes, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
 
 if (!is_dir($pdfDir)) {
-    mkdir($pdfDir, 0777, true);
+    if (!mkdir($pdfDir, 0775, true) && !is_dir($pdfDir)) {
+        rollbackCertificadoSiActivo(
+            $mysqli,
+            $transaccionActiva
+        );
+
+        error_log(
+            '[updCertificados][pdf] No se pudo crear el directorio: ' .
+            $pdfDir
+        );
+
+        echo json_encode([
+            'status' => 'error',
+            'message' => 'No se pudo preparar el directorio del informe.'
+        ], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+        exit;
+    }
 }
 
-$html = buildInformeHtml(
-    $veterinario,
-    $configuracion_informe_id,
-    $paciente_id,
-    $fecha_examen,
-    $motivo,
-    $descripcion,
-    $imagenes,
-    $recinto,
-    $medico_solicitante,
-    $manual_data,
-    $plantilla_informe_id
-);
+if (!is_writable($pdfDir)) {
+    rollbackCertificadoSiActivo(
+        $mysqli,
+        $transaccionActiva
+    );
 
-$pdf = new Dompdf();
-$options = $pdf->getOptions();
-$options->set('isRemoteEnabled', true);
-$pdf->setOptions($options);
-$pdf->loadHtml($html);
-$pdf->setPaper('A4', 'portrait');
-$pdf->render();
+    error_log(
+        '[updCertificados][pdf] Directorio sin permisos de escritura: ' .
+        $pdfDir
+    );
 
-$pdfFilename = "cert_{$veterinario}_" . uniqid() . ".pdf";
-file_put_contents($pdfDir . $pdfFilename, $pdf->output());
-$rutaPdf = "uploads/certificados/informes/" . $pdfFilename;
+    echo json_encode([
+        'status' => 'error',
+        'message' => 'No se pudo preparar el archivo del informe.'
+    ], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+    exit;
+}
+
+$pdfFilename =
+    "cert_{$veterinario}_" .
+    bin2hex(random_bytes(12)) .
+    ".pdf";
+
+$pdfPathFisico = $pdfDir . $pdfFilename;
+
+try {
+    $html = buildInformeHtml(
+        $veterinario,
+        $configuracion_informe_id,
+        $paciente_id,
+        $fecha_examen,
+        $motivo,
+        $descripcion,
+        $imagenes,
+        $recinto,
+        $medico_solicitante,
+        $manual_data,
+        $plantilla_informe_id
+    );
+
+    $pdf = new Dompdf();
+
+    $options = $pdf->getOptions();
+    $options->set('isRemoteEnabled', false);
+    $pdf->setOptions($options);
+
+    $pdf->loadHtml($html);
+    $pdf->setPaper('A4', 'portrait');
+    $pdf->render();
+
+    $pdfContenido = $pdf->output();
+
+    if ($pdfContenido === '') {
+        throw new RuntimeException(
+            'Dompdf generó un contenido PDF vacío.'
+        );
+    }
+
+    $bytesEscritos = file_put_contents(
+        $pdfPathFisico,
+        $pdfContenido,
+        LOCK_EX
+    );
+
+    if ($bytesEscritos === false || $bytesEscritos <= 0) {
+        throw new RuntimeException(
+            'No se pudo escribir el archivo PDF.'
+        );
+    }
+
+    @chmod($pdfPathFisico, 0644);
+
+} catch (Throwable $e) {
+    rollbackCertificadoSiActivo($mysqli, $transaccionActiva);
+
+    limpiarArchivosNuevosCertificado($imagenesNuevas, $pdfPathFisico);
+
+    error_log('[updCertificados][pdf] ' . $e->getMessage());
+
+    echo json_encode([
+        'status' => 'error',
+        'message' => 'No se pudo generar el informe PDF.'
+    ], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+    exit;
+}
+
+$rutaPdf =
+    "uploads/certificados/informes/" .
+    $pdfFilename;
+
+$pdfAnteriorEliminar = null;
+$imagenesEliminarDespues = [];
 
 if ($action === 'ingresar') {
     $stmt = $mysqli->prepare("INSERT INTO certificados 
@@ -982,15 +1672,17 @@ if ($action === 'ingresar') {
         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), NOW())");
 
     if (!$stmt) {
-        rollbackCertificadoSiActivo(
-            $mysqli,
-            $transaccionActiva
+        rollbackCertificadoSiActivo($mysqli, $transaccionActiva);
+        limpiarArchivosNuevosCertificado($imagenesNuevas, $pdfPathFisico);
+
+        error_log(
+            '[updCertificados][certificado][insert_prepare] ' .
+            $mysqli->error
         );
 
         echo json_encode([
             'status' => 'error',
-            'message' => 'Error preparando inserción.',
-            'mysql_error' => $mysqli->error
+            'message' => 'Error preparando inserción.'
         ], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
         exit;
     }
@@ -1013,40 +1705,120 @@ if ($action === 'ingresar') {
         $destacado_titulo
     );
 } elseif ($action === 'modificar' && $id > 0) {
-    $stmtPrev = $mysqli->prepare("SELECT archivo_pdf, imagenes_json FROM certificados WHERE id = ? AND veterinario_id = ?");
-    if ($stmtPrev) {
-        $stmtPrev->bind_param("ii", $id, $veterinario);
-        $stmtPrev->execute();
-        $res = $stmtPrev->get_result();
-        $prev = $res->fetch_assoc();
+    
 
-        if (!empty($prev['archivo_pdf'])) {
-            $rutaAnterior = realpath("../../" . $prev['archivo_pdf']);
-            if ($rutaAnterior && file_exists($rutaAnterior)) {
-                @unlink($rutaAnterior);
-            }
-        }
 
-        $imagenesPrevias = [];
 
-        if (!empty($prev['imagenes_json'])) {
-            $imagenesPreviasDecode = json_decode($prev['imagenes_json'], true);
+    $stmtPrev = $mysqli->prepare(
+        "SELECT archivo_pdf, imagenes_json
+        FROM certificados
+        WHERE id = ?
+        AND veterinario_id = ?
+        LIMIT 1"
+    );
 
-            if (is_array($imagenesPreviasDecode)) {
-                $imagenesPrevias = normalizarListaImagenesCertificado($imagenesPreviasDecode);
-            }
-        }
+    if (!$stmtPrev) {
+        rollbackCertificadoSiActivo(
+            $mysqli,
+            $transaccionActiva
+        );
 
-        $imagenesActuales = normalizarListaImagenesCertificado($imagenes);
+        error_log(
+            '[updCertificados][modificar][prev_prepare] ' .
+            $mysqli->error
+        );
 
-        $imagenesEliminadas = array_values(array_diff($imagenesPrevias, $imagenesActuales));
+        echo json_encode([
+            'status' => 'error',
+            'message' => 'No se pudo preparar la actualización del certificado.'
+        ], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+        exit;
+    }
 
-        foreach ($imagenesEliminadas as $imagenEliminada) {
-            if (!in_array($imagenEliminada, $imagenesActuales, true)) {
-                eliminarImagenCertificadoFisica($imagenEliminada);
-            }
+    $stmtPrev->bind_param(
+        "ii",
+        $id,
+        $veterinario
+    );
+
+    if (!$stmtPrev->execute()) {
+        rollbackCertificadoSiActivo(
+            $mysqli,
+            $transaccionActiva
+        );
+
+        error_log(
+            '[updCertificados][modificar][prev_execute] ' .
+            $stmtPrev->error
+        );
+
+        $stmtPrev->close();
+
+        echo json_encode([
+            'status' => 'error',
+            'message' => 'No se pudo preparar la actualización del certificado.'
+        ], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+        exit;
+    }
+
+    $prev = $stmtPrev
+        ->get_result()
+        ->fetch_assoc();
+
+    $stmtPrev->close();
+
+    if (!$prev) {
+        rollbackCertificadoSiActivo(
+            $mysqli,
+            $transaccionActiva
+        );
+
+        echo json_encode([
+            'status' => 'error',
+            'message' => 'Certificado no encontrado o sin permisos.'
+        ], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+        exit;
+    }
+
+    /*
+    * Importante:
+    * todavía NO eliminamos ningún archivo.
+    * Solo guardamos qué archivos habrá que eliminar
+    * después de que el UPDATE haya sido exitoso.
+    */
+    if (!empty($prev['archivo_pdf'])) {
+        $pdfAnteriorEliminar = trim(
+            (string)$prev['archivo_pdf']
+        );
+    }
+
+    $imagenesPrevias = [];
+
+    if (!empty($prev['imagenes_json'])) {
+        $imagenesPreviasDecode = json_decode(
+            $prev['imagenes_json'],
+            true
+        );
+
+        if (is_array($imagenesPreviasDecode)) {
+            $imagenesPrevias = normalizarListaImagenesCertificado(
+                $imagenesPreviasDecode
+            );
         }
     }
+
+    $imagenesActuales = normalizarListaImagenesCertificado(
+        $imagenes
+    );
+
+    $imagenesEliminarDespues = array_values(
+        array_diff(
+            $imagenesPrevias,
+            $imagenesActuales
+        )
+    );
+
+
 
     $tienePaciente = !empty($paciente_id);
     $llegaManualNuevo = !empty($manual_data);
@@ -1074,15 +1846,17 @@ if ($action === 'ingresar') {
             AND veterinario_id = ?");
 
     if (!$stmt) {
-        rollbackCertificadoSiActivo(
-            $mysqli,
-            $transaccionActiva
+        rollbackCertificadoSiActivo($mysqli, $transaccionActiva);
+        limpiarArchivosNuevosCertificado($imagenesNuevas, $pdfPathFisico);
+
+        error_log(
+            '[updCertificados][certificado][update_prepare] ' .
+            $mysqli->error
         );
 
         echo json_encode([
             'status' => 'error',
-            'message' => 'Error preparando actualización.',
-            'mysql_error' => $mysqli->error
+            'message' => 'Error preparando actualización.'
         ], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
         exit;
     }
@@ -1121,20 +1895,56 @@ if ($action === 'ingresar') {
 if ($stmt->execute()) {
     if ($transaccionActiva) {
         if (!$mysqli->commit()) {
-            rollbackCertificadoSiActivo(
-                $mysqli,
-                $transaccionActiva
+            rollbackCertificadoSiActivo($mysqli, $transaccionActiva);
+            limpiarArchivosNuevosCertificado($imagenesNuevas, $pdfPathFisico);
+
+            error_log(
+                '[updCertificados][transaccion][commit] ' .
+                $mysqli->error
             );
 
             echo json_encode([
                 'status' => 'error',
-                'message' => 'No se pudo confirmar la transacción de guardado.',
-                'mysql_error' => $mysqli->error
+                'message' => 'No se pudo confirmar la transacción de guardado.'
             ], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
             exit;
         }
 
         $transaccionActiva = false;
+    }
+
+    if ($action === 'modificar') {
+        /*
+        * El UPDATE ya fue exitoso y, si había transacción,
+        * también quedó confirmada.
+        * Recién ahora podemos eliminar archivos anteriores.
+        */
+
+        if ($pdfAnteriorEliminar !== null) {
+            $basePdf = realpath($pdfDir);
+
+            $pdfAnteriorReal = realpath(
+                "../../" . ltrim($pdfAnteriorEliminar, '/')
+            );
+
+            if (
+                $basePdf !== false &&
+                $pdfAnteriorReal !== false &&
+                is_file($pdfAnteriorReal) &&
+                strpos(
+                    $pdfAnteriorReal,
+                    $basePdf . DIRECTORY_SEPARATOR
+                ) === 0
+            ) {
+                @unlink($pdfAnteriorReal);
+            }
+        }
+
+        foreach ($imagenesEliminarDespues as $imagenEliminar) {
+            eliminarImagenCertificadoFisica(
+                $imagenEliminar
+            );
+        }
     }
 
     $certId = 0;
@@ -1160,6 +1970,7 @@ if ($stmt->execute()) {
         if ($audio_tmp !== '') {
             stt_link_certificado($mysqli, $audio_tmp, $certId);
         }
+
         if ($borrador_id > 0) {
             $stmtBorrador = $mysqli->prepare("
                 UPDATE certificados_borradores
@@ -1168,13 +1979,23 @@ if ($stmt->execute()) {
                     updated_at = NOW()
                 WHERE id = ?
                     AND veterinario_id = ?
+                    AND scope_key = ?
+                    AND estado = 'activo'
             ");
 
             if ($stmtBorrador) {
-                $stmtBorrador->bind_param("iii", $certId, $borrador_id, $veterinario);
+                $stmtBorrador->bind_param(
+                    "iiis",
+                    $certId,
+                    $borrador_id,
+                    $veterinario,
+                    $borrador_scope_key
+                );
+
                 $stmtBorrador->execute();
+                $stmtBorrador->close();
             }
-        } elseif ($borrador_scope_key !== '') {
+        } else {
             $stmtBorrador = $mysqli->prepare("
                 UPDATE certificados_borradores
                 SET estado = 'finalizado',
@@ -1186,8 +2007,15 @@ if ($stmt->execute()) {
             ");
 
             if ($stmtBorrador) {
-                $stmtBorrador->bind_param("iis", $certId, $veterinario, $borrador_scope_key);
+                $stmtBorrador->bind_param(
+                    "iis",
+                    $certId,
+                    $veterinario,
+                    $borrador_scope_key
+                );
+
                 $stmtBorrador->execute();
+                $stmtBorrador->close();
             }
         }
 
@@ -1204,15 +2032,17 @@ if ($stmt->execute()) {
         'audio' => $audioResultado
     ], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
 } else {
-    rollbackCertificadoSiActivo(
-        $mysqli,
-        $transaccionActiva
+    rollbackCertificadoSiActivo($mysqli, $transaccionActiva);
+    limpiarArchivosNuevosCertificado($imagenesNuevas, $pdfPathFisico);
+
+    error_log(
+        '[updCertificados][certificado][execute] ' .
+        $stmt->error
     );
 
     echo json_encode([
         'status' => 'error',
-        'message' => 'Error al guardar el certificado.',
-        'mysql_error' => $stmt->error
+        'message' => 'Error al guardar el certificado.'
     ], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
 }
 

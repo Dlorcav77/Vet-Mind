@@ -1,188 +1,280 @@
 <?php
+
+declare(strict_types=1);
+
 require_once("../config.php");
 
 $mysqli = conn();
 
-$action = $_POST['action'] ?? '';
-$id = $_POST['id'] ?? '';
-
-// ✅ helper: resuelve especie/raza texto desde raza_id (o null si vacío)
-function resolver_especie_y_raza_por_id(mysqli $db, $raza_id) {
-    if (!$raza_id) return [null, null];
-    $sql = "SELECT r.nombre AS raza, e.nombre AS especie
-              FROM razas r
-              JOIN especies e ON e.id = r.especie_id
-             WHERE r.id = ? LIMIT 1";
-    if ($st = $db->prepare($sql)) {
-        $st->bind_param('i', $raza_id);
-        $st->execute();
-        $rs = $st->get_result();
-        if ($row = $rs->fetch_assoc()) {
-            return [$row['especie'] ?? null, $row['raza'] ?? null];
-        }
-    }
-    return [null, null];
+function jexit(string $status, string $message): void
+{
+    echo json_encode(['status' => $status, 'message' => $message], JSON_UNESCAPED_UNICODE);
+    exit;
 }
 
-if ($action !== 'eliminar') {
-    $veterinario_id   = intval($_POST['veterinario_id']);
-    $tutor_id         = intval($_POST['tutor_id']);
-    $nombre           = trim($_POST['nombre'] ?? '');
+function tutor_pertenece_al_veterinario(mysqli $db, int $tutorId, int $veterinarioId): bool
+{
+    $stmt = $db->prepare("SELECT id FROM tutores WHERE id = ? AND veterinario_id = ? LIMIT 1");
+    $stmt->bind_param('ii', $tutorId, $veterinarioId);
+    $stmt->execute();
+    $res = $stmt->get_result();
+    $stmt->close();
 
-    // ✅ obligatorios: tutor + nombre
-    if ($tutor_id <= 0) {
-        echo json_encode(['status' => 'error', 'message' => 'Tutor inválido.']);
-        exit;
+    return $res->num_rows > 0;
+}
+
+function paciente_pertenece_al_veterinario(mysqli $db, int $pacienteId, int $veterinarioId): bool
+{
+    $stmt = $db->prepare("SELECT id FROM pacientes WHERE id = ? AND veterinario_id = ? LIMIT 1");
+    $stmt->bind_param('ii', $pacienteId, $veterinarioId);
+    $stmt->execute();
+    $res = $stmt->get_result();
+    $stmt->close();
+
+    return $res->num_rows > 0;
+}
+
+function resolver_especie_y_raza_por_id(mysqli $db, ?int $razaId): array
+{
+    if (!$razaId) return [null, null];
+
+    $stmt = $db->prepare(
+        "SELECT r.nombre AS raza, e.nombre AS especie
+         FROM razas r
+         JOIN especies e ON e.id = r.especie_id
+         WHERE r.id = ?
+         LIMIT 1"
+    );
+    $stmt->bind_param('i', $razaId);
+    $stmt->execute();
+    $res = $stmt->get_result();
+    $row = $res->fetch_assoc();
+    $stmt->close();
+
+    if (!$row) return [null, null];
+
+    return [$row['especie'] ?? null, $row['raza'] ?? null];
+}
+
+if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
+    http_response_code(405);
+    jexit('error', 'Método no permitido.');
+}
+
+validarTokenCsrf();
+
+$action = trim((string)($_POST['action'] ?? ''));
+$id = isset($_POST['id']) ? (int)$_POST['id'] : 0;
+$veterinarioId = (int)$usuario_id;
+
+if (!in_array($action, ['ingresar', 'modificar', 'eliminar'], true)) {
+    jexit('error', 'Acción inválida.');
+}
+
+switch ($action) {
+    case 'ingresar':
+        credenciales('tutor', 'ingresar');
+        break;
+    case 'modificar':
+        credenciales('tutor', 'modificar');
+        break;
+    case 'eliminar':
+        credenciales('tutor', 'eliminar');
+        break;
+}
+
+try {
+    if ($action === 'eliminar') {
+        if ($id <= 0) {
+            jexit('error', 'Paciente inválido.');
+        }
+
+        if (!paciente_pertenece_al_veterinario($mysqli, $id, $veterinarioId)) {
+            jexit('error', 'No tienes permiso para eliminar este paciente.');
+        }
+
+        $stmt = $mysqli->prepare("DELETE FROM pacientes WHERE id = ? AND veterinario_id = ?");
+        $stmt->bind_param('ii', $id, $veterinarioId);
+        $stmt->execute();
+        $stmt->close();
+
+        logg("Eliminación de paciente ID: $id");
+        jexit('success', 'Paciente eliminado exitosamente.');
     }
+
+    $tutorId = isset($_POST['tutor_id']) ? (int)$_POST['tutor_id'] : 0;
+    $nombre = trim((string)($_POST['nombre'] ?? ''));
+
+    if ($tutorId <= 0) {
+        jexit('error', 'Tutor inválido.');
+    }
+
+    if (!tutor_pertenece_al_veterinario($mysqli, $tutorId, $veterinarioId)) {
+        jexit('error', 'No tienes permiso para utilizar este tutor.');
+    }
+
     if ($nombre === '') {
-        echo json_encode(['status' => 'error', 'message' => 'El nombre es obligatorio.']);
-        exit;
+        jexit('error', 'El nombre es obligatorio.');
     }
+
     validar_length("Nombre", $nombre, 100);
 
-    // ✅ código interno opcional
-    $codigo_paciente  = trim($_POST['codigo_paciente'] ?? '');
-    if ($codigo_paciente === '') $codigo_paciente = null;
-    if ($codigo_paciente !== null) {
-        validar_length("Código de paciente", $codigo_paciente, 30, true);
+    $codigoPaciente = trim((string)($_POST['codigo_paciente'] ?? ''));
+    $codigoPaciente = $codigoPaciente !== '' ? $codigoPaciente : null;
+
+    if ($codigoPaciente !== null) {
+        validar_length("Código de paciente", $codigoPaciente, 30, true);
     }
 
-    // ✅ raza opcional (ID en el <select>)
-    $raza_id_post = (isset($_POST['raza']) && $_POST['raza'] !== '') ? intval($_POST['raza']) : null;
+    $razaId = isset($_POST['raza']) && $_POST['raza'] !== ''
+        ? (int)$_POST['raza']
+        : null;
 
-    // ✅ resolvemos especie/raza (texto) desde BD (o null si no se seleccionó)
-    list($especie, $raza) = resolver_especie_y_raza_por_id($mysqli, $raza_id_post);
+    [$especie, $raza] = resolver_especie_y_raza_por_id($mysqli, $razaId);
 
-    $fecha_nacimiento = trim($_POST['fecha_nacimiento'] ?? '');
-    $n_chip           = trim($_POST['n_chip'] ?? '');
-    $sexo             = trim($_POST['sexo'] ?? '');
+    $fechaNacimiento = trim((string)($_POST['fecha_nacimiento'] ?? ''));
+    $nChip = trim((string)($_POST['n_chip'] ?? ''));
+    $sexo = trim((string)($_POST['sexo'] ?? ''));
 
-    // ✅ sexo opcional (solo validamos si viene)
-    $sexos_validos = ['Macho','Macho Castrado','Hembra','Hembra Esterilizada','Otro'];
-    if ($sexo !== '' && !in_array($sexo, $sexos_validos, true)) {
-        echo json_encode(['status' => 'error', 'message' => 'Sexo inválido.']);
-        exit;
+    $sexosValidos = ['Macho', 'Macho Castrado', 'Hembra', 'Hembra Esterilizada', 'Otro'];
+
+    if ($sexo !== '' && !in_array($sexo, $sexosValidos, true)) {
+        jexit('error', 'Sexo inválido.');
     }
 
-    // ✅ raza/especie opcional
     if ($raza !== null) validar_length("Raza", $raza, 100, true);
     if ($especie !== null) validar_length("Especie", $especie, 20, true);
 
-    // ✅ fecha opcional (validamos si viene)
-    if ($fecha_nacimiento !== '') {
-        if (!preg_match('/^\d{4}-\d{2}-\d{2}$/', $fecha_nacimiento)) {
-            echo json_encode(['status' => 'error', 'message' => 'Fecha de nacimiento inválida (formato esperado: YYYY-MM-DD).']);
-            exit;
+    if ($fechaNacimiento !== '') {
+        if (!preg_match('/^\d{4}-\d{2}-\d{2}$/', $fechaNacimiento)) {
+            jexit('error', 'Fecha de nacimiento inválida (formato esperado: YYYY-MM-DD).');
         }
-        if (strtotime($fecha_nacimiento) > time()) {
-            echo json_encode(['status' => 'error', 'message' => 'La fecha de nacimiento no puede ser futura.']);
-            exit;
+
+        if (strtotime($fechaNacimiento) > time()) {
+            jexit('error', 'La fecha de nacimiento no puede ser futura.');
         }
     } else {
-        $fecha_nacimiento = NULL;
+        $fechaNacimiento = null;
     }
 
-    // ✅ chip opcional (validamos si viene)
-    if ($n_chip !== '') {
-        if (!preg_match('/^[0-9]{10,15}$/', $n_chip)) {
-            echo json_encode(['status' => 'error', 'message' => 'El número de chip debe tener entre 10 y 15 dígitos numéricos.']);
-            exit;
+    if ($nChip !== '' && !preg_match('/^[0-9]{10,15}$/', $nChip)) {
+        jexit('error', 'El número de chip debe tener entre 10 y 15 dígitos numéricos.');
+    }
+
+    if ($action === 'modificar') {
+        if ($id <= 0) {
+            jexit('error', 'Paciente inválido.');
         }
-    }
-}
 
+        if (!paciente_pertenece_al_veterinario($mysqli, $id, $veterinarioId)) {
+            jexit('error', 'No tienes permiso para modificar este paciente.');
+        }
 
-// Eliminar
-if ($action === 'eliminar' && !empty($id)) {
-    $delete_query = "DELETE FROM pacientes WHERE id = ?";
-    $stmt = $mysqli->prepare($delete_query);
-    $stmt->bind_param('i', $id);
+        if ($especie !== null) {
+            $stmt = $mysqli->prepare(
+                "SELECT id FROM pacientes
+                 WHERE nombre = ? AND tutor_id = ? AND especie = ? AND id != ?
+                 LIMIT 1"
+            );
+            $stmt->bind_param('sisi', $nombre, $tutorId, $especie, $id);
+        } else {
+            $stmt = $mysqli->prepare(
+                "SELECT id FROM pacientes
+                 WHERE nombre = ? AND tutor_id = ? AND id != ?
+                 LIMIT 1"
+            );
+            $stmt->bind_param('sii', $nombre, $tutorId, $id);
+        }
 
-    if ($stmt->execute()) {
-        logg("Eliminación de paciente ID: $id");
-        echo json_encode(['status' => 'success', 'message' => 'Paciente eliminado exitosamente.']);
-    } else {
-        echo json_encode(['status' => 'error', 'message' => 'Error al eliminar el paciente.']);
-    }
-    exit;
-}
+        $stmt->execute();
+        $res = $stmt->get_result();
+        $stmt->close();
 
-// Modificar
-if ($action === 'modificar') {
+        if ($res->num_rows > 0) {
+            jexit('error', 'Ya existe un paciente con ese nombre para este tutor' . ($especie ? " (especie $especie)" : "") . '.');
+        }
 
-    // ✅ Duplicidad por nombre + tutor (+ especie si la pudimos resolver)
-    if ($especie !== null) {
-        $sel = "SELECT id FROM pacientes WHERE nombre = ? AND tutor_id = ? AND especie = ? AND id != ?";
-        $stmt = $mysqli->prepare($sel);
-        $stmt->bind_param('sisi', $nombre, $tutor_id, $especie, $id);
-    } else {
-        $sel = "SELECT id FROM pacientes WHERE nombre = ? AND tutor_id = ? AND id != ?";
-        $stmt = $mysqli->prepare($sel);
-        $stmt->bind_param('sii', $nombre, $tutor_id, $id);
-    }
-    $stmt->execute();
-    $res = $stmt->get_result();
+        $stmt = $mysqli->prepare(
+            "UPDATE pacientes
+             SET nombre = ?,
+                 codigo_paciente = ?,
+                 n_chip = ?,
+                 especie = ?,
+                 raza = ?,
+                 fecha_nacimiento = ?,
+                 sexo = ?,
+                 updated_at = NOW()
+             WHERE id = ?
+               AND veterinario_id = ?"
+        );
+        $stmt->bind_param(
+            'sssssssii',
+            $nombre,
+            $codigoPaciente,
+            $nChip,
+            $especie,
+            $raza,
+            $fechaNacimiento,
+            $sexo,
+            $id,
+            $veterinarioId
+        );
+        $stmt->execute();
+        $stmt->close();
 
-    if ($res->num_rows > 0) {
-        echo json_encode(['status' => 'error', 'message' => 'Ya existe un paciente con ese nombre para este tutor' . ($especie ? " (especie $especie)" : "") . '.']);
-        exit;
-    }
-
-    // ✅ guardamos especie/raza como TEXTO + código opcional
-    $update_query = "UPDATE pacientes
-                        SET nombre = ?,
-                            codigo_paciente = ?,
-                            n_chip = ?,
-                            especie = ?,
-                            raza = ?,
-                            fecha_nacimiento = ?,
-                            sexo = ?,
-                            updated_at = NOW()
-                      WHERE id = ?";
-    $stmt = $mysqli->prepare($update_query);
-    $stmt->bind_param('sssssssi', $nombre, $codigo_paciente, $n_chip, $especie, $raza, $fecha_nacimiento, $sexo, $id);
-
-    if ($stmt->execute()) {
         logg("Modificación de paciente ID: $id, Nombre: $nombre");
-        echo json_encode(['status' => 'success', 'message' => 'Paciente actualizado exitosamente.']);
-    } else {
-        echo json_encode(['status' => 'error', 'message' => 'Error al actualizar el paciente.']);
+        jexit('success', 'Paciente actualizado exitosamente.');
     }
-    exit;
+
+    if ($action === 'ingresar') {
+        if ($especie !== null) {
+            $stmt = $mysqli->prepare(
+                "SELECT id FROM pacientes
+                 WHERE nombre = ? AND especie = ? AND tutor_id = ?
+                 LIMIT 1"
+            );
+            $stmt->bind_param('ssi', $nombre, $especie, $tutorId);
+        } else {
+            $stmt = $mysqli->prepare(
+                "SELECT id FROM pacientes
+                 WHERE nombre = ? AND tutor_id = ?
+                 LIMIT 1"
+            );
+            $stmt->bind_param('si', $nombre, $tutorId);
+        }
+
+        $stmt->execute();
+        $res = $stmt->get_result();
+        $stmt->close();
+
+        if ($res->num_rows > 0) {
+            jexit('error', 'Ya existe un paciente con ese nombre para este tutor' . ($especie ? " (especie $especie)" : "") . '.');
+        }
+
+        $stmt = $mysqli->prepare(
+            "INSERT INTO pacientes
+                (veterinario_id, tutor_id, nombre, codigo_paciente, n_chip, especie, raza, fecha_nacimiento, sexo, created_at)
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, NOW())"
+        );
+        $stmt->bind_param(
+            'iisssssss',
+            $veterinarioId,
+            $tutorId,
+            $nombre,
+            $codigoPaciente,
+            $nChip,
+            $especie,
+            $raza,
+            $fechaNacimiento,
+            $sexo
+        );
+        $stmt->execute();
+        $stmt->close();
+
+        logg("Inserción de paciente: $nombre, Tutor ID: $tutorId");
+        jexit('success', 'Paciente ingresado exitosamente.');
+    }
+} catch (Throwable $e) {
+    error_log('[updPacientes] ' . $e->getMessage());
+    jexit('error', 'No se pudo completar la operación.');
 }
-
-// Ingresar
-if ($action === 'ingresar') {
-
-    // ✅ Duplicidad por nombre + tutor (+ especie si se resolvió)
-    if ($especie !== null) {
-        $sel = "SELECT id FROM pacientes WHERE nombre = ? AND especie = ? AND tutor_id = ?";
-        $stmt = $mysqli->prepare($sel);
-        $stmt->bind_param('ssi', $nombre, $especie, $tutor_id);
-    } else {
-        $sel = "SELECT id FROM pacientes WHERE nombre = ? AND tutor_id = ?";
-        $stmt = $mysqli->prepare($sel);
-        $stmt->bind_param('si', $nombre, $tutor_id);
-    }
-    $stmt->execute();
-    $res = $stmt->get_result();
-
-    if ($res->num_rows > 0) {
-        echo json_encode(['status' => 'error', 'message' => 'Ya existe un paciente con ese nombre para este tutor' . ($especie ? " (especie $especie)" : "") . '.']);
-        exit;
-    }
-
-    // ✅ guardamos especie/raza texto + código opcional
-    $ins = "INSERT INTO pacientes (veterinario_id, tutor_id, nombre, codigo_paciente, n_chip, especie, raza, fecha_nacimiento, sexo, created_at)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, NOW())";
-    $stmt = $mysqli->prepare($ins);
-    $stmt->bind_param('iisssssss', $veterinario_id, $tutor_id, $nombre, $codigo_paciente, $n_chip, $especie, $raza, $fecha_nacimiento, $sexo);
-
-    if ($stmt->execute()) {
-        logg("Inserción de paciente: $nombre, Tutor ID: $tutor_id");
-        echo json_encode(['status' => 'success', 'message' => 'Paciente ingresado exitosamente.']);
-    } else {
-        echo json_encode(['status' => 'error', 'message' => 'Error al ingresar el paciente.']);
-    }
-}
-?>

@@ -44,7 +44,7 @@ if($action == "modificar"){
         <div class="row mb-3">
           <div class="col-md-6  mb-2">
             <label for="rutp" class="form-label">Rut</label>
-            <input type="text" class="form-control" id="rut" name="rut" oninput="checkRut(this)" autocomplete="off" maxlength="12" value="<?php echo $fila['rut']; ?>" required>
+            <input type="text" class="form-control" id="rut" name="rut" oninput="checkRut(this)" autocomplete="off" maxlength="12" value="<?php echo $fila['rut']; ?>">
           </div>
           <div class="col-md-6">
           </div>

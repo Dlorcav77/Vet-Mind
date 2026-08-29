@@ -5,6 +5,16 @@ require_once("../../config.php");
 
 header('Content-Type: application/json; charset=utf-8');
 
+$veterinario = (int)$usuario_id;
+
+if ($veterinario <= 0) {
+    http_response_code(401);
+    echo json_encode(['status' => 'error', 'message' => 'Sesión inválida.'], JSON_UNESCAPED_UNICODE);
+    exit;
+}
+
+validarTokenCsrf();
+
 if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
     echo json_encode([
         'status' => 'error',
@@ -65,7 +75,7 @@ if (!is_dir($directorioTmp)) {
     }
 }
 
-$nombreArchivo = 'tmp_img_' . date('Ymd_His') . '_' . bin2hex(random_bytes(4)) . '.' . $extension;
+$nombreArchivo = 'tmp_img_' . $veterinario . '_' . date('Ymd_His') . '_' . bin2hex(random_bytes(4)) . '.' . $extension;
 $rutaDestino = $directorioTmp . $nombreArchivo;
 
 if (!move_uploaded_file($tmpPath, $rutaDestino)) {

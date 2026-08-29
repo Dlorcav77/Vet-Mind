@@ -1,165 +1,274 @@
 <?php
+
+declare(strict_types=1);
+
 require_once("../config.php");
 
 $mysqli = conn();
+$mysqli->set_charset('utf8mb4');
 
-$action = $_POST['action'] ?? '';
-$id = $_POST['id'] ?? '';
-
-if ($action !== 'eliminar') {
-  $nombre       = $_POST['nombre'];
-  $descripcion  = $_POST['descripcion'];
-  $aplicaciones = $_POST['aplicaciones'] ?? [];
-
-  validar_length("Nombre", $nombre, 30);
-  validar_length("Descripción", $descripcion, 255);
-  if (empty($aplicaciones)) {
-    echo json_encode([
-        'status' => 'error',
-        'message' => 'El campo Aplicaciones no puede estar vacío.'
-    ]);
+function jexit(string $status, string $message, array $extra = []): void
+{
+    echo json_encode(array_merge(['status' => $status, 'message' => $message], $extra), JSON_UNESCAPED_UNICODE);
     exit;
-  }
 }
 
+function reemplazarPermisos(mysqli $mysqli, int $perfilId, array $permisos): void
+{
+    $stmt = $mysqli->prepare("DELETE FROM perfiles_permisos WHERE perfil_id = ?");
+    $stmt->bind_param('i', $perfilId);
+    $stmt->execute();
+    $stmt->close();
 
-if ($action === 'eliminar' && !empty($id)) {
+    $stmt = $mysqli->prepare("INSERT INTO perfiles_permisos (perfil_id, permiso_id) VALUES (?, ?)");
+    $permisoId = 0;
+    $stmt->bind_param('ii', $perfilId, $permisoId);
 
-  $sel = "SELECT id FROM usuarios_perfil WHERE perfiles_id = ? AND deleted_at IS NULL";
-  $stmtP = $mysqli->prepare($sel);
-  $stmtP->bind_param('i', $id);
-  $stmtP->execute();
-  $resP = $stmtP->get_result();
+    foreach ($permisos as $permisoId) {
+        $stmt->execute();
+    }
 
-  if ($resP->num_rows > 0) {
-      echo json_encode(['status' => 'error', 'message' => 'No se puede eliminar el perfil porque está siendo utilizado por un usuario.']);
-      exit;
-  }
-  
-  $delete_query = "UPDATE perfiles SET deleted_at = NOW() WHERE id = ?";
-  $stmt = $mysqli->prepare($delete_query);
-  $stmt->bind_param('i', $id);
-
-  if ($stmt->execute()) {
-    echo json_encode(['status' => 'success', 'message' => 'Perfil eliminado exitosamente.']);
-  } else {
-    echo json_encode(['status' => 'error', 'message' => 'Error al eliminar el perfil.']);
-  }
-  exit;
+    $stmt->close();
 }
 
+if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
+    http_response_code(405);
+    jexit('error', 'Método no permitido.');
+}
 
+validarTokenCsrf();
+
+$action = trim((string)($_POST['action'] ?? ''));
+$id = isset($_POST['id']) ? (int)$_POST['id'] : 0;
+
+if (!in_array($action, ['ingresar', 'modificar', 'eliminar'], true)) {
+    jexit('error', 'Acción inválida.');
+}
+
+switch ($action) {
+    case 'ingresar':
+        credenciales('perfil', 'ingresar');
+        break;
+
+    case 'modificar':
+        credenciales('perfil', 'modificar');
+        break;
+
+    case 'eliminar':
+        credenciales('perfil', 'eliminar');
+        break;
+}
+
+if ($action === 'eliminar') {
+    if ($id <= 0) {
+        jexit('error', 'ID de perfil inválido.');
+    }
+
+    try {
+        $stmt = $mysqli->prepare(
+            "SELECT id
+             FROM usuarios_perfil
+             WHERE perfiles_id = ?
+               AND deleted_at IS NULL
+             LIMIT 1"
+        );
+        $stmt->bind_param('i', $id);
+        $stmt->execute();
+        $res = $stmt->get_result();
+        $stmt->close();
+
+        if ($res->num_rows > 0) {
+            jexit('error', 'No se puede eliminar el perfil porque está siendo utilizado por un usuario.');
+        }
+
+        $stmt = $mysqli->prepare(
+            "UPDATE perfiles
+             SET deleted_at = NOW()
+             WHERE id = ?
+               AND deleted_at IS NULL"
+        );
+        $stmt->bind_param('i', $id);
+        $stmt->execute();
+
+        if ($stmt->affected_rows === 0) {
+            $stmt->close();
+            jexit('error', 'El perfil no existe o ya se encuentra eliminado.');
+        }
+
+        $stmt->close();
+
+        jexit('success', 'Perfil eliminado exitosamente.');
+    } catch (Throwable $e) {
+        error_log('[updPerfiles][eliminar] ' . $e->getMessage());
+        jexit('error', 'Error al eliminar el perfil.');
+    }
+}
+
+$nombre = trim((string)($_POST['nombre'] ?? ''));
+$descripcion = trim((string)($_POST['descripcion'] ?? ''));
+$aplicaciones = $_POST['aplicaciones'] ?? [];
+
+if ($nombre === '') {
+    jexit('error', 'El campo Nombre no puede estar vacío.');
+}
+
+validar_length("Nombre", $nombre, 30);
+validar_length("Descripción", $descripcion, 255);
+
+if (!is_array($aplicaciones)) {
+    $aplicaciones = [$aplicaciones];
+}
+
+$aplicaciones = array_values(array_unique(array_filter(
+    array_map('intval', $aplicaciones),
+    static fn(int $permisoId): bool => $permisoId > 0
+)));
+
+if (empty($aplicaciones)) {
+    jexit('error', 'El campo Aplicaciones no puede estar vacío.');
+}
 
 if ($action === 'modificar') {
-  // Verificar si ya existe un perfil con el mismo nombre en la misma sede (excepto este ID)
-  $sel = "SELECT id FROM perfiles WHERE nombre = ? AND codsede = ? AND id != ? AND deleted_at IS NULL";
-  $stmt = $mysqli->prepare($sel);
-  $stmt->bind_param('ssi', $nombre, $codsede, $id);
-  $stmt->execute();
-  $resP = $stmt->get_result();
-
-  if ($resP->num_rows > 0) {
-    echo json_encode(['status' => 'error', 'message' => 'El perfil con el mismo nombre ya existe.']);
-    exit;
-  }
-
-  // Actualizar perfil (sin categorías ahora)
-  $update_query = "UPDATE perfiles SET nombre = ?, descripcion = ?, updated_at = NOW() WHERE id = ?";
-  $stmt = $mysqli->prepare($update_query);
-  $stmt->bind_param('ssi', $nombre, $descripcion, $id);
-
-  if ($stmt->execute()) {
-    // Eliminar permisos anteriores
-    $delete_permisos_query = "DELETE FROM perfiles_permisos WHERE perfil_id = ?";
-    $stmt = $mysqli->prepare($delete_permisos_query);
-    $stmt->bind_param('i', $id);
-    $stmt->execute();
-
-    // Insertar nuevos permisos
-    foreach ($aplicaciones as $permiso_id) {
-      $insert_permiso_query = "INSERT INTO perfiles_permisos (perfil_id, permiso_id) VALUES (?, ?)";
-      $stmt = $mysqli->prepare($insert_permiso_query);
-      $stmt->bind_param('ii', $id, $permiso_id);
-      $stmt->execute();
+    if ($id <= 0) {
+        jexit('error', 'ID de perfil inválido.');
     }
 
-    echo json_encode(['status' => 'success', 'message' => 'Perfil actualizado exitosamente.']);
-  } else {
-    echo json_encode(['status' => 'error', 'message' => 'Error al actualizar el perfil.']);
-  }
-  exit;
-}
+    try {
+        $stmt = $mysqli->prepare(
+            "SELECT id
+             FROM perfiles
+             WHERE nombre = ?
+               AND id != ?
+               AND deleted_at IS NULL
+             LIMIT 1"
+        );
+        $stmt->bind_param('si', $nombre, $id);
+        $stmt->execute();
+        $res = $stmt->get_result();
+        $stmt->close();
 
+        if ($res->num_rows > 0) {
+            jexit('error', 'El perfil con el mismo nombre ya existe.');
+        }
+
+        $mysqli->begin_transaction();
+
+        $stmt = $mysqli->prepare(
+            "UPDATE perfiles
+             SET nombre = ?, descripcion = ?, updated_at = NOW()
+             WHERE id = ?
+               AND deleted_at IS NULL"
+        );
+        $stmt->bind_param('ssi', $nombre, $descripcion, $id);
+        $stmt->execute();
+
+        if ($stmt->affected_rows === 0) {
+            $stmt->close();
+
+            $stmt = $mysqli->prepare(
+                "SELECT id
+                 FROM perfiles
+                 WHERE id = ?
+                   AND deleted_at IS NULL
+                 LIMIT 1"
+            );
+            $stmt->bind_param('i', $id);
+            $stmt->execute();
+            $existe = $stmt->get_result()->num_rows > 0;
+            $stmt->close();
+
+            if (!$existe) {
+                throw new RuntimeException('Perfil inexistente o eliminado.');
+            }
+        } else {
+            $stmt->close();
+        }
+
+        reemplazarPermisos($mysqli, $id, $aplicaciones);
+
+        $mysqli->commit();
+
+        jexit('success', 'Perfil actualizado exitosamente.');
+    } catch (Throwable $e) {
+        $mysqli->rollback();
+        error_log('[updPerfiles][modificar] ' . $e->getMessage());
+        jexit('error', 'Error al actualizar el perfil.');
+    }
+}
 
 if ($action === 'ingresar') {
-  // Verificar si ya existe un perfil con el mismo nombre (sin estar eliminado)
-  $sel = "SELECT id FROM perfiles WHERE nombre = ? AND codsede = ? AND deleted_at IS NULL";
-  $stmt = $mysqli->prepare($sel);
-  $stmt->bind_param('ss', $nombre, $codsede);
-  $stmt->execute();
-  $resP = $stmt->get_result();
+    try {
+        $stmt = $mysqli->prepare(
+            "SELECT id
+             FROM perfiles
+             WHERE nombre = ?
+               AND deleted_at IS NULL
+             LIMIT 1"
+        );
+        $stmt->bind_param('s', $nombre);
+        $stmt->execute();
+        $res = $stmt->get_result();
+        $stmt->close();
 
-  if ($resP->num_rows > 0) {
-    echo json_encode(['status' => 'error', 'message' => 'El perfil con el mismo nombre ya existe.']);
-    exit;
-  }
+        if ($res->num_rows > 0) {
+            jexit('error', 'El perfil con el mismo nombre ya existe.');
+        }
 
-  // Verificar si existe eliminado lógicamente (para reactivar)
-  $sel = "SELECT id FROM perfiles WHERE nombre = ? AND codsede = ? AND deleted_at IS NOT NULL";
-  $stmt = $mysqli->prepare($sel);
-  $stmt->bind_param('ss', $nombre, $codsede);
-  $stmt->execute();
-  $resEliminado = $stmt->get_result();
+        $stmt = $mysqli->prepare(
+            "SELECT id
+             FROM perfiles
+             WHERE nombre = ?
+               AND deleted_at IS NOT NULL
+             ORDER BY id DESC
+             LIMIT 1"
+        );
+        $stmt->bind_param('s', $nombre);
+        $stmt->execute();
+        $resEliminado = $stmt->get_result();
+        $stmt->close();
 
-  if ($resEliminado->num_rows > 0) {
-    $perfilRecuperado = $resEliminado->fetch_assoc();
-    $perfil_id = $perfilRecuperado['id'];
+        $mysqli->begin_transaction();
 
-    // Reactivar perfil
-    $upd = "UPDATE perfiles SET descripcion = ?, deleted_at = NULL, updated_at = NOW() WHERE id = ?";
-    $stmt = $mysqli->prepare($upd);
-    $stmt->bind_param('si', $descripcion, $perfil_id);
-    $stmt->execute();
+        if ($resEliminado->num_rows > 0) {
+            $perfilRecuperado = $resEliminado->fetch_assoc();
+            $perfilId = (int)$perfilRecuperado['id'];
 
-    // Eliminar permisos anteriores
-    $del = "DELETE FROM perfiles_permisos WHERE perfil_id = ?";
-    $stmt = $mysqli->prepare($del);
-    $stmt->bind_param('i', $perfil_id);
-    $stmt->execute();
+            $stmt = $mysqli->prepare(
+                "UPDATE perfiles
+                 SET nombre = ?, descripcion = ?, deleted_at = NULL, updated_at = NOW()
+                 WHERE id = ?"
+            );
+            $stmt->bind_param('ssi', $nombre, $descripcion, $perfilId);
+            $stmt->execute();
+            $stmt->close();
 
-    // Insertar nuevos permisos
-    foreach ($aplicaciones as $permiso_id) {
-      $insert_permiso = "INSERT INTO perfiles_permisos (perfil_id, permiso_id) VALUES (?, ?)";
-      $stmt = $mysqli->prepare($insert_permiso);
-      $stmt->bind_param('ii', $perfil_id, $permiso_id);
-      $stmt->execute();
+            reemplazarPermisos($mysqli, $perfilId, $aplicaciones);
+
+            $mysqli->commit();
+
+            jexit('success', 'Perfil reactivado exitosamente.');
+        }
+
+        $stmt = $mysqli->prepare(
+            "INSERT INTO perfiles (nombre, descripcion, created_at)
+             VALUES (?, ?, NOW())"
+        );
+        $stmt->bind_param('ss', $nombre, $descripcion);
+        $stmt->execute();
+
+        $perfilId = (int)$stmt->insert_id;
+        $stmt->close();
+
+        reemplazarPermisos($mysqli, $perfilId, $aplicaciones);
+
+        $mysqli->commit();
+
+        jexit('success', 'Perfil ingresado exitosamente.');
+    } catch (Throwable $e) {
+        $mysqli->rollback();
+        error_log('[updPerfiles][ingresar] ' . $e->getMessage());
+        jexit('error', 'Error al ingresar el perfil.');
     }
-
-    echo json_encode(['status' => 'success', 'message' => 'Perfil reactivado exitosamente.']);
-    exit;
-  }
-
-  // Si no existe ni activo ni eliminado, lo crea nuevo
-  $ins = "INSERT INTO perfiles (nombre, descripcion, codsede, created_at) VALUES (?, ?, ?, NOW())";
-  $stmt = $mysqli->prepare($ins);
-  $stmt->bind_param('sss', $nombre, $descripcion, $codsede);
-
-  if ($stmt->execute()) {
-    $perfil_id = $stmt->insert_id;
-
-    foreach ($aplicaciones as $permiso_id) {
-      $insert_permiso = "INSERT INTO perfiles_permisos (perfil_id, permiso_id) VALUES (?, ?)";
-      $stmt = $mysqli->prepare($insert_permiso);
-      $stmt->bind_param('ii', $perfil_id, $permiso_id);
-      $stmt->execute();
-    }
-
-    echo json_encode(['status' => 'success', 'message' => 'Perfil ingresado exitosamente.']);
-  } else {
-    echo json_encode(['status' => 'error', 'message' => 'Error al ingresar el perfil.']);
-  }
-  exit;
 }
 
-
-?>
+jexit('error', 'Acción inválida.');

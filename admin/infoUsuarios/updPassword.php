@@ -1,46 +1,79 @@
 <?php
+
+declare(strict_types=1);
+
 require_once("../config.php");
 
 $mysqli = conn();
-$action = $_POST['action'] ?? '';
-$id = $_POST['id'] ?? '';
 
-if ($action === 'modificar' && !empty($id)) {
-    $password_actual = $_POST['password_actual'];
-    $password_nueva = $_POST['password_nueva'];
-    $password_repetida = $_POST['password_repetida'];
+function jexit(string $status, string $message): void
+{
+    echo json_encode(['status' => $status, 'message' => $message], JSON_UNESCAPED_UNICODE);
+    exit;
+}
 
-    // Verificar que las nuevas contraseñas coincidan
-    if ($password_nueva !== $password_repetida) {
-        echo json_encode(['status' => 'error', 'message' => 'Las contraseñas no coinciden.']);
-        exit;
-    }
+if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
+    http_response_code(405);
+    jexit('error', 'Método no permitido.');
+}
 
-    // Consultar la contraseña actual en la base de datos
-    $sel = "SELECT password FROM usuarios WHERE id = ?";
-    $stmt = $mysqli->prepare($sel);
+validarTokenCsrf();
+
+$action = trim((string)($_POST['action'] ?? ''));
+
+if ($action !== 'modificar') {
+    jexit('error', 'Acción no permitida.');
+}
+
+$id = (int)$usuario_id;
+$passwordActual = (string)($_POST['password_actual'] ?? '');
+$passwordNueva = (string)($_POST['password_nueva'] ?? '');
+$passwordRepetida = (string)($_POST['password_repetida'] ?? '');
+
+if ($passwordActual === '' || $passwordNueva === '' || $passwordRepetida === '') {
+    jexit('error', 'Debes completar todos los campos de contraseña.');
+}
+
+if ($passwordNueva !== $passwordRepetida) {
+    jexit('error', 'Las contraseñas no coinciden.');
+}
+
+try {
+    $stmt = $mysqli->prepare(
+        "SELECT password
+         FROM usuarios
+         WHERE id = ?
+           AND deleted_at IS NULL
+         LIMIT 1"
+    );
     $stmt->bind_param('i', $id);
     $stmt->execute();
     $res = $stmt->get_result();
     $fila = $res->fetch_assoc();
+    $stmt->close();
 
-    if (!password_verify($password_actual, $fila['password'])) {
-        echo json_encode(['status' => 'error', 'message' => 'La contraseña actual es incorrecta.']);
-        exit;
+    if (!$fila || !password_verify($passwordActual, (string)$fila['password'])) {
+        jexit('error', 'La contraseña actual es incorrecta.');
     }
 
-    // Actualizar la contraseña
-    $password_hashed = password_hash($password_nueva, PASSWORD_BCRYPT);
-    $update_query = "UPDATE usuarios SET password = ? WHERE id = ?";
-    $stmt = $mysqli->prepare($update_query);
-    $stmt->bind_param('si', $password_hashed, $id);
+    $passwordHash = password_hash($passwordNueva, PASSWORD_BCRYPT);
 
-    if ($stmt->execute()) {
-        echo json_encode(['status' => 'success', 'message' => 'Contraseña actualizada exitosamente.']);
-    } else {
-        echo json_encode(['status' => 'error', 'message' => 'Error al actualizar la contraseña.']);
+    if ($passwordHash === false) {
+        throw new RuntimeException('No se pudo generar el hash.');
     }
-} else {
-    echo json_encode(['status' => 'error', 'message' => 'Acción no permitida.']);
+
+    $stmt = $mysqli->prepare(
+        "UPDATE usuarios
+         SET password = ?
+         WHERE id = ?
+           AND deleted_at IS NULL"
+    );
+    $stmt->bind_param('si', $passwordHash, $id);
+    $stmt->execute();
+    $stmt->close();
+
+    jexit('success', 'Contraseña actualizada exitosamente.');
+} catch (Throwable $e) {
+    error_log('[updPassword] ' . $e->getMessage());
+    jexit('error', 'Error al actualizar la contraseña.');
 }
-?>

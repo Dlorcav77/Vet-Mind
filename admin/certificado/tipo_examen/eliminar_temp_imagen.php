@@ -1,9 +1,27 @@
 <?php
 // admin/certificado/tipo_examen/eliminar_temp_imagen.php
 
+require_once("../../config.php");
+
 header('Content-Type: application/json; charset=utf-8');
 
-function normalizarRutaImagenTemporalCertificado($rutaImagen)
+if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
+    http_response_code(405);
+    echo json_encode(['status' => 'error', 'message' => 'Método no permitido.'], JSON_UNESCAPED_UNICODE);
+    exit;
+}
+
+validarTokenCsrf();
+
+$veterinario = (int)$usuario_id;
+
+if ($veterinario <= 0) {
+    http_response_code(401);
+    echo json_encode(['status' => 'error', 'message' => 'Sesión inválida.'], JSON_UNESCAPED_UNICODE);
+    exit;
+}
+
+function normalizarRutaImagenTemporalCertificado($rutaImagen, $veterinario)
 {
     $rutaImagen = trim((string)$rutaImagen);
 
@@ -26,8 +44,8 @@ function normalizarRutaImagenTemporalCertificado($rutaImagen)
     }
 
     $prefijosPermitidos = [
-        'tmp_img_',
-        'previmg_'
+        'tmp_img_' . (int)$veterinario . '_',
+        'previmg_' . (int)$veterinario . '_'
     ];
 
     $prefijoOk = false;
@@ -50,9 +68,9 @@ function normalizarRutaImagenTemporalCertificado($rutaImagen)
     ];
 }
 
-function eliminarImagenTemporalCertificadoSeguro($documentRoot, $rutaImagen)
+function eliminarImagenTemporalCertificadoSeguro($documentRoot, $rutaImagen, $veterinario)
 {
-    $normalizada = normalizarRutaImagenTemporalCertificado($rutaImagen);
+    $normalizada = normalizarRutaImagenTemporalCertificado($rutaImagen, $veterinario);
 
     if ($normalizada === null) {
         return [
@@ -122,10 +140,7 @@ if ($documentRoot === '') {
 }
 
 if ($documentRoot === false || $documentRoot === '') {
-    echo json_encode([
-        'status' => 'error',
-        'message' => 'No se pudo resolver DOCUMENT_ROOT.'
-    ], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+    echo json_encode(['status' => 'error', 'message' => 'No se pudo resolver DOCUMENT_ROOT.'], JSON_UNESCAPED_UNICODE);
     exit;
 }
 
@@ -167,7 +182,7 @@ $eliminadas = 0;
 $errores = 0;
 
 foreach ($imagenes as $imagen) {
-    $resultado = eliminarImagenTemporalCertificadoSeguro($documentRoot, $imagen);
+    $resultado = eliminarImagenTemporalCertificadoSeguro($documentRoot, $imagen, $veterinario);
 
     if (!empty($resultado['ok'])) {
         $eliminadas++;
@@ -190,4 +205,5 @@ echo json_encode([
         'detalle' => $resultados
     ]
 ], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+
 exit;

@@ -1,196 +1,298 @@
 <?php
-//admin/configuracion_informe/updConfiguracion.php
+// admin/configuracion_informe/updConfiguracion.php
+
+declare(strict_types=1);
+
 require_once("../config.php");
+
 $mysqli = conn();
 
-$action     = $_POST['action'] ?? '';
-$id         = $_POST['id'] ?? null;
-$usuario_id = $_SESSION['usuario_id'] ?? 0;
+function jexit(string $status, string $message): void
+{
+    echo json_encode(['status' => $status, 'message' => $message], JSON_UNESCAPED_UNICODE);
+    exit;
+}
 
-$nombre_plantilla     = trim($_POST['nombre_plantilla'] ?? 'Plantilla principal');
-$es_predeterminada    = isset($_POST['es_predeterminada']) ? 1 : 0;
+if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
+    http_response_code(405);
+    jexit('error', 'Método no permitido.');
+}
+
+validarTokenCsrf();
+
+$action = trim((string)($_POST['action'] ?? ''));
+$id = isset($_POST['id']) ? (int)$_POST['id'] : 0;
+$veterinarioId = (int)$usuario_id;
+
+if (!in_array($action, ['ingresar', 'modificar'], true)) {
+    jexit('error', 'Acción no válida.');
+}
+
+if ($action === 'ingresar') {
+    credenciales('configuracion_informe', 'ingresar');
+}
+
+if ($action === 'modificar') {
+    credenciales('configuracion_informe', 'modificar');
+
+    if ($id <= 0) {
+        jexit('error', 'Configuración inválida.');
+    }
+
+    $stmtOwner = $mysqli->prepare(
+        "SELECT id
+         FROM configuracion_informes
+         WHERE id = ? AND veterinario_id = ?
+         LIMIT 1"
+    );
+    $stmtOwner->bind_param('ii', $id, $veterinarioId);
+    $stmtOwner->execute();
+    $resOwner = $stmtOwner->get_result();
+    $stmtOwner->close();
+
+    if ($resOwner->num_rows === 0) {
+        jexit('error', 'No tienes permiso para modificar esta configuración.');
+    }
+}
+
+$nombre_plantilla = trim((string)($_POST['nombre_plantilla'] ?? 'Plantilla principal'));
+$es_predeterminada = isset($_POST['es_predeterminada']) ? 1 : 0;
 
 $layouts_permitidos = ['clasico', 'clinica'];
-$layout_tipo = $_POST['layout_tipo'] ?? 'clasico';
+$layout_tipo = (string)($_POST['layout_tipo'] ?? 'clasico');
+
 if (!in_array($layout_tipo, $layouts_permitidos, true)) {
     $layout_tipo = 'clasico';
 }
 
-$logo_position        = $_POST['logo_position'] ?? 'center';
-$mostrar_marca_agua   = isset($_POST['mostrar_marca_agua']) ? 1 : 0;
-$color_primario       = $_POST['color_primario'] ?? '#3498db';
-$color_secundario     = $_POST['color_secundario'] ?? '#2ecc71';
-$firma_nombre         = trim($_POST['firma_nombre'] ?? '');
-$firma_titulo         = trim($_POST['firma_titulo'] ?? '');
-$firma_subtitulos     = $_POST['firma_subtitulos'] ?? [];
-$firma_subtitulos     = array_filter(array_map('trim', $firma_subtitulos));
-$firma_subtitulo      = !empty($firma_subtitulos) ? json_encode(array_values($firma_subtitulos)) : null;
-$firma_align          = $_POST['firma_align'] ?? 'center';
-$footer_texto         = trim($_POST['footer_texto'] ?? '');
-$footer_align         = $_POST['footer_align'] ?? 'center';
-$mostrar_fecha        = isset($_POST['mostrar_fecha']) ? 1 : 0;
-$formato_fecha        = $_POST['formato_fecha'] ?? 'd-m-Y';
-$lugar_fecha          = trim($_POST['lugar_fecha'] ?? '');
-$fecha_align          = $_POST['fecha_align'] ?? 'right';
-$logo_size            = $_POST['logo_size'] ?? 'medium';
-$marca_agua_size      = $_POST['marca_agua_size'] ?? 'medium';
-$imagenes_por_fila    = (int)($_POST['imagenes_por_fila'] ?? 2);
-$titulo_informe       = trim($_POST['titulo_informe'] ?? 'INFORME ECOGRÁFICO');
+$logo_position = (string)($_POST['logo_position'] ?? 'center');
+$mostrar_marca_agua = isset($_POST['mostrar_marca_agua']) ? 1 : 0;
+$color_primario = (string)($_POST['color_primario'] ?? '#3498db');
+$color_secundario = (string)($_POST['color_secundario'] ?? '#2ecc71');
+
+$firma_nombre = trim((string)($_POST['firma_nombre'] ?? ''));
+$firma_titulo = trim((string)($_POST['firma_titulo'] ?? ''));
+
+$firma_subtitulos = $_POST['firma_subtitulos'] ?? [];
+if (!is_array($firma_subtitulos)) {
+    $firma_subtitulos = [];
+}
+
+$firma_subtitulos = array_values(array_filter(array_map(
+    static fn($valor): string => trim((string)$valor),
+    $firma_subtitulos
+)));
+
+$firma_subtitulo = !empty($firma_subtitulos)
+    ? json_encode($firma_subtitulos, JSON_UNESCAPED_UNICODE)
+    : null;
+
+$firma_align = (string)($_POST['firma_align'] ?? 'center');
+$footer_texto = trim((string)($_POST['footer_texto'] ?? ''));
+$footer_align = (string)($_POST['footer_align'] ?? 'center');
+$mostrar_fecha = isset($_POST['mostrar_fecha']) ? 1 : 0;
+$formato_fecha = (string)($_POST['formato_fecha'] ?? 'd-m-Y');
+$lugar_fecha = trim((string)($_POST['lugar_fecha'] ?? ''));
+$fecha_align = (string)($_POST['fecha_align'] ?? 'right');
+$logo_size = (string)($_POST['logo_size'] ?? 'medium');
+$marca_agua_size = (string)($_POST['marca_agua_size'] ?? 'medium');
+$imagenes_por_fila = (int)($_POST['imagenes_por_fila'] ?? 2);
+$titulo_informe = trim((string)($_POST['titulo_informe'] ?? 'INFORME ECOGRÁFICO'));
 $mostrar_firma_imagen = isset($_POST['mostrar_firma_imagen']) ? 1 : 0;
-$subtitulo            = trim($_POST['subtitulo'] ?? '');
-$subtitulo_align      = $_POST['subtitulo_align'] ?? 'center';
-$recinto_default      = trim($_POST['recinto_default'] ?? '');
+$subtitulo = trim((string)($_POST['subtitulo'] ?? ''));
+$subtitulo_align = (string)($_POST['subtitulo_align'] ?? 'center');
+$recinto_default = trim((string)($_POST['recinto_default'] ?? ''));
+
 $layout_config_post = $_POST['layout_config'] ?? [];
+if (!is_array($layout_config_post)) {
+    $layout_config_post = [];
+}
+
 $layout_config_json = prepararLayoutConfigJson($layout_config_post);
 
-$firma_imagen_subida = null;
-if (isset($_FILES['firma_imagen']) && !empty($_FILES['firma_imagen']['name'])) {
-    $firma_imagen_subida = subir_imagen('firma_imagen', 'firmas', $usuario_id, 'firma');
-}
-
 try {
-    $logo_subido       = subir_imagen('logo', 'logos', $usuario_id, 'logo');
-    $marca_agua_subida = subir_imagen('marca_agua', 'marcas_agua', $usuario_id, 'marcaagua');
-} catch (Exception $e) {
-    echo json_encode(['status' => 'error', 'message' => $e->getMessage()]);
-    exit;
+    $firma_imagen_subida = subir_imagen('firma_imagen', 'firmas', $veterinarioId, 'firma');
+    $logo_subido = subir_imagen('logo', 'logos', $veterinarioId, 'logo');
+    $marca_agua_subida = subir_imagen('marca_agua', 'marcas_agua', $veterinarioId, 'marcaagua');
+} catch (Throwable $e) {
+    error_log('[updConfiguracion][upload] ' . $e->getMessage());
+    jexit('error', $e->getMessage());
 }
 
-//
-// ✅ MODIFICAR
-//
-if ($action === 'modificar' && !empty($id)) {
+if ($action === 'modificar') {
     if (!$logo_subido) {
-        $logo_subido = obtener_url_actual($mysqli, $id, $usuario_id, 'logo_url');
+        $logo_subido = obtener_url_actual($mysqli, $id, $veterinarioId, 'logo_url');
     }
+
     if (!$marca_agua_subida) {
-        $marca_agua_subida = obtener_url_actual($mysqli, $id, $usuario_id, 'marca_agua_url');
+        $marca_agua_subida = obtener_url_actual($mysqli, $id, $veterinarioId, 'marca_agua_url');
     }
+
     if (!$firma_imagen_subida) {
-        $firma_imagen_subida = obtener_url_actual($mysqli, $id, $usuario_id, 'firma_imagen_url');
+        $firma_imagen_subida = obtener_url_actual($mysqli, $id, $veterinarioId, 'firma_imagen_url');
     }
 
-    $sql = "UPDATE configuracion_informes SET
-        nombre_plantilla = ?,
-        es_predeterminada = ?,
-        layout_tipo = ?,
-        logo_url = ?, logo_position = ?, logo_size = ?, 
-        marca_agua_url = ?, marca_agua_size = ?, mostrar_marca_agua = ?,
-        color_primario = ?, color_secundario = ?,
-        firma_nombre = ?, firma_titulo = ?, firma_subtitulo = ?, firma_align = ?,
-        footer_texto = ?, footer_align = ?, mostrar_fecha = ?, formato_fecha = ?, 
-        lugar_fecha = ?, fecha_align = ?, imagenes_por_fila = ?, titulo_informe = ?, 
-        firma_imagen_url = ?, mostrar_firma_imagen = ?, subtitulo = ?, subtitulo_align = ?,
-        layout_config_json = ?,
-        recinto_default = ?,
-        updated_at = NOW()
-        WHERE id = ? AND veterinario_id = ?";
+    try {
+        $sql = "UPDATE configuracion_informes SET
+            nombre_plantilla = ?,
+            es_predeterminada = ?,
+            layout_tipo = ?,
+            logo_url = ?, logo_position = ?, logo_size = ?,
+            marca_agua_url = ?, marca_agua_size = ?, mostrar_marca_agua = ?,
+            color_primario = ?, color_secundario = ?,
+            firma_nombre = ?, firma_titulo = ?, firma_subtitulo = ?, firma_align = ?,
+            footer_texto = ?, footer_align = ?, mostrar_fecha = ?, formato_fecha = ?,
+            lugar_fecha = ?, fecha_align = ?, imagenes_por_fila = ?, titulo_informe = ?,
+            firma_imagen_url = ?, mostrar_firma_imagen = ?, subtitulo = ?, subtitulo_align = ?,
+            layout_config_json = ?,
+            recinto_default = ?,
+            updated_at = NOW()
+            WHERE id = ? AND veterinario_id = ?";
 
-    $stmt = $mysqli->prepare($sql);
-    $stmt->bind_param(
-        "sissssssissssssssisssississssii",
-        $nombre_plantilla,
-        $es_predeterminada,
-        $layout_tipo,
-        $logo_subido, $logo_position, $logo_size,
-        $marca_agua_subida, $marca_agua_size, $mostrar_marca_agua,
-        $color_primario, $color_secundario,
-        $firma_nombre, $firma_titulo, $firma_subtitulo, $firma_align,
-        $footer_texto, $footer_align,
-        $mostrar_fecha, $formato_fecha, $lugar_fecha, $fecha_align,
-        $imagenes_por_fila, $titulo_informe, $firma_imagen_subida, $mostrar_firma_imagen,
-        $subtitulo, $subtitulo_align, $layout_config_json,
-        $recinto_default,
-        $id, $usuario_id
-    );
+        $stmt = $mysqli->prepare($sql);
+        $stmt->bind_param(
+            "sissssssissssssssisssississssii",
+            $nombre_plantilla,
+            $es_predeterminada,
+            $layout_tipo,
+            $logo_subido,
+            $logo_position,
+            $logo_size,
+            $marca_agua_subida,
+            $marca_agua_size,
+            $mostrar_marca_agua,
+            $color_primario,
+            $color_secundario,
+            $firma_nombre,
+            $firma_titulo,
+            $firma_subtitulo,
+            $firma_align,
+            $footer_texto,
+            $footer_align,
+            $mostrar_fecha,
+            $formato_fecha,
+            $lugar_fecha,
+            $fecha_align,
+            $imagenes_por_fila,
+            $titulo_informe,
+            $firma_imagen_subida,
+            $mostrar_firma_imagen,
+            $subtitulo,
+            $subtitulo_align,
+            $layout_config_json,
+            $recinto_default,
+            $id,
+            $veterinarioId
+        );
 
+        $stmt->execute();
+        $stmt->close();
 
-    if ($stmt->execute()) {
         if ($es_predeterminada === 1) {
-            $stmtDefault = $mysqli->prepare("
-                UPDATE configuracion_informes
-                SET es_predeterminada = 0
-                WHERE veterinario_id = ? AND id <> ?
-            ");
-            $stmtDefault->bind_param("ii", $usuario_id, $id);
+            $stmtDefault = $mysqli->prepare(
+                "UPDATE configuracion_informes
+                 SET es_predeterminada = 0
+                 WHERE veterinario_id = ? AND id <> ?"
+            );
+            $stmtDefault->bind_param('ii', $veterinarioId, $id);
             $stmtDefault->execute();
+            $stmtDefault->close();
         }
 
-        logg("Modificación de configuración para veterinario ID $usuario_id");
         guardarCamposInforme(
             $mysqli,
-            $usuario_id,
-            (int)$id,
+            $veterinarioId,
+            $id,
             'modificar',
             $_POST['campos_nuevos'] ?? [],
             $_POST['campos'] ?? [],
-            explode(',', $_POST['campos_ids_actuales'] ?? '')
+            explode(',', (string)($_POST['campos_ids_actuales'] ?? ''))
         );
 
-        echo json_encode(['status' => 'success', 'message' => 'Configuración actualizada correctamente.']);
-    } else {
-        echo json_encode(['status' => 'error', 'message' => 'Error al actualizar la configuración.']);
+        logg("Modificación de configuración para veterinario ID $veterinarioId");
+        jexit('success', 'Configuración actualizada correctamente.');
+    } catch (Throwable $e) {
+        error_log('[updConfiguracion][modificar] ' . $e->getMessage());
+        jexit('error', 'Error al actualizar la configuración.');
     }
-    exit;
 }
 
-//
-// ✅ INGRESAR
-//
 if ($action === 'ingresar') {
-    $sql = "INSERT INTO configuracion_informes 
-        (veterinario_id, nombre_plantilla, es_predeterminada, layout_tipo, logo_url, logo_position, logo_size, marca_agua_url, marca_agua_size, mostrar_marca_agua,
-        color_primario, color_secundario, firma_nombre, firma_titulo, firma_subtitulo, firma_align,
-        footer_texto, footer_align, mostrar_fecha, formato_fecha, lugar_fecha, fecha_align, 
-        imagenes_por_fila, titulo_informe, firma_imagen_url, mostrar_firma_imagen, subtitulo, subtitulo_align, layout_config_json,
-        recinto_default,
-        created_at, updated_at)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), NOW())";
+    try {
+        $sql = "INSERT INTO configuracion_informes
+            (veterinario_id, nombre_plantilla, es_predeterminada, layout_tipo, logo_url, logo_position, logo_size,
+             marca_agua_url, marca_agua_size, mostrar_marca_agua, color_primario, color_secundario,
+             firma_nombre, firma_titulo, firma_subtitulo, firma_align, footer_texto, footer_align,
+             mostrar_fecha, formato_fecha, lugar_fecha, fecha_align, imagenes_por_fila, titulo_informe,
+             firma_imagen_url, mostrar_firma_imagen, subtitulo, subtitulo_align, layout_config_json,
+             recinto_default, created_at, updated_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW(), NOW())";
 
-    $stmt = $mysqli->prepare($sql);
-    $stmt->bind_param(
-        "isissssssissssssssisssississss",
-        $usuario_id, $nombre_plantilla, $es_predeterminada, $layout_tipo,
-        $logo_subido, $logo_position, $logo_size, $marca_agua_subida, $marca_agua_size, $mostrar_marca_agua,
-        $color_primario, $color_secundario, $firma_nombre, $firma_titulo, $firma_subtitulo, $firma_align,
-        $footer_texto, $footer_align, $mostrar_fecha, $formato_fecha, $lugar_fecha, $fecha_align,
-        $imagenes_por_fila, $titulo_informe, $firma_imagen_subida, $mostrar_firma_imagen,
-        $subtitulo, $subtitulo_align, $layout_config_json, $recinto_default
-    );
+        $stmt = $mysqli->prepare($sql);
+        $stmt->bind_param(
+            "isissssssissssssssisssississss",
+            $veterinarioId,
+            $nombre_plantilla,
+            $es_predeterminada,
+            $layout_tipo,
+            $logo_subido,
+            $logo_position,
+            $logo_size,
+            $marca_agua_subida,
+            $marca_agua_size,
+            $mostrar_marca_agua,
+            $color_primario,
+            $color_secundario,
+            $firma_nombre,
+            $firma_titulo,
+            $firma_subtitulo,
+            $firma_align,
+            $footer_texto,
+            $footer_align,
+            $mostrar_fecha,
+            $formato_fecha,
+            $lugar_fecha,
+            $fecha_align,
+            $imagenes_por_fila,
+            $titulo_informe,
+            $firma_imagen_subida,
+            $mostrar_firma_imagen,
+            $subtitulo,
+            $subtitulo_align,
+            $layout_config_json,
+            $recinto_default
+        );
 
-    if ($stmt->execute()) {
-        $nueva_configuracion_id = (int)$mysqli->insert_id;
+        $stmt->execute();
+        $nueva_configuracion_id = (int)$stmt->insert_id;
+        $stmt->close();
 
         if ($es_predeterminada === 1) {
-            $stmtDefault = $mysqli->prepare("
-                UPDATE configuracion_informes
-                SET es_predeterminada = 0
-                WHERE veterinario_id = ? AND id <> ?
-            ");
-            $stmtDefault->bind_param("ii", $usuario_id, $nueva_configuracion_id);
+            $stmtDefault = $mysqli->prepare(
+                "UPDATE configuracion_informes
+                 SET es_predeterminada = 0
+                 WHERE veterinario_id = ? AND id <> ?"
+            );
+            $stmtDefault->bind_param('ii', $veterinarioId, $nueva_configuracion_id);
             $stmtDefault->execute();
+            $stmtDefault->close();
         }
-
-        logg("Creación de configuración para veterinario ID $usuario_id");
-        $nueva_configuracion_id = (int)$mysqli->insert_id;
 
         guardarCamposInforme(
             $mysqli,
-            $usuario_id,
+            $veterinarioId,
             $nueva_configuracion_id,
             'ingresar',
             $_POST['campos_nuevos'] ?? []
         );
 
-        echo json_encode(['status' => 'success', 'message' => 'Configuración ingresada correctamente.']);
-    } else {
-        echo json_encode(['status' => 'error', 'message' => 'Error al ingresar la configuración.']);
+        logg("Creación de configuración para veterinario ID $veterinarioId");
+        jexit('success', 'Configuración ingresada correctamente.');
+    } catch (Throwable $e) {
+        error_log('[updConfiguracion][ingresar] ' . $e->getMessage());
+        jexit('error', 'Error al ingresar la configuración.');
     }
-    exit;
 }
-
-echo json_encode(['status' => 'error', 'message' => 'Acción no válida.']);
-
 
 function prepararLayoutConfigJson($layout_config_post) {
     $layout_config = [];

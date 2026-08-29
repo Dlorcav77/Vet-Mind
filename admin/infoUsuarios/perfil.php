@@ -59,7 +59,7 @@ $(document).ready(function() {
       success: function(response) {
         let jsonResponse = JSON.parse(response);
         if (jsonResponse.status === 'success') {
-          $('#content').load('infoUsuarios/perfil.php');
+          $('#content').load('inicio/inicio.php');
           Swal.fire({
             icon: 'success',
             title: '¡Éxito!',

@@ -78,10 +78,10 @@ $res = $stmt->get_result();
                         <?php if (in_array('eliminar', $acceso_aplicaciones['plantilla_informe'] ?? [])): ?>
                           <a class="dropdown-item" href="#" onclick="confirmDelete('<?= $id ?>')">Eliminar</a>
                         <?php endif; ?>
-                        <div class="dropdown-divider"></div>
+                        <!-- <div class="dropdown-divider"></div>
                         <a class="dropdown-item" href="#" onclick="verEjemplos(<?= $id ?>, '<?= addslashes($nombre) ?>')">
                           <i class="fas fa-book me-2"></i> Ejemplos
-                        </a>
+                        </a> -->
                       </div>
                     </div>
                   </td>

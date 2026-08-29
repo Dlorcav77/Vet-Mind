@@ -1,86 +1,162 @@
 <?php
+
+declare(strict_types=1);
+
 require_once("../config.php");
 
 $mysqli = conn();
 
-$action = $_POST['action'] ?? '';
-$id     = $_POST['id'] ?? '';
+function jexit(string $status, string $message): void
+{
+    echo json_encode(['status' => $status, 'message' => $message], JSON_UNESCAPED_UNICODE);
+    exit;
+}
 
-if ($action !== 'eliminar') {
-    $nombre      = trim($_POST['nombre'] ?? '');
-    $descripcion = trim($_POST['descripcion'] ?? '');
-    $estado      = trim($_POST['estado'] ?? 'activo');
+function examen_pertenece_al_veterinario(mysqli $db, int $id, int $veterinarioId): bool
+{
+    $stmt = $db->prepare(
+        "SELECT id
+         FROM tipo_examen
+         WHERE id = ?
+           AND veterinario_id = ?
+         LIMIT 1"
+    );
+    $stmt->bind_param('ii', $id, $veterinarioId);
+    $stmt->execute();
+    $res = $stmt->get_result();
+    $stmt->close();
+
+    return $res->num_rows > 0;
+}
+
+if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
+    http_response_code(405);
+    jexit('error', 'Método no permitido.');
+}
+
+validarTokenCsrf();
+
+$action = trim((string)($_POST['action'] ?? ''));
+$id = isset($_POST['id']) ? (int)$_POST['id'] : 0;
+$veterinarioId = (int)$usuario_id;
+
+if (!in_array($action, ['ingresar', 'modificar', 'eliminar'], true)) {
+    jexit('error', 'Acción inválida.');
+}
+
+switch ($action) {
+    case 'ingresar':
+        credenciales('examenes', 'ingresar');
+        break;
+    case 'modificar':
+        credenciales('examenes', 'modificar');
+        break;
+    case 'eliminar':
+        credenciales('examenes', 'eliminar');
+        break;
+}
+
+try {
+    if ($action === 'eliminar') {
+        if ($id <= 0) {
+            jexit('error', 'Tipo de examen inválido.');
+        }
+
+        if (!examen_pertenece_al_veterinario($mysqli, $id, $veterinarioId)) {
+            jexit('error', 'No tienes permiso para eliminar este tipo de examen.');
+        }
+
+        $stmt = $mysqli->prepare(
+            "DELETE FROM tipo_examen
+             WHERE id = ?
+               AND veterinario_id = ?"
+        );
+        $stmt->bind_param('ii', $id, $veterinarioId);
+        $stmt->execute();
+        $stmt->close();
+
+        logg("Eliminación de tipo_examen ID: $id");
+        jexit('success', 'Tipo de examen eliminado exitosamente.');
+    }
+
+    $nombre = trim((string)($_POST['nombre'] ?? ''));
+    $descripcion = trim((string)($_POST['descripcion'] ?? ''));
+    $estado = trim((string)($_POST['estado'] ?? 'activo'));
 
     validar_length("Nombre", $nombre, 255);
     validar_length("Descripción", $descripcion, 500, true);
     validar_length("Estado", $estado, 50);
-}
 
-// 🗑 Eliminar
-if ($action === 'eliminar' && !empty($id)) {
-    $delete_query = "DELETE FROM tipo_examen WHERE id = ?";
-    $stmt = $mysqli->prepare($delete_query);
-    $stmt->bind_param('i', $id);
+    if ($action === 'modificar') {
+        if ($id <= 0) {
+            jexit('error', 'Tipo de examen inválido.');
+        }
 
-    if ($stmt->execute()) {
-        logg("Eliminación de tipo_examen ID: $id");
-        echo json_encode(['status' => 'success', 'message' => 'Tipo de examen eliminado exitosamente.']);
-    } else {
-        echo json_encode(['status' => 'error', 'message' => 'Error al eliminar el tipo de examen.']);
-    }
-    exit;
-}
+        if (!examen_pertenece_al_veterinario($mysqli, $id, $veterinarioId)) {
+            jexit('error', 'No tienes permiso para modificar este tipo de examen.');
+        }
 
-// ✏️ Modificar
-if ($action === 'modificar' && !empty($id)) {
-    // Validar duplicado
-    $sel = "SELECT id FROM tipo_examen WHERE nombre = ? AND id != ? and veterinario_id = ?";
-    $stmt = $mysqli->prepare($sel);
-    $stmt->bind_param('sii', $nombre, $id, $usuario_id);
-    $stmt->execute();
-    $res = $stmt->get_result();
+        $stmt = $mysqli->prepare(
+            "SELECT id
+             FROM tipo_examen
+             WHERE nombre = ?
+               AND id != ?
+               AND veterinario_id = ?
+             LIMIT 1"
+        );
+        $stmt->bind_param('sii', $nombre, $id, $veterinarioId);
+        $stmt->execute();
+        $res = $stmt->get_result();
+        $stmt->close();
 
-    if ($res->num_rows > 0) {
-        echo json_encode(['status' => 'error', 'message' => 'Ya existe un tipo de examen con este nombre.']);
-        exit;
-    }
+        if ($res->num_rows > 0) {
+            jexit('error', 'Ya existe un tipo de examen con este nombre.');
+        }
 
-    $update_query = "UPDATE tipo_examen SET veterinario_id = ?, nombre = ?, descripcion = ?, estado = ?, updated_at = NOW() WHERE id = ?";
-    $stmt = $mysqli->prepare($update_query);
-    $stmt->bind_param('isssi', $usuario_id, $nombre, $descripcion, $estado, $id);
+        $stmt = $mysqli->prepare(
+            "UPDATE tipo_examen
+             SET nombre = ?, descripcion = ?, estado = ?, updated_at = NOW()
+             WHERE id = ?
+               AND veterinario_id = ?"
+        );
+        $stmt->bind_param('sssii', $nombre, $descripcion, $estado, $id, $veterinarioId);
+        $stmt->execute();
+        $stmt->close();
 
-    if ($stmt->execute()) {
         logg("Modificación de tipo_examen ID: $id");
-        echo json_encode(['status' => 'success', 'message' => 'Tipo de examen actualizado exitosamente.']);
-    } else {
-        echo json_encode(['status' => 'error', 'message' => 'Error al actualizar el tipo de examen.']);
-    }
-    exit;
-}
-
-// ➕ Ingresar
-if ($action === 'ingresar') {
-    // Validar duplicado
-    $sel = "SELECT id FROM tipo_examen WHERE nombre = ? and veterinario_id = ?";
-    $stmt = $mysqli->prepare($sel);
-    $stmt->bind_param('si', $nombre, $usuario_id);
-    $stmt->execute();
-    $res = $stmt->get_result();
-
-    if ($res->num_rows > 0) {
-        echo json_encode(['status' => 'error', 'message' => 'Ya existe un tipo de examen con este nombre.']);
-        exit;
+        jexit('success', 'Tipo de examen actualizado exitosamente.');
     }
 
-    $ins = "INSERT INTO tipo_examen (veterinario_id, nombre, descripcion, estado, created_at, updated_at) VALUES (?, ?, ?, ?, NOW(), NOW())";
-    $stmt = $mysqli->prepare($ins);
-    $stmt->bind_param('isss', $usuario_id, $nombre, $descripcion, $estado);
+    if ($action === 'ingresar') {
+        $stmt = $mysqli->prepare(
+            "SELECT id
+             FROM tipo_examen
+             WHERE nombre = ?
+               AND veterinario_id = ?
+             LIMIT 1"
+        );
+        $stmt->bind_param('si', $nombre, $veterinarioId);
+        $stmt->execute();
+        $res = $stmt->get_result();
+        $stmt->close();
 
-    if ($stmt->execute()) {
+        if ($res->num_rows > 0) {
+            jexit('error', 'Ya existe un tipo de examen con este nombre.');
+        }
+
+        $stmt = $mysqli->prepare(
+            "INSERT INTO tipo_examen
+                (veterinario_id, nombre, descripcion, estado, created_at, updated_at)
+             VALUES (?, ?, ?, ?, NOW(), NOW())"
+        );
+        $stmt->bind_param('isss', $veterinarioId, $nombre, $descripcion, $estado);
+        $stmt->execute();
+        $stmt->close();
+
         logg("Inserción de tipo_examen: $nombre");
-        echo json_encode(['status' => 'success', 'message' => 'Tipo de examen ingresado exitosamente.']);
-    } else {
-        echo json_encode(['status' => 'error', 'message' => 'Error al ingresar el tipo de examen.']);
+        jexit('success', 'Tipo de examen ingresado exitosamente.');
     }
+} catch (Throwable $e) {
+    error_log('[updExamenes] ' . $e->getMessage());
+    jexit('error', 'No se pudo completar la operación.');
 }
-?>

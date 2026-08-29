@@ -122,48 +122,6 @@ global $usuario_id;
 </div>
 
 <script>
-$(document).ready(function() {
-  $('#formPaciente').on('submit', function(e) {
-    e.preventDefault();
-    var formData = $(this).serialize();
-
-    $.ajax({
-      url: $(this).attr('action'),
-      type: 'POST',
-      data: formData,
-      success: function(response) {
-          let jsonResponse = JSON.parse(response);
-          if (jsonResponse.status === 'success') {
-              Swal.fire({
-                  icon: 'success',
-                  title: '¡Éxito!',
-                  text: jsonResponse.message,
-                  confirmButtonText: 'OK'
-              }).then(() => {
-                  $('#modalPacientes .modal-body').load(
-                      'paciente/lisPacientes.php?tutor_id=<?= $action == 'modificar' ? $fila['tutor_id'] : $tutor_id; ?>'
-                  );
-              });
-          } else {
-              Swal.fire({
-                  icon: 'error',
-                  title: 'Error',
-                  text: jsonResponse.message,
-                  confirmButtonText: 'OK'
-              });
-          }
-      },
-      error: function() {
-        Swal.fire({
-          icon: 'error',
-          title: 'Error',
-          text: 'Hubo un problema al guardar el paciente.',
-          confirmButtonText: 'OK'
-        });
-      }
-    });
-  });
-});
 
 function volverListado(tutorId) {
   $('#modalPacientes .modal-body').load('paciente/lisPacientes.php?tutor_id=' + tutorId);

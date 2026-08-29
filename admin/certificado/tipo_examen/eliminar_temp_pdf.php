@@ -1,66 +1,84 @@
 <?php
 // admin/certificado/tipo_examen/eliminar_temp_pdf.php
 
+require_once("../../config.php");
+
 header('Content-Type: application/json; charset=utf-8');
+
+if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
+    http_response_code(405);
+    echo json_encode(['status' => 'error', 'message' => 'Método no permitido.'], JSON_UNESCAPED_UNICODE);
+    exit;
+}
+
+validarTokenCsrf();
+
+$veterinario = (int)$usuario_id;
+
+if ($veterinario <= 0) {
+    http_response_code(401);
+    echo json_encode(['status' => 'error', 'message' => 'Sesión inválida.'], JSON_UNESCAPED_UNICODE);
+    exit;
+}
 
 function eliminarArchivoTemporalPreviewSeguro($baseDir, $nombreArchivo)
 {
     $nombreArchivo = basename((string)$nombreArchivo);
 
     if ($nombreArchivo === '' || $nombreArchivo === '.' || $nombreArchivo === '..') {
-        return [
-            'ok' => false,
-            'message' => 'Nombre inválido.'
-        ];
+        return ['ok' => false, 'message' => 'Nombre inválido.'];
     }
 
     $baseReal = realpath($baseDir);
 
     if ($baseReal === false || !is_dir($baseReal)) {
-        return [
-            'ok' => false,
-            'message' => 'Directorio base inválido.'
-        ];
+        return ['ok' => false, 'message' => 'Directorio base inválido.'];
     }
 
     $ruta = $baseReal . DIRECTORY_SEPARATOR . $nombreArchivo;
     $rutaReal = realpath($ruta);
 
     if ($rutaReal === false || !file_exists($rutaReal)) {
-        return [
-            'ok' => true,
-            'message' => 'Archivo no existe.'
-        ];
+        return ['ok' => true, 'message' => 'Archivo no existe.'];
     }
 
     if (strpos($rutaReal, $baseReal . DIRECTORY_SEPARATOR) !== 0) {
-        return [
-            'ok' => false,
-            'message' => 'Ruta fuera del directorio permitido.'
-        ];
+        return ['ok' => false, 'message' => 'Ruta fuera del directorio permitido.'];
     }
 
     if (!is_file($rutaReal)) {
-        return [
-            'ok' => false,
-            'message' => 'No es archivo.'
-        ];
+        return ['ok' => false, 'message' => 'No es archivo.'];
     }
 
     if (@unlink($rutaReal)) {
-        return [
-            'ok' => true,
-            'message' => 'Archivo eliminado.'
-        ];
+        return ['ok' => true, 'message' => 'Archivo eliminado.'];
     }
 
-    return [
-        'ok' => false,
-        'message' => 'No se pudo eliminar archivo.'
-    ];
+    return ['ok' => false, 'message' => 'No se pudo eliminar archivo.'];
 }
 
-function normalizarRutaImagenPreview($rutaImagen)
+function normalizarPdfPreview($nombrePDF, $veterinario)
+{
+    $nombrePDF = basename(trim((string)$nombrePDF));
+
+    if ($nombrePDF === '' || $nombrePDF === '.' || $nombrePDF === '..') {
+        return null;
+    }
+
+    $prefijoEsperado = 'preview_' . (int)$veterinario . '_';
+
+    if (strpos($nombrePDF, $prefijoEsperado) !== 0) {
+        return null;
+    }
+
+    if (strtolower(pathinfo($nombrePDF, PATHINFO_EXTENSION)) !== 'pdf') {
+        return null;
+    }
+
+    return $nombrePDF;
+}
+
+function normalizarRutaImagenPreview($rutaImagen, $veterinario)
 {
     $rutaImagen = trim((string)$rutaImagen);
 
@@ -77,12 +95,9 @@ function normalizarRutaImagenPreview($rutaImagen)
     }
 
     $nombreImagen = basename($rutaImagen);
+    $prefijoEsperado = 'previmg_' . (int)$veterinario . '_';
 
-    if ($nombreImagen === '' || $nombreImagen === '.' || $nombreImagen === '..') {
-        return null;
-    }
-
-    if (strpos($nombreImagen, 'previmg_') !== 0) {
+    if (strpos($nombreImagen, $prefijoEsperado) !== 0) {
         return null;
     }
 
@@ -92,12 +107,12 @@ function normalizarRutaImagenPreview($rutaImagen)
     ];
 }
 
-$nombrePDF = trim((string)($_POST['pdf'] ?? ''));
+$nombrePDF = normalizarPdfPreview($_POST['pdf'] ?? '', $veterinario);
 
-if ($nombrePDF === '') {
+if ($nombrePDF === null) {
     echo json_encode([
         'status' => 'error',
-        'message' => 'Nombre de PDF no proporcionado.'
+        'message' => 'PDF temporal inválido o no permitido.'
     ], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
     exit;
 }
@@ -122,9 +137,6 @@ $previewImgDir = $documentRoot . '/uploads/tmp/img';
 $resultadoPdf = eliminarArchivoTemporalPreviewSeguro($previewDir, $nombrePDF);
 
 $imagenes = $_POST['imagenes'] ?? [];
-$resultadosImagenes = [];
-$imagenesEliminadas = 0;
-$imagenesErrores = 0;
 
 if (is_string($imagenes)) {
     $decode = json_decode($imagenes, true);
@@ -135,22 +147,27 @@ if (!is_array($imagenes)) {
     $imagenes = [];
 }
 
+$resultadosImagenes = [];
+$imagenesEliminadas = 0;
+$imagenesErrores = 0;
+
 foreach ($imagenes as $imagen) {
-    $normalizada = normalizarRutaImagenPreview($imagen);
+    $normalizada = normalizarRutaImagenPreview($imagen, $veterinario);
 
     if ($normalizada === null) {
         $imagenesErrores++;
-
         $resultadosImagenes[] = [
             'imagen' => (string)$imagen,
             'ok' => false,
             'message' => 'Ruta de imagen no permitida.'
         ];
-
         continue;
     }
 
-    $resultadoImagen = eliminarArchivoTemporalPreviewSeguro($previewImgDir, $normalizada['nombre']);
+    $resultadoImagen = eliminarArchivoTemporalPreviewSeguro(
+        $previewImgDir,
+        $normalizada['nombre']
+    );
 
     if (!empty($resultadoImagen['ok'])) {
         $imagenesEliminadas++;
@@ -165,13 +182,15 @@ foreach ($imagenes as $imagen) {
     ];
 }
 
-$status = (!empty($resultadoPdf['ok']) && $imagenesErrores === 0) ? 'success' : 'partial';
+$status = (!empty($resultadoPdf['ok']) && $imagenesErrores === 0)
+    ? 'success'
+    : 'partial';
 
 echo json_encode([
     'status' => $status,
     'message' => 'Limpieza de vista previa ejecutada.',
     'pdf' => [
-        'archivo' => basename($nombrePDF),
+        'archivo' => $nombrePDF,
         'ok' => !empty($resultadoPdf['ok']),
         'message' => $resultadoPdf['message'] ?? ''
     ],
@@ -182,4 +201,5 @@ echo json_encode([
         'detalle' => $resultadosImagenes
     ]
 ], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+
 exit;
