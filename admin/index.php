@@ -272,75 +272,36 @@ $(document).ready(function() {
         );
     }
 
-
     /*
-     * Carga una pantalla dentro de #content.
-     */
-    function cargarPagina(
-        ruta,
-        actualizarHistorial = false
-    ) {
-
-        $('#content').css(
-            'visibility',
-            'hidden'
-        );
-
+    * Carga una pantalla dentro de #content.
+    */
+    function cargarPagina(ruta, actualizarHistorial = false) {
         $.ajax({
             url: ruta,
             method: 'GET',
 
             success: function(data) {
-
                 $('#content').html(data);
 
-                const pagina =
-                    $('#content')
-                        .find('[data-page-id]')
-                        .first();
-
-                const pageId =
-                    pagina.attr('data-page-id');
+                const pagina = $('#content').find('[data-page-id]').first();
+                const pageId = pagina.attr('data-page-id');
 
                 updateMenuState(pageId);
 
-
                 /*
-                 * Solo guardamos la URL si la respuesta
-                 * corresponde a una pantalla de VetMind.
-                 *
-                 * Los módulos actuales ya utilizan
-                 * data-page-id.
-                 */
-                if (
-                    actualizarHistorial &&
-                    pagina.length > 0
-                ) {
+                * Solo guardamos la URL si la respuesta
+                * corresponde a una pantalla de VetMind.
+                */
+                if (actualizarHistorial && pagina.length > 0) {
                     actualizarUrlPanel(ruta);
                 }
-
-
-                setTimeout(function() {
-
-                    $('#content').css(
-                        'visibility',
-                        'visible'
-                    );
-
-                }, 250);
             },
 
             error: function(xhr) {
-
-                $('#content').css(
-                    'visibility',
-                    'visible'
-                );
-
                 /*
-                 * El controlador global se encarga
-                 * de una sesión expirada.
-                 */
+                * El controlador global se encarga
+                * de una sesión expirada.
+                */
                 if (xhr.status === 401) {
                     return;
                 }
@@ -353,7 +314,6 @@ $(document).ready(function() {
             }
         });
     }
-
 
     /*
      * Primera carga.
