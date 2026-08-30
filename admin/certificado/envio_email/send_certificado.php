@@ -256,19 +256,66 @@ try {
         $mailer->overrideFrom($nombreRemitente);
     }
 
-    $resp = $mailer->send($destinatarios, $subject, $body, $attachments);
+    require_once __DIR__ . '/email_historial.php';
+
+    $historialId = vmCrearHistorialEmail(
+        $mysqli,
+        $usuario_id,
+        'individual',
+        $destinatarios,
+        $subject,
+        [
+            [
+                'id' => $certificado_id,
+                'paciente' => $paciente,
+                'propietario' => $propietario,
+                'tipo_examen' => $tipoExamen,
+                'fecha_examen' => $cert['fecha_examen'] ?? null,
+                'nombre_pdf' => $nombreAdjunto
+            ]
+        ]
+    );
+
+    $resp = $mailer->send(
+        $destinatarios,
+        $subject,
+        $body,
+        $attachments
+    );
+
+    if (($resp['status'] ?? '') === 'success') {
+        vmFinalizarHistorialEmail(
+            $mysqli,
+            $historialId,
+            'success'
+        );
+    } else {
+        vmFinalizarHistorialEmail(
+            $mysqli,
+            $historialId,
+            'error',
+            $resp['message'] ?? 'Error desconocido al enviar.'
+        );
+    }
 
     if ($tmpFile && is_file($tmpFile)) {
         @unlink($tmpFile);
     }
+
     if ($tmpDir && is_dir($tmpDir)) {
         @rmdir($tmpDir);
     }
 
     echo json_encode(
-        $resp['status'] === 'success'
-            ? ['status' => 'success', 'message' => 'Correo enviado correctamente.']
-            : ['status' => 'error', 'message' => $resp['message']]
+        ($resp['status'] ?? '') === 'success'
+            ? [
+                'status' => 'success',
+                'message' => 'Correo enviado correctamente.'
+            ]
+            : [
+                'status' => 'error',
+                'message' => $resp['message'] ?? 'No se pudo enviar el correo.'
+            ]
     );
 
 } catch (Exception $e) {

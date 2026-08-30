@@ -51,12 +51,13 @@
           <div class="section-title">Destinatarios</div>
 
           <label class="form-label fw-bold mt-2 mb-1">Propietario</label>
-          <div class="input-group mb-3">
-            <span class="input-group-text">
-              <input class="form-check-input mt-0" type="checkbox" id="chk_propietario" checked aria-label="Enviar a propietario">
-            </span>
-            <input type="email" class="form-control" id="correo_propietario" name="correo_propietario" readonly>
+          <div class="input-group">
+              <span class="input-group-text">
+                  <input class="form-check-input mt-0" type="checkbox" id="chk_propietario" checked aria-label="Enviar a propietario">
+              </span>
+              <input type="email" class="form-control" id="correo_propietario" name="correo_propietario" readonly>
           </div>
+          <div id="correo_propietario_estado" class="form-text mb-3"></div>
 
           <label class="form-label fw-bold mb-1">Clínica</label>
           <div class="input-group mb-3">
@@ -131,67 +132,127 @@ function renderClinicasSelect(correoPropietario) {
 }
 
 async function abrirModalCorreo(el, certificadoId) {
-  const { paciente, propietario, tipo_examen, email } = el.dataset || {};
+    const { paciente, propietario, tipo_examen, email } = el.dataset || {};
 
-  $('#correo_certificado_id').val(certificadoId);
-  $('#info_paciente').text(paciente || '-');
-  $('#info_propietario').text(propietario || '-');
-  $('#info_tipo_examen').text(tipo_examen || '-');
+    $('#correo_certificado_id').val(certificadoId);
+    $('#info_paciente').text(paciente || '-');
+    $('#info_propietario').text(propietario || '-');
+    $('#info_tipo_examen').text(tipo_examen || '-');
 
-  $('#correo_propietario').val('');
-  $('#selectClinica').empty().append('<option value="">— Selecciona una clínica —</option>');
-  $('#correo_adicional').val('').prop('disabled', true);
+    $('#correo_propietario')
+        .val('')
+        .attr('placeholder', 'Buscando correo...');
 
-  $('#chk_propietario').prop('checked', true).prop('disabled', false);
-  $('#chk_clinica').prop('checked', false);
-  $('#chk_adicionales').prop('checked', false);
-  $('#selectClinica').prop('disabled', true);
+    $('#correo_propietario_estado')
+        .removeClass('text-danger text-warning text-success')
+        .addClass('text-muted')
+        .text('');
 
-  const showModal = () => {
-    const modal = new bootstrap.Modal(document.getElementById('modalEnviarCorreo'));
+    $('#selectClinica')
+        .empty()
+        .append('<option value="">— Selecciona una clínica —</option>');
+
+    $('#correo_adicional').val('').prop('disabled', true);
+    $('#chk_propietario').prop('checked', true).prop('disabled', false);
+    $('#chk_clinica').prop('checked', false);
+    $('#chk_adicionales').prop('checked', false);
+    $('#selectClinica').prop('disabled', true);
+
+    /*
+     * Abrimos inmediatamente el modal.
+     * No esperamos a resolver primero el correo.
+     */
+    const modalEl = document.getElementById('modalEnviarCorreo');
+    const modal = bootstrap.Modal.getOrCreateInstance(modalEl);
     modal.show();
-  };
 
-  window.CLINICAS = null;
+    window.CLINICAS = null;
 
-  const setPropietarioYClinicas = async (correo) => {
-    const c = (correo || '').trim();
-    $('#correo_propietario').val(c);
+    const setPropietarioYClinicas = async function (correo, estado = 'ok') {
+        const c = String(correo || '').trim();
 
-    if (!c) {
-      $('#chk_propietario').prop('checked', false).prop('disabled', true);
+        $('#correo_propietario')
+            .val(c)
+            .attr('placeholder', c ? '' : 'Sin correo registrado');
+
+        if (c) {
+            $('#chk_propietario').prop('checked', true).prop('disabled', false);
+
+            $('#correo_propietario_estado')
+                .removeClass('text-danger text-warning')
+                .addClass('text-muted')
+                .text('');
+        } else {
+            $('#chk_propietario').prop('checked', false).prop('disabled', true);
+
+            const mensaje = estado === 'error'
+                ? 'No se pudo obtener el correo del propietario. Puedes enviar igualmente a una clínica o ingresar un correo adicional.'
+                : 'El propietario no tiene un correo registrado. Puedes enviar a una clínica o ingresar un correo adicional.';
+
+            $('#correo_propietario_estado')
+                .removeClass('text-danger text-success')
+                .addClass(estado === 'error' ? 'text-warning' : 'text-muted')
+                .text(mensaje);
+        }
+
+        try {
+            await ensureClinicasCache();
+            renderClinicasSelect(c);
+        } catch (error) {
+            console.error('No se pudieron cargar las clínicas:', error);
+
+            $('#correo_propietario_estado')
+                .removeClass('text-success')
+                .addClass('text-warning');
+
+            if (c) {
+                $('#correo_propietario_estado').text('No se pudo cargar el listado de clínicas.');
+            }
+        }
+    };
+
+    /*
+     * Si el listado ya conoce el correo,
+     * no consultamos nuevamente.
+     */
+    if (email && String(email).trim() !== '') {
+        await setPropietarioYClinicas(email, 'ok');
+        return;
     }
 
-    await ensureClinicasCache();
-    renderClinicasSelect(c);
-    showModal();
-  };
+    /*
+     * Si no venía correo desde el listado,
+     * intentamos obtenerlo desde el certificado.
+     */
+    $.ajax({
+        url: 'certificado/envio_email/get_email_certificado.php',
+        type: 'POST',
+        dataType: 'json',
+        data: { id: certificadoId },
 
-  if (email && email.trim() !== '') {
-    await setPropietarioYClinicas(email);
-    return;
-  }
+        success: async function (res) {
+            const data = typeof res === 'string' ? JSON.parse(res) : res;
 
-  $.ajax({
-    url: 'certificado/envio_email/get_email_certificado.php',
-    type: 'POST',
-    dataType: 'json',
-    data: { id: certificadoId },
-    success: async function(res) {
-      const data = (typeof res === 'string') ? JSON.parse(res) : res;
+            if (data && data.status === 'success') {
+                await setPropietarioYClinicas(data.correo || '', 'ok');
+                return;
+            }
 
-      if (data && data.status === 'success') {
-        await setPropietarioYClinicas(data.correo || '');
-      } else {
-        await setPropietarioYClinicas('');
-        Swal.fire('Aviso', (data && data.message) || 'No se encontró el correo del propietario.', 'warning');
-      }
-    },
-    error: async function(xhr) {
-      await setPropietarioYClinicas('');
-      Swal.fire('Aviso', 'No se pudo obtener el correo del propietario. Puedes continuar con clínica o correo manual.', 'warning');
-    }
-  });
+            /*
+             * Ya NO mostramos SweetAlert.
+             */
+            await setPropietarioYClinicas('', 'sin_correo');
+        },
+
+        error: async function (xhr) {
+            console.error('Error al obtener correo:', xhr.responseText);
+
+            /*
+             * Tampoco mostramos SweetAlert acá.
+             */
+            await setPropietarioYClinicas('', 'error');
+        }
+    });
 }
 
 $(document).on('change', '#chk_clinica', function () {

@@ -172,33 +172,83 @@
 
             </div>
 
-            <div class="modal-footer">
+            <div
+                class="modal-footer d-flex justify-content-between align-items-center flex-wrap gap-2"
+            >
 
-                <a
-                    href="#"
-                    class="btn btn-sm vm-btn-accent-outline"
-                    id="btnVerInformeDescargar"
+                <div
+                    class="d-flex align-items-center gap-2"
+                    id="verInformeNavegacion"
                 >
-                    <i class="fas fa-download me-1"></i>
-                    Descargar PDF
-                </a>
+                    <button
+                        type="button"
+                        class="btn btn-sm vm-btn-accent-outline"
+                        id="btnVerInformeAnterior"
+                        title="Informe anterior"
+                        aria-label="Informe anterior"
+                        disabled
+                    >
+                        <i class="fas fa-chevron-left"></i>
+                    </button>
 
-                <a
-                    href="#"
-                    class="btn btn-sm vm-btn-accent ajax-link"
-                    id="btnVerInformeEditar"
-                >
-                    <i class="fas fa-edit me-1"></i>
-                    Editar
-                </a>
+                    <span
+                        id="verInformePosicion"
+                        class="small text-muted text-nowrap"
+                    >
+                        - / -
+                    </span>
 
-                <button
-                    type="button"
-                    class="btn btn-sm btn-secondary"
-                    data-bs-dismiss="modal"
-                >
-                    Cerrar
-                </button>
+                    <button
+                        type="button"
+                        class="btn btn-sm vm-btn-accent-outline"
+                        id="btnVerInformeSiguiente"
+                        title="Informe siguiente"
+                        aria-label="Informe siguiente"
+                        disabled
+                    >
+                        <i class="fas fa-chevron-right"></i>
+                    </button>
+                </div>
+
+
+                <div class="d-flex align-items-center gap-2">
+
+                    <a
+                        href="#"
+                        class="btn btn-sm vm-btn-accent-outline"
+                        id="btnVerInformeDescargar"
+                    >
+                        <i class="fas fa-download me-1"></i>
+                        Descargar PDF
+                    </a>
+
+                    <button
+                        type="button"
+                        class="btn btn-sm btn-success"
+                        id="btnVerInformeEnviar"
+                    >
+                        <i class="fas fa-envelope me-1"></i>
+                        Enviar
+                    </button>
+
+                    <a
+                        href="#"
+                        class="btn btn-sm vm-btn-accent ajax-link"
+                        id="btnVerInformeEditar"
+                    >
+                        <i class="fas fa-edit me-1"></i>
+                        Editar
+                    </a>
+
+                    <button
+                        type="button"
+                        class="btn btn-sm btn-secondary"
+                        data-bs-dismiss="modal"
+                    >
+                        Cerrar
+                    </button>
+
+                </div>
 
             </div>
 

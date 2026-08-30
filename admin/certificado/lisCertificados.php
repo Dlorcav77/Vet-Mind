@@ -39,7 +39,7 @@ $stmt->bind_param('i', $usuario_id);
 $stmt->execute();
 $res = $stmt->get_result();
 ?>
-<link rel="stylesheet" href="certificado/ver/css/ver.css?v=1">
+<link rel="stylesheet" href="certificado/ver/css/ver.css?v=2">
 <style>
 
     .cert-numero-wrap {
@@ -99,6 +99,97 @@ $res = $stmt->get_result();
 
     #tablaCertificados_wrapper .dataTables_filter label {
         margin-bottom: 0;
+    }
+
+
+
+
+
+#btnEnvioMasivo {
+    width: 28px;
+    height: 28px;
+    padding: 0;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    position: relative;
+    overflow: visible;
+    border: 0 !important;
+    background: transparent !important;
+    box-shadow: none !important;
+    font-size: 15px;
+    color: #6c757d;
+}
+
+#btnEnvioMasivo:hover,
+#btnEnvioMasivo.is-active {
+    color: #198754;
+}
+
+#btnEnvioMasivo .cert-envio-count,
+#btnEnvioMasivo .cert-envio-history {
+    position: absolute;
+    top: -1px;
+    right: 0;
+    min-width: 13px;
+    height: 13px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 9px;
+    line-height: 1;
+    font-weight: 700;
+}
+
+#btnEnvioMasivo .cert-envio-history {
+    top: -1px;
+    right: 0;
+    min-width: 13px;
+    height: 13px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    line-height: 1;
+    cursor: pointer;
+    color: #198754;
+}
+
+#btnEnvioMasivo .cert-envio-history i {
+    color: inherit;
+    font-size: 11px;
+    font-weight: 900;
+    transform: scale(1.08);
+    transform-origin: center;
+}
+
+#btnEnvioMasivo .cert-envio-history:hover {
+    color: #157347;
+}
+
+
+
+
+
+
+
+    .cert-select-envio {
+        display: none;
+        margin: 0 2px 0 0;
+        cursor: pointer;
+    }
+
+    #certificado.vm-envio-seleccion-activa .cert-select-envio {
+        display: inline-block;
+    }
+
+    #certificado.vm-envio-seleccion-activa .cert-numero-wrap {
+        gap: 7px;
+    }
+
+    #btnEnvioMasivo .cert-envio-count {
+        font-size: 10px;
+        font-weight: 700;
+        margin-left: 2px;
     }
 
 </style>
@@ -203,6 +294,18 @@ $res = $stmt->get_result();
                     >
                         <span class="cert-numero-wrap">
 
+                            <input
+                                type="checkbox"
+                                class="form-check-input cert-select-envio"
+                                value="<?= (int)$fila['id'] ?>"
+                                data-id="<?= (int)$fila['id'] ?>"
+                                data-paciente="<?= htmlspecialchars($paciente, ENT_QUOTES, 'UTF-8') ?>"
+                                data-propietario="<?= htmlspecialchars($propietario, ENT_QUOTES, 'UTF-8') ?>"
+                                data-tipo-examen="<?= htmlspecialchars($fila['tipo_examen'] ?? '-', ENT_QUOTES, 'UTF-8') ?>"
+                                data-fecha="<?= htmlspecialchars(date('d-m-Y', strtotime($fila['fecha_examen'])), ENT_QUOTES, 'UTF-8') ?>"
+                                aria-label="Seleccionar informe para enviar"
+                            >
+
                             <span><?= $numeroListado ?></span>
 
                             <?php if ($esDestacado): ?>
@@ -280,9 +383,15 @@ $res = $stmt->get_result();
                                 data-email="<?= htmlspecialchars($fila['email'] ?? '', ENT_QUOTES, 'UTF-8') ?>">
                             <i class="fas fa-envelope me-2 text-success"></i> Enviar por correo
                           </a>
-                          <a class="dropdown-item" href="#" onclick="confirmDelete(<?= (int)$fila['id'] ?>, '<?= htmlspecialchars($tipo_ingreso, ENT_QUOTES) ?>')">
-                            <i class="fas fa-trash-alt me-2 text-danger"></i> Eliminar
-                          </a>
+                            <button
+                                type="button"
+                                class="dropdown-item btn-eliminar-informe"
+                                data-id="<?= (int)$fila['id'] ?>"
+                                data-tipo="<?= htmlspecialchars($tipo_ingreso, ENT_QUOTES, 'UTF-8') ?>"
+                            >
+                                <i class="fas fa-trash-alt me-2 text-danger"></i>
+                                Eliminar
+                            </button>
                         </div>
                       </div>
                     </td>
@@ -348,57 +457,169 @@ $res = $stmt->get_result();
 
 <?php require __DIR__ . '/partials/modal_ver_informe.php'; ?>
 <?php include 'envio_email/envio_email.php'; ?>
+<?php include 'envio_email/envio_masivo.php'; ?>
+<?php include 'envio_email/historial_envios.php'; ?>
 
-<script src="certificado/ver/js/ver.js?v=1"></script>
+<script src="certificado/ver/js/ver.js?v=3"></script>
 <script>
-function confirmDelete(id, tipo) {
-    Swal.fire({
-        title: '¿Eliminar Informe?',
-        text: 'Esta acción no se puede deshacer',
-        icon: 'warning',
-        showCancelButton: true,
-        confirmButtonColor: '#d33',
-        cancelButtonColor: '#3085d6',
-        confirmButtonText: 'Sí, eliminar',
-        cancelButtonText: 'Cancelar'
-    }).then((result) => {
-        if (!result.isConfirmed) {
-            return;
-        }
 
-        const url = tipo === 'manual'
-            ? 'certificado/subir_informe/updSubirInforme.php'
-            : 'certificado/updCertificados.php';
+(function () {
 
-      $.ajax({
-          url: url,
-          type: 'POST',
-          dataType: 'json',
-          data: { action: 'eliminar', id: id },
-          success: function (response) {
-              const jsonResponse = response;
+    $(document)
+        .off(
+            'click.certEliminarInforme',
+            '.btn-eliminar-informe'
+        )
+        .on(
+            'click.certEliminarInforme',
+            '.btn-eliminar-informe',
+            function (e) {
 
-              if (jsonResponse.status === 'success') {
-                  if (typeof destroyTiptapEditors === 'function') {
-                      destroyTiptapEditors();
-                  }
+                e.preventDefault();
+                e.stopPropagation();
 
-                  Swal.fire('Eliminado', jsonResponse.message, 'success').then(() => {
-                      $('#content').load('certificado/lisCertificados.php');
-                  });
-              } else {
-                  Swal.fire('Error', jsonResponse.message || 'No se pudo eliminar el informe.', 'error');
-              }
-          },
-          error: function (xhr) {
-              console.error('Error AJAX al eliminar:', xhr.responseText);
-              Swal.fire('Error', 'No se pudo eliminar el Informe.', 'error');
-          }
-      });
-    });
-}
-</script>
-<script>
+                const $boton = $(this);
+
+                const id =
+                    parseInt(
+                        $boton.attr('data-id'),
+                        10
+                    ) || 0;
+
+                const tipo =
+                    String(
+                        $boton.attr('data-tipo') || ''
+                    ).trim();
+
+                if (id <= 0) {
+                    Swal.fire(
+                        'Error',
+                        'Informe inválido.',
+                        'error'
+                    );
+
+                    return;
+                }
+
+                /*
+                 * Guardamos la fila antes del AJAX.
+                 */
+                let $fila = $boton.closest('tr');
+
+                /*
+                 * Compatibilidad con DataTables Responsive.
+                 * Si el botón estuviera dentro de una fila child,
+                 * la fila real es la anterior.
+                 */
+                if ($fila.hasClass('child')) {
+                    $fila = $fila.prev();
+                }
+
+                Swal.fire({
+                    title: '¿Eliminar Informe?',
+                    text: 'Esta acción no se puede deshacer',
+                    icon: 'warning',
+                    showCancelButton: true,
+                    confirmButtonColor: '#d33',
+                    cancelButtonColor: '#3085d6',
+                    confirmButtonText: 'Sí, eliminar',
+                    cancelButtonText: 'Cancelar'
+                }).then(function (result) {
+
+                    if (!result.isConfirmed) {
+                        return;
+                    }
+
+                    const url =
+                        tipo === 'manual'
+                            ? 'certificado/subir_informe/updSubirInforme.php'
+                            : 'certificado/updCertificados.php';
+
+                    $.ajax({
+                        url: url,
+                        type: 'POST',
+                        dataType: 'json',
+                        data: {
+                            action: 'eliminar',
+                            id: id
+                        },
+
+                        success: function (response) {
+
+                            if (
+                                !response ||
+                                response.status !== 'success'
+                            ) {
+                                Swal.fire(
+                                    'Error',
+                                    response?.message ||
+                                    'No se pudo eliminar el informe.',
+                                    'error'
+                                );
+
+                                return;
+                            }
+
+                            const $tabla =
+                                $('#tablaCertificados');
+
+                            /*
+                             * Quitamos solamente la fila eliminada.
+                             *
+                             * NO volvemos a cargar lisCertificados.php.
+                             */
+                            if (
+                                $tabla.length &&
+                                $.fn.DataTable &&
+                                $.fn.DataTable.isDataTable(
+                                    $tabla[0]
+                                )
+                            ) {
+                                const tabla =
+                                    $tabla.DataTable();
+
+                                tabla
+                                    .row($fila)
+                                    .remove()
+                                    .draw(false);
+
+                            } else {
+
+                                $fila.remove();
+                            }
+
+                            Swal.fire(
+                                'Eliminado',
+                                response.message ||
+                                'El informe fue eliminado correctamente.',
+                                'success'
+                            );
+                        },
+
+                        error: function (xhr) {
+
+                            console.error(
+                                'Error AJAX al eliminar:',
+                                xhr.responseText
+                            );
+
+                            const mensaje =
+                                xhr.responseJSON?.message ||
+                                'No se pudo eliminar el Informe.';
+
+                            Swal.fire(
+                                'Error',
+                                mensaje,
+                                'error'
+                            );
+                        }
+                    });
+                });
+            }
+        );
+
+})();
+
 (function () {
 
     window.vmCertificadosSoloDestacados =
@@ -507,51 +728,49 @@ function confirmDelete(id, tipo) {
             return;
         }
 
-        const $wrapper =
-            $('#tablaCertificados_wrapper');
-
-        const $filter =
-            $wrapper.find('.dataTables_filter');
+        const $wrapper = $('#tablaCertificados_wrapper');
+        const $filter = $wrapper.find('.dataTables_filter');
 
         if (!$filter.length) {
             return;
         }
 
         if (!$('#btnFiltroDestacados').length) {
+            const $boton = $('<button>', {
+                type: 'button',
+                id: 'btnFiltroDestacados',
+                title: 'Mostrar solo casos de referencia',
+                'aria-label': 'Mostrar solo casos de referencia',
+                'aria-pressed': 'false'
+            });
 
-          const $boton = $(
-              '<button>',
-              {
-                  type: 'button',
-                  id: 'btnFiltroDestacados',
-                  title:
-                      'Mostrar solo casos de referencia',
-                  'aria-label':
-                      'Mostrar solo casos de referencia',
-                  'aria-pressed':
-                      'false'
-              }
-          );
-
-          $boton.html(
-              '<i class="far fa-bookmark"></i>'
-          );
-
+            $boton.html('<i class="far fa-bookmark"></i>');
             $filter.append($boton);
         }
 
-        actualizarBotonDestacados();
-
         /*
-         * Si DataTables fue reinicializado por global.js
-         * mientras el filtro estaba activo,
-         * volvemos a dibujarlo.
-         */
+        * Botón de envío múltiple.
+        */
+        if (!$('#btnEnvioMasivo').length) {
+            const $botonCorreo = $('<button>', {
+                type: 'button',
+                id: 'btnEnvioMasivo',
+                title: 'Seleccionar informes para enviar',
+                'aria-label': 'Seleccionar informes para enviar',
+                'aria-pressed': 'false'
+            });
+
+            $botonCorreo.html('<i class="far fa-envelope"></i>');
+            $filter.append($botonCorreo);
+        }
+
+        actualizarBotonDestacados();
+        actualizarBotonEnvioMasivo();
+
         if (window.vmCertificadosSoloDestacados) {
             $tabla.DataTable().draw(false);
         }
     }
-
 
     /*
      * Clic en estrella junto al buscador.
@@ -642,6 +861,279 @@ function confirmDelete(id, tipo) {
                 modal.show();
             }
         );
+
+    /*
+    * =========================================================
+    * Selección de informes para envío múltiple
+    * =========================================================
+    */
+
+    window.vmCertificadosModoEnvio = false;
+    window.vmCertificadosSeleccionEnvio = new Map();
+
+    /*
+    * Obtiene los datos de un checkbox.
+    */
+    function obtenerDatosCheckEnvio(check) {
+        const $check = $(check);
+
+        return {
+            id: parseInt($check.attr('data-id'), 10) || 0,
+            paciente: $check.attr('data-paciente') || '',
+            propietario: $check.attr('data-propietario') || '',
+            tipo_examen: $check.attr('data-tipo-examen') || '',
+            fecha: $check.attr('data-fecha') || ''
+        };
+    }
+
+    /*
+    * Sincroniza los checkbox que DataTables
+    * tiene actualmente visibles en el DOM.
+    */
+    function actualizarChecksVisiblesEnvio() {
+        $('.cert-select-envio').each(function () {
+            const id = parseInt($(this).attr('data-id'), 10) || 0;
+
+            $(this).prop(
+                'checked',
+                window.vmCertificadosSeleccionEnvio.has(id)
+            );
+        });
+    }
+
+    /*
+    * Actualiza el sobre y contador.
+    */
+    function actualizarBotonEnvioMasivo() {
+        const $btn = $('#btnEnvioMasivo');
+
+        if (!$btn.length) return;
+
+        const activo = window.vmCertificadosModoEnvio === true;
+        const cantidad = window.vmCertificadosSeleccionEnvio.size;
+
+        $btn
+            .toggleClass('is-active', activo)
+            .attr('aria-pressed', activo ? 'true' : 'false');
+
+        /*
+        * Estado normal.
+        */
+        if (!activo) {
+            $btn
+                .attr('title', 'Seleccionar informes para enviar')
+                .attr('aria-label', 'Seleccionar informes para enviar')
+                .html('<i class="far fa-envelope"></i>');
+
+            return;
+        }
+
+        /*
+        * Modo envío sin seleccionados:
+        * mostramos el historial como mini icono
+        * dentro del mismo espacio del sobre.
+        */
+        if (cantidad === 0) {
+            $btn
+                .attr('title', 'Modo de selección activo')
+                .attr('aria-label', 'Modo de selección activo')
+                .html(
+                    '<i class="fas fa-envelope"></i>' +
+                    '<span class="cert-envio-history" ' +
+                        'title="Historial de envíos" ' +
+                        'aria-label="Historial de envíos">' +
+                        '<i class="far fa-clock"></i>' +
+                    '</span>'
+                );
+
+            return;
+        }
+
+        /*
+        * Con seleccionados:
+        * el mismo espacio muestra el contador.
+        */
+        $btn
+            .attr(
+                'title',
+                'Continuar con ' + cantidad + ' informe(s)'
+            )
+            .attr(
+                'aria-label',
+                'Continuar con ' + cantidad + ' informe(s)'
+            )
+            .html(
+                '<i class="fas fa-envelope"></i>' +
+                '<span class="cert-envio-count">' +
+                    cantidad +
+                '</span>'
+            );
+    }
+
+    /*
+    * Entrar al modo selección.
+    */
+    function activarModoEnvioMasivo() {
+        window.vmCertificadosModoEnvio = true;
+        window.vmCertificadosSeleccionEnvio.clear();
+
+        $('#certificado').addClass('vm-envio-seleccion-activa');
+
+        actualizarChecksVisiblesEnvio();
+        actualizarBotonEnvioMasivo();
+    }
+
+    /*
+    * Salir del modo selección.
+    */
+    function cancelarModoEnvioMasivo() {
+        window.vmCertificadosModoEnvio = false;
+        window.vmCertificadosSeleccionEnvio.clear();
+
+        $('#certificado').removeClass('vm-envio-seleccion-activa');
+
+        actualizarChecksVisiblesEnvio();
+        actualizarBotonEnvioMasivo();
+    }
+
+    window.vmCancelarModoEnvioMasivo = cancelarModoEnvioMasivo;
+
+    /*
+    * Clic en el sobre.
+    *
+    * Primer clic:
+    * activa modo selección.
+    *
+    * Si ya existen seleccionados:
+    * abre el modal con TODOS los seleccionados,
+    * aunque estén en distintas páginas.
+    *
+    * Si no existe ninguno:
+    * sale del modo selección.
+    */
+   
+    $(document)
+        .off('click.certEnvioMasivo', '#btnEnvioMasivo')
+        .on('click.certEnvioMasivo', '#btnEnvioMasivo', function (e) {
+            e.preventDefault();
+            e.stopPropagation();
+
+            /*
+            * Si el clic fue específicamente sobre
+            * el pequeño icono del historial,
+            * abrimos el historial y no hacemos
+            * ninguna otra acción.
+            */
+            if ($(e.target).closest('.cert-envio-history').length) {
+                if (
+                    typeof window.abrirHistorialEnviosCertificados
+                    !== 'function'
+                ) {
+                    Swal.fire(
+                        'Error',
+                        'No se pudo abrir el historial de envíos.',
+                        'error'
+                    );
+                    return;
+                }
+
+                window.abrirHistorialEnviosCertificados();
+                return;
+            }
+
+            /*
+            * Primer clic en el sobre:
+            * activa selección.
+            */
+            if (!window.vmCertificadosModoEnvio) {
+                activarModoEnvioMasivo();
+                return;
+            }
+
+            /*
+            * Si estamos en modo selección pero todavía
+            * no marcamos nada, otro clic en el sobre
+            * cancela el modo.
+            */
+            if (window.vmCertificadosSeleccionEnvio.size === 0) {
+                cancelarModoEnvioMasivo();
+                return;
+            }
+
+            /*
+            * Con informes seleccionados abrimos
+            * el envío múltiple.
+            */
+            const informes = Array.from(
+                window.vmCertificadosSeleccionEnvio.values()
+            );
+
+            if (
+                typeof window.abrirModalEnvioMasivoCertificados
+                !== 'function'
+            ) {
+                Swal.fire(
+                    'Error',
+                    'No se pudo abrir el módulo de envío.',
+                    'error'
+                );
+                return;
+            }
+
+            window.abrirModalEnvioMasivoCertificados(informes);
+        });
+
+    /*
+    * Cada vez que se marca/desmarca un informe,
+    * guardamos su estado en el Map global.
+    */
+    $(document)
+        .off('change.certEnvioSeleccion', '.cert-select-envio')
+        .on('change.certEnvioSeleccion', '.cert-select-envio', function () {
+            const datos = obtenerDatosCheckEnvio(this);
+
+            if (!datos.id) return;
+
+            if (this.checked) {
+                window.vmCertificadosSeleccionEnvio.set(
+                    datos.id,
+                    datos
+                );
+            } else {
+                window.vmCertificadosSeleccionEnvio.delete(
+                    datos.id
+                );
+            }
+
+            actualizarBotonEnvioMasivo();
+        });
+
+    /*
+    * Evitamos que pulsar el checkbox active
+    * comportamientos de la fila.
+    */
+    $(document)
+        .off('click.certEnvioCheckbox', '.cert-select-envio')
+        .on('click.certEnvioCheckbox', '.cert-select-envio', function (e) {
+            e.stopPropagation();
+        });
+
+    /*
+    * DataTables reconstruye las filas al cambiar
+    * de página, ordenar, buscar o filtrar.
+    *
+    * Restauramos los checkbox desde el Map.
+    */
+    $('#tablaCertificados')
+        .off('draw.dt.certEnvioMasivo')
+        .on('draw.dt.certEnvioMasivo', function () {
+            if (!window.vmCertificadosModoEnvio) return;
+
+            $('#certificado').addClass('vm-envio-seleccion-activa');
+
+            actualizarChecksVisiblesEnvio();
+            actualizarBotonEnvioMasivo();
+        });
 
 
     /*

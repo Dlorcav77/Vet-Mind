@@ -238,6 +238,28 @@
     color: #138496;
 }
 
+#modalVerInforme .modal-body {
+    position: relative;
+}
+
+#modalVerInforme.vm-ver-cambiando #verInformeLoading {
+    display: flex !important;
+    position: absolute;
+    inset: 0;
+    z-index: 20;
+    align-items: center;
+    justify-content: center;
+    flex-direction: column;
+    background: rgba(255, 255, 255, 0.72);
+    backdrop-filter: blur(1px);
+}
+
+#modalVerInforme.vm-ver-cambiando #verInformeVistaSistema,
+#modalVerInforme.vm-ver-cambiando #verInformeVistaPdf {
+    opacity: 0.55;
+    pointer-events: none;
+}
+
 @media (max-width: 767.98px) {
     #modalVerInforme .modal-dialog {
         max-width: none;

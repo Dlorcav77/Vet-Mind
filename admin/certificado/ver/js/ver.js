@@ -598,6 +598,26 @@
         return bootstrap.Modal.getOrCreateInstance(modalEl);
     }
 
+    function iniciarCambioInforme() {
+        $('#modalVerInforme')
+            .addClass('vm-ver-cambiando');
+
+        $('#verInformeLoading')
+            .show();
+
+        $('#btnVerInformeAnterior, #btnVerInformeSiguiente')
+            .prop('disabled', true);
+    }
+
+
+    function finalizarCambioInforme() {
+        $('#modalVerInforme')
+            .removeClass('vm-ver-cambiando');
+
+        $('#verInformeLoading')
+            .hide();
+    }
+
     function limpiarVisor() {
         informeActual = null;
 
@@ -637,6 +657,17 @@
 
         $('#btnVerInformeEditar')
             .attr('href', '#');
+
+        $('#btnVerInformeAnterior')
+            .prop('disabled', true)
+            .removeAttr('data-id');
+
+        $('#btnVerInformeSiguiente')
+            .prop('disabled', true)
+            .removeAttr('data-id');
+
+        $('#verInformePosicion')
+            .text('- / -');
 
         $('#verInformeLoading')
             .show();
@@ -812,10 +843,9 @@
         }
 
         $('#btnVerInformeEditar')
-            .attr(
-                'href',
-                editarUrl
-            );
+            .attr('href', editarUrl);
+
+        actualizarNavegacionInforme();
     }
 
     function activarBotonVista(vista) {
@@ -893,6 +923,174 @@
         }
     }
 
+    function obtenerIdsInformesVisibles() {
+        const ids = [];
+
+        const $tabla =
+            $('#tablaCertificados');
+
+        /*
+        * Si DataTables está activo, utilizamos exactamente
+        * su orden y sus filtros actuales.
+        */
+        if (
+            $tabla.length &&
+            $.fn.DataTable &&
+            $.fn.DataTable.isDataTable(
+                $tabla[0]
+            )
+        ) {
+            const tabla =
+                $tabla.DataTable();
+
+            const filas =
+                tabla
+                    .rows({
+                        search: 'applied',
+                        order: 'applied'
+                    })
+                    .nodes()
+                    .toArray();
+
+            filas.forEach(function (fila) {
+
+                const id =
+                    parseInt(
+                        $(fila)
+                            .find('.btn-ver-informe')
+                            .first()
+                            .attr('data-id'),
+                        10
+                    ) || 0;
+
+                if (id > 0) {
+                    ids.push(id);
+                }
+            });
+
+            return ids;
+        }
+
+        /*
+        * Fallback por si el listado todavía no tiene
+        * DataTables inicializado.
+        */
+        $('#tablaCertificados tbody tr')
+            .each(function () {
+
+                const id =
+                    parseInt(
+                        $(this)
+                            .find('.btn-ver-informe')
+                            .first()
+                            .attr('data-id'),
+                        10
+                    ) || 0;
+
+                if (id > 0) {
+                    ids.push(id);
+                }
+            });
+
+        return ids;
+    }
+
+
+    function obtenerEstadoNavegacion(idActual) {
+        const ids =
+            obtenerIdsInformesVisibles();
+
+        const actual =
+            parseInt(idActual, 10);
+
+        const indice =
+            ids.indexOf(actual);
+
+        return {
+            ids: ids,
+            indice: indice,
+
+            anterior:
+                indice > 0
+                    ? ids[indice - 1]
+                    : null,
+
+            siguiente:
+                indice >= 0 &&
+                indice < ids.length - 1
+                    ? ids[indice + 1]
+                    : null
+        };
+    }
+
+
+    function actualizarNavegacionInforme() {
+        if (!informeActual) {
+
+            $('#btnVerInformeAnterior')
+                .prop('disabled', true)
+                .removeAttr('data-id');
+
+            $('#btnVerInformeSiguiente')
+                .prop('disabled', true)
+                .removeAttr('data-id');
+
+            $('#verInformePosicion')
+                .text('- / -');
+
+            return;
+        }
+
+        const estado =
+            obtenerEstadoNavegacion(
+                informeActual.id
+            );
+
+        const total =
+            estado.ids.length;
+
+        const posicion =
+            estado.indice >= 0
+                ? estado.indice + 1
+                : 0;
+
+        $('#verInformePosicion')
+            .text(
+                posicion > 0
+                    ? posicion + ' / ' + total
+                    : '- / ' + total
+            );
+
+
+        $('#btnVerInformeAnterior')
+            .prop(
+                'disabled',
+                !estado.anterior
+            )
+            .attr(
+                'data-id',
+                estado.anterior || ''
+            );
+
+
+        $('#btnVerInformeSiguiente')
+            .prop(
+                'disabled',
+                !estado.siguiente
+            )
+            .attr(
+                'data-id',
+                estado.siguiente || ''
+            );
+    }
+
+
+    function obtenerVistaActualInforme() {
+        return $('#verInformeVistaPdf').is(':visible')
+            ? 'pdf'
+            : 'informe';
+    }
+
     function abrirVisorInforme(id, vistaInicial = 'informe') {
         const certificadoId =
             parseInt(id, 10);
@@ -912,7 +1110,21 @@
                 ? 'pdf'
                 : 'informe';
 
-        limpiarVisor();
+        const modalEl =
+            document.getElementById('modalVerInforme');
+
+        const modalYaAbierto =
+            !!(
+                modalEl &&
+                modalEl.classList.contains('show') &&
+                informeActual
+            );
+
+        if (modalYaAbierto) {
+            iniciarCambioInforme();
+        } else {
+            limpiarVisor();
+        }
 
         const modal =
             obtenerModal();
@@ -927,7 +1139,9 @@
             return;
         }
 
-        modal.show();
+        if (!modalYaAbierto) {
+            modal.show();
+        }
 
         if (requestInforme) {
             requestInforme.abort();
@@ -950,7 +1164,7 @@
                     response.status !== 'success' ||
                     !response.informe
                 ) {
-                    $('#verInformeLoading').hide();
+                    finalizarCambioInforme();
 
                     Swal.fire(
                         'Error',
@@ -959,7 +1173,9 @@
                         'error'
                     );
 
-                    modal.hide();
+                    if (!modalYaAbierto) {
+                        modal.hide();
+                    }
                     return;
                 }
 
@@ -967,13 +1183,24 @@
                     response.informe
                 );
 
-                $('#verInformeLoading').hide();
-
+                /*
+                * Si veníamos navegando por PDF,
+                * quitamos el iframe anterior justo antes
+                * de construir el nuevo.
+                */
                 if (modoInicial === 'pdf') {
+
+                    $('#verInformePdfContenido')
+                        .empty();
+
                     mostrarVistaPdf();
+
                 } else {
+
                     mostrarVistaInforme();
                 }
+
+                finalizarCambioInforme();
             },
 
             error: function (xhr, status) {
@@ -1055,6 +1282,66 @@
             }
         );
 
+    $(document)
+        .off(
+            'click.verInformeAnterior',
+            '#btnVerInformeAnterior'
+        )
+        .on(
+            'click.verInformeAnterior',
+            '#btnVerInformeAnterior',
+            function () {
+
+                const id =
+                    parseInt(
+                        $(this).attr('data-id'),
+                        10
+                    ) || 0;
+
+                if (!id) {
+                    return;
+                }
+
+                const vista =
+                    obtenerVistaActualInforme();
+
+                abrirVisorInforme(
+                    id,
+                    vista
+                );
+            }
+        );
+
+
+    $(document)
+        .off(
+            'click.verInformeSiguiente',
+            '#btnVerInformeSiguiente'
+        )
+        .on(
+            'click.verInformeSiguiente',
+            '#btnVerInformeSiguiente',
+            function () {
+
+                const id =
+                    parseInt(
+                        $(this).attr('data-id'),
+                        10
+                    ) || 0;
+
+                if (!id) {
+                    return;
+                }
+
+                const vista =
+                    obtenerVistaActualInforme();
+
+                abrirVisorInforme(
+                    id,
+                    vista
+                );
+            }
+        );
 
     /*
      * Botones internos del modal.
@@ -1086,6 +1373,114 @@
             }
         );
 
+        /*
+    * Enviar por correo desde el visor.
+    *
+    * Reutiliza exactamente el mismo modal individual
+    * utilizado desde el listado de certificados.
+    */
+    $(document)
+        .off(
+            'click.verInformeEnviar',
+            '#btnVerInformeEnviar'
+        )
+        .on(
+            'click.verInformeEnviar',
+            '#btnVerInformeEnviar',
+            function (e) {
+                e.preventDefault();
+                e.stopPropagation();
+
+                if (!informeActual) {
+                    Swal.fire(
+                        'Error',
+                        'No hay un informe cargado para enviar.',
+                        'error'
+                    );
+                    return;
+                }
+
+                if (typeof window.abrirModalCorreo !== 'function') {
+                    Swal.fire(
+                        'Error',
+                        'No se pudo abrir el módulo de correo.',
+                        'error'
+                    );
+                    return;
+                }
+
+                /*
+                * Guardamos los datos ANTES de cerrar
+                * el visor, porque al cerrarse
+                * informeActual se limpia.
+                */
+                const datosCorreo = {
+                    id: parseInt(informeActual.id, 10) || 0,
+                    paciente: String(informeActual.paciente || ''),
+                    propietario: String(informeActual.propietario || ''),
+                    tipo_examen: String(informeActual.tipo_examen || '')
+                };
+
+                if (!datosCorreo.id) {
+                    Swal.fire(
+                        'Error',
+                        'El informe no tiene un ID válido.',
+                        'error'
+                    );
+                    return;
+                }
+
+                /*
+                * Creamos un elemento temporal compatible
+                * con abrirModalCorreo(), que actualmente
+                * recibe los datos mediante dataset.
+                *
+                * Dejamos email vacío para que el módulo
+                * consulte get_email_certificado.php,
+                * igual que ya sabe hacer actualmente.
+                */
+                const elementoCorreo = document.createElement('button');
+
+                elementoCorreo.dataset.id = String(datosCorreo.id);
+                elementoCorreo.dataset.paciente = datosCorreo.paciente;
+                elementoCorreo.dataset.propietario = datosCorreo.propietario;
+                elementoCorreo.dataset.tipo_examen = datosCorreo.tipo_examen;
+                elementoCorreo.dataset.email = '';
+
+                const modalEl =
+                    document.getElementById('modalVerInforme');
+
+                const modal =
+                    obtenerModal();
+
+                if (!modalEl || !modal) {
+                    Swal.fire(
+                        'Error',
+                        'No se encontró el visor de informes.',
+                        'error'
+                    );
+                    return;
+                }
+
+                /*
+                * Esperamos a que Bootstrap termine
+                * de cerrar el visor antes de abrir
+                * el modal de correo.
+                */
+                $(modalEl)
+                    .one(
+                        'hidden.bs.modal.verInformeCorreo',
+                        function () {
+                            window.abrirModalCorreo(
+                                elementoCorreo,
+                                datosCorreo.id
+                            );
+                        }
+                    );
+
+                modal.hide();
+            }
+        );
 
     /*
      * Antes de ir a editar cerramos el modal.
@@ -1110,31 +1505,52 @@
             }
         );
 
+        /*
+        * Limpiar al cerrar.
+        */
+        $(document)
+            .off(
+                'hidden.bs.modal.verInforme',
+                '#modalVerInforme'
+            )
+            .on(
+                'hidden.bs.modal.verInforme',
+                '#modalVerInforme',
+                function () {
 
-    /*
-     * Limpiar al cerrar.
-     */
-    $(document)
-        .off(
-            'hidden.bs.modal.verInforme',
-            '#modalVerInforme'
-        )
-        .on(
-            'hidden.bs.modal.verInforme',
-            '#modalVerInforme',
-            function () {
+                    /*
+                    * Si todavía existe una petición cargando
+                    * otro informe, la cancelamos.
+                    */
+                    if (requestInforme) {
+                        requestInforme.abort();
+                        requestInforme = null;
+                    }
 
-                if (requestInforme) {
-                    requestInforme.abort();
-                    requestInforme = null;
+                    /*
+                    * Quitamos cualquier estado visual usado
+                    * mientras navegamos entre informes.
+                    */
+                    $('#modalVerInforme')
+                        .removeClass('vm-ver-cambiando');
+
+                    $('#verInformeLoading')
+                        .hide();
+
+                    /*
+                    * Limpiamos el PDF cargado para evitar
+                    * mantener el iframe en memoria.
+                    */
+                    $('#verInformePdfContenido')
+                        .empty();
+
+                    /*
+                    * Ya no existe un informe activo porque
+                    * el modal fue cerrado completamente.
+                    */
+                    informeActual = null;
                 }
-
-                $('#verInformePdfContenido')
-                    .empty();
-
-                informeActual = null;
-            }
-        );
+            );
 
 
     /*
