@@ -9,3 +9,7 @@ configP.php
 /funciones/logs/*.jsonl
 funciones/GPT/snapshots/
 DEADJOE
+
+# Python cache
+__pycache__/
+*.pyc
