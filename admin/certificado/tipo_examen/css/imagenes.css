@@ -15,3 +15,148 @@
         border: 1px solid #ddd;
         display: block;
     }
+
+    .canvas-container {
+        overflow: hidden;
+    }
+
+    #canvasMedicion.modo-mover {
+        cursor: grab;
+    }
+
+    #canvasMedicion.modo-mover:active {
+        cursor: grabbing;
+    }
+
+    .btn-medicion-flotante {
+        position: absolute;
+        right: 14px;
+        bottom: 14px;
+        z-index: 1052;
+        display: inline-flex;
+        align-items: center;
+        gap: 7px;
+        padding: 8px 13px;
+        color: #fff;
+        background: rgba(25, 29, 36, .86);
+        border: 1px solid rgba(255, 255, 255, .28);
+        border-radius: 8px;
+        box-shadow: 0 3px 10px rgba(0, 0, 0, .28);
+        backdrop-filter: blur(3px);
+        transition: background .15s ease, border-color .15s ease;
+    }
+
+    .btn-medicion-flotante:hover,
+    .btn-medicion-flotante:focus {
+        color: #fff;
+        background: rgba(38, 43, 52, .96);
+        border-color: rgba(255, 255, 255, .48);
+    }
+
+    .btn-medicion-flotante i {
+        color: #ffd24a;
+    }
+
+    .btn-panel-medicion {
+        color: #fff;
+        background: rgba(20, 24, 30, .78);
+        border: 1px solid rgba(255, 255, 255, .22);
+        backdrop-filter: blur(3px);
+    }
+
+    .btn-panel-medicion:hover,
+    .btn-panel-medicion:focus {
+        color: #fff;
+        background: rgba(35, 40, 48, .92);
+    }
+
+    .btn-accion-medicion {
+        padding: 7px 12px;
+        font-size: .9rem;
+    }
+
+    .estado-calibracion {
+        display: none;
+        position: absolute;
+        top: 12px;
+        right: 12px;
+        z-index: 11;
+        padding: 5px 9px;
+        color: #fff;
+        background: rgba(20, 24, 30, .78);
+        border: 1px solid rgba(255, 255, 255, .22);
+        border-radius: 7px;
+        box-shadow: 0 2px 8px rgba(0, 0, 0, .22);
+        backdrop-filter: blur(3px);
+        font-size: 12px;
+        pointer-events: none;
+    }
+
+    .panel-visualizacion {
+        position: absolute;
+        bottom: 12px;
+        left: 12px;
+        z-index: 11;
+    }
+
+    .controles-visualizacion {
+        display: none;
+        width: 230px;
+        margin-top: 6px;
+        padding: 11px 12px;
+        color: #fff;
+        background: rgba(20, 24, 30, .88);
+        border: 1px solid rgba(255, 255, 255, .18);
+        border-radius: 9px;
+        box-shadow: 0 4px 14px rgba(0, 0, 0, .3);
+        backdrop-filter: blur(4px);
+    }
+
+    .controles-visualizacion label {
+        color: rgba(255, 255, 255, .86);
+    }
+
+    .calibracion-manual-panel {
+        display: none;
+        position: absolute;
+        top: 12px;
+        left: 12px;
+        z-index: 12;
+        width: 310px;
+        max-width: calc(100% - 24px);
+        padding: 10px 12px;
+        background: rgba(248, 249, 250, .96);
+        border: 1px solid rgba(0, 0, 0, .14);
+        border-radius: 9px;
+        box-shadow: 0 4px 14px rgba(0, 0, 0, .25);
+        backdrop-filter: blur(4px);
+    }
+
+    .calibracion-manual-panel #calibracionManualCm {
+        width: 85px;
+    }
+
+    #canvasMedicion {
+        width: 100%;
+        border: 1px solid #333;
+        background: #fff;
+        display: block;
+    }
+
+    .filtros-medicion-svg {
+        position: absolute;
+        pointer-events: none;
+    }
+
+    #canvasLupaMedicion {
+        display: none;
+        position: absolute;
+        width: 120px;
+        height: 120px;
+        z-index: 10;
+        pointer-events: none;
+        background: #000;
+        border: 2px solid #fff;
+        border-radius: 50%;
+        box-shadow: 0 2px 10px rgba(0, 0, 0, .55);
+    }

@@ -156,14 +156,6 @@ function updateInputFiles() {
     $('#imagenInput')[0].files = dt.files;
 }
 
-function controlarGuardar() {
-    if (archivosSeleccionados.length > LIMITE_IMAGENES) {
-        $('#btnGuardarCertificado').prop('disabled', true);
-    } else {
-        $('#btnGuardarCertificado').prop('disabled', false);
-    }
-}
-
 $('#columnasImagenes').on('change', function () {
     const columnas = $(this).val();
     $('#imagenesPreview').css('grid-template-columns', `repeat(${columnas}, 1fr)`);
@@ -268,13 +260,36 @@ function llamarCalibrar(imgUrl) {
     const canvas = document.getElementById('canvasMedicion');
     const ctx = canvas.getContext('2d');
     const img = new Image();
-    let mediciones = [];
+    const mediciones = [];
     let pxPorCm = 0;
+
+    function abrirMedicionManual() {
+        Swal.close();
+
+        inicializarCalibracionManual(canvas, ctx, img, function (nuevoPxPorCm, cmReferencia) {
+            pxPorCm = nuevoPxPorCm;
+            mediciones.length = 0;
+            $('#estadoCalibracion').text('Manual · ' + cmReferencia + ' cm').show();
+            inicializarMedicion(canvas, ctx, img, mediciones, () => pxPorCm);
+        });
+
+        $('#medirModal').modal('show');
+    }
 
     img.onload = function () {
         canvas.width = img.width;
         canvas.height = img.height;
         ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+
+        inicializarLupaPrecision(canvas, img);
+        inicializarVisualizacionTemporal(canvas);
+        inicializarZoomPan(canvas);
+
+        $('#estadoCalibracion').hide().text('');
+        $('#calibracionManualPanel').hide();
+        $('#calibracionManualCm').val('');
+        $('#btnAplicarCalibracionManual').prop('disabled', true);
+        $('#btnGuardarMediciones, #btnDescargarImagen').prop('disabled', false);
 
         $.ajax({
             url: 'certificado/tipo_examen/calibrar_imagen.php',
@@ -286,29 +301,306 @@ function llamarCalibrar(imgUrl) {
                     try {
                         res = JSON.parse(res);
                     } catch (e) {
-                        Swal.fire('Error', 'Respuesta inválida del servidor (calibrar).', 'error');
+                        abrirMedicionManual();
                         return;
                     }
                 }
 
-                if (res.status === 'success') {
-                    pxPorCm = res.pxPorCm;
-                    inicializarMedicion(canvas, ctx, img, mediciones, () => pxPorCm);
-                    $('#medirModal').modal('show');
-                    Swal.close();
-                } else {
-                    Swal.fire('Error', res.message, 'error');
-                    Swal.close();
+                if (res.status !== 'success') {
+                    abrirMedicionManual();
+                    return;
                 }
-            },
-            error: function () {
-                Swal.fire('Error', 'Error al calibrar imagen.', 'error');
+
+                pxPorCm = parseFloat(res.pxPorCm);
+                if (!Number.isFinite(pxPorCm) || pxPorCm <= 0) {
+                    abrirMedicionManual();
+                    return;
+                }
+
                 Swal.close();
-            }
+                $('#estadoCalibracion').text('Auto · ' + pxPorCm.toFixed(1) + ' px/cm').show();
+                inicializarMedicion(canvas, ctx, img, mediciones, () => pxPorCm);
+                $('#medirModal').modal('show');
+            },
+            error: abrirMedicionManual
         });
     };
 
+    img.onerror = function () {
+        Swal.fire('Error', 'No se pudo cargar la imagen para medir.', 'error');
+    };
+
     img.src = imgUrl;
+}
+
+function inicializarLupaPrecision(canvas, img) {
+    const lupa = document.getElementById('canvasLupaMedicion');
+    const ctxLupa = lupa.getContext('2d');
+    const tamano = lupa.width;
+    const zoom = 2;
+    const margen = 16;
+    const tamanoVisual = 120;
+    const $canvas = $(canvas);
+
+    $canvas.off('.lupaPrecision');
+
+    $canvas.on('mouseenter.lupaPrecision', function () {
+        lupa.style.display = 'block';
+    });
+
+    $canvas.on('mouseleave.lupaPrecision', function () {
+        lupa.style.display = 'none';
+    });
+
+    $canvas.on('mousemove.lupaPrecision', function (e) {
+        const pos = getMousePos(canvas, e);
+
+        ctxLupa.clearRect(0, 0, tamano, tamano);
+        ctxLupa.save();
+        ctxLupa.imageSmoothingEnabled = false;
+        ctxLupa.translate(tamano / 2 - pos.x * zoom, tamano / 2 - pos.y * zoom);
+        ctxLupa.scale(zoom, zoom);
+        ctxLupa.drawImage(img, 0, 0);
+        ctxLupa.restore();
+
+        ctxLupa.save();
+        ctxLupa.strokeStyle = '#FFD600';
+        ctxLupa.lineWidth = 1;
+        ctxLupa.beginPath();
+        ctxLupa.moveTo(tamano / 2 - 12, tamano / 2);
+        ctxLupa.lineTo(tamano / 2 + 12, tamano / 2);
+        ctxLupa.moveTo(tamano / 2, tamano / 2 - 12);
+        ctxLupa.lineTo(tamano / 2, tamano / 2 + 12);
+        ctxLupa.stroke();
+        ctxLupa.restore();
+
+        const contenedor = lupa.parentElement.getBoundingClientRect();
+        let left = e.clientX - contenedor.left + margen;
+        let top = e.clientY - contenedor.top - tamanoVisual - margen;
+
+        if (left + tamanoVisual > contenedor.width) left = e.clientX - contenedor.left - tamanoVisual - margen;
+        if (top < 0) top = e.clientY - contenedor.top + margen;
+
+        lupa.style.left = Math.max(0, left) + 'px';
+        lupa.style.top = Math.max(0, top) + 'px';
+    });
+}
+
+function inicializarVisualizacionTemporal(canvas) {
+    const $panel = $('#controlesVisualizacion');
+    const $brillo = $('#visualBrillo');
+    const $contraste = $('#visualContraste');
+    const $gamma = $('#visualGamma');
+    const $nitidez = $('#visualNitidez');
+    const $invertir = $('#btnInvertirVisualizacion');
+    let invertido = false;
+
+    function aplicar() {
+        const brillo = parseInt($brillo.val(), 10) || 100;
+        const contraste = parseInt($contraste.val(), 10) || 100;
+        const gamma = parseFloat($gamma.val()) || 1;
+        const nitidez = (parseInt($nitidez.val(), 10) || 0) / 100;
+
+        $('#filtroGammaMedicion feFuncR, #filtroGammaMedicion feFuncG, #filtroGammaMedicion feFuncB').attr('exponent', gamma);
+
+        const centro = 1 + nitidez * 4;
+        const lateral = -nitidez;
+        $('#filtroNitidezMedicion').attr('kernelMatrix', `0 ${lateral} 0 ${lateral} ${centro} ${lateral} 0 ${lateral} 0`);
+
+        canvas.style.filter = `url(#filtroGammaMedicion) brightness(${brillo}%) contrast(${contraste}%) invert(${invertido ? 1 : 0})`;
+
+        $('#visualBrilloValor').text(brillo + '%');
+        $('#visualContrasteValor').text(contraste + '%');
+        $('#visualGammaValor').text(gamma.toFixed(2));
+        $('#visualNitidezValor').text(Math.round(nitidez * 100) + '%');
+        $invertir.toggleClass('active', invertido);
+    }
+
+    $('#btnToggleVisualizacion').off('click.visualizacion').on('click.visualizacion', function () {
+        $panel.toggle();
+    });
+
+    $brillo.add($contraste).add($gamma).add($nitidez).off('input.visualizacion').on('input.visualizacion', aplicar);
+
+    $invertir.off('click.visualizacion').on('click.visualizacion', function () {
+        invertido = !invertido;
+        aplicar();
+    });
+
+    $('#btnResetVisualizacion').off('click.visualizacion').on('click.visualizacion', function () {
+        $brillo.val(100);
+        $contraste.val(100);
+        $gamma.val(1);
+        $nitidez.val(0);
+        invertido = false;
+        aplicar();
+    });
+
+    $brillo.val(100);
+    $contraste.val(100);
+    $gamma.val(1);
+    $nitidez.val(0);
+    invertido = false;
+    aplicar();
+}
+
+function inicializarZoomPan(canvas) {
+    const $canvas = $(canvas);
+    const $zoom = $('#visualZoom');
+    const $btnMover = $('#btnMoverImagen');
+    let zoom = 1;
+    let moverActivo = false;
+    let arrastrando = false;
+    let inicioX = 0;
+    let inicioY = 0;
+    let offsetX = 0;
+    let offsetY = 0;
+
+    function aplicarTransformacion() {
+        canvas.style.transformOrigin = 'top left';
+        canvas.style.transform = `translate(${offsetX}px, ${offsetY}px) scale(${zoom})`;
+        $('#visualZoomValor').text(Math.round(zoom * 100) + '%');
+    }
+
+    function limitarPosicion() {
+        if (zoom <= 1) {
+            offsetX = 0;
+            offsetY = 0;
+            return;
+        }
+
+        const w = canvas.clientWidth;
+        const h = canvas.clientHeight;
+        const minX = -(w * zoom - w);
+        const minY = -(h * zoom - h);
+
+        offsetX = Math.min(0, Math.max(minX, offsetX));
+        offsetY = Math.min(0, Math.max(minY, offsetY));
+    }
+
+    function resetVista() {
+        zoom = 1;
+        offsetX = 0;
+        offsetY = 0;
+        $zoom.val(100);
+        aplicarTransformacion();
+    }
+
+    $canvas.off('.zoomPan');
+
+    $zoom.off('input.zoomPan').on('input.zoomPan', function () {
+        zoom = parseInt($(this).val(), 10) / 100;
+        limitarPosicion();
+        aplicarTransformacion();
+    });
+
+    $btnMover.off('click.zoomPan').on('click.zoomPan', function () {
+        moverActivo = !moverActivo;
+        canvas.dataset.modoMover = moverActivo ? '1' : '0';
+        $canvas.toggleClass('modo-mover', moverActivo);
+        $btnMover.toggleClass('active', moverActivo);
+    });
+
+    $('#btnResetVista').off('click.zoomPan').on('click.zoomPan', resetVista);
+
+    $canvas.on('mousedown.zoomPan', function (e) {
+        if (!moverActivo || zoom <= 1) return;
+
+        arrastrando = true;
+        inicioX = e.clientX - offsetX;
+        inicioY = e.clientY - offsetY;
+        e.preventDefault();
+    });
+
+    $(document).off('mousemove.zoomPan').on('mousemove.zoomPan', function (e) {
+        if (!arrastrando) return;
+
+        offsetX = e.clientX - inicioX;
+        offsetY = e.clientY - inicioY;
+        limitarPosicion();
+        aplicarTransformacion();
+    });
+
+    $(document).off('mouseup.zoomPan').on('mouseup.zoomPan', function () {
+        arrastrando = false;
+    });
+
+    canvas.dataset.modoMover = '0';
+    moverActivo = false;
+    $canvas.removeClass('modo-mover');
+    $btnMover.removeClass('active');
+    resetVista();
+}
+
+function inicializarCalibracionManual(canvas, ctx, img, onAplicar) {
+    let puntos = [];
+    const $panel = $('#calibracionManualPanel');
+    const $input = $('#calibracionManualCm');
+    const $btn = $('#btnAplicarCalibracionManual');
+
+    $panel.show();
+    $input.val('');
+    $btn.prop('disabled', true);
+    $('#btnGuardarMediciones, #btnDescargarImagen').prop('disabled', true);
+
+    canvas.onmousemove = null;
+    canvas.onmouseup = null;
+    canvas.onclick = null;
+
+    function redraw() {
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+
+        puntos.forEach(p => dibujarCruz(ctx, p.x, p.y));
+
+        if (puntos.length === 2) {
+            ctx.save();
+            ctx.strokeStyle = '#FFD24A';
+            ctx.lineWidth = 1.5;
+            ctx.setLineDash([8, 6]);
+            ctx.beginPath();
+            ctx.moveTo(puntos[0].x, puntos[0].y);
+            ctx.lineTo(puntos[1].x, puntos[1].y);
+            ctx.stroke();
+            ctx.restore();
+        }
+    }
+
+    canvas.onmousedown = function (e) {
+        if (canvas.dataset.modoMover === '1') return;
+        if (puntos.length === 2) puntos = [];
+        puntos.push(getMousePos(canvas, e));
+        $btn.prop('disabled', puntos.length !== 2);
+        redraw();
+    };
+
+    $btn.off('click.calibracionManual').on('click.calibracionManual', function () {
+        const cm = parseFloat($input.val());
+
+        if (!Number.isFinite(cm) || cm <= 0 || puntos.length !== 2) {
+            Swal.fire('Calibración', 'Indica una distancia válida en centímetros.', 'warning');
+            return;
+        }
+
+        const dx = puntos[1].x - puntos[0].x;
+        const dy = puntos[1].y - puntos[0].y;
+        const distanciaPx = Math.sqrt(dx * dx + dy * dy);
+
+        if (distanciaPx <= 0) return;
+
+        const pxPorCm = distanciaPx / cm;
+
+        canvas.onmousedown = null;
+        $panel.hide();
+        $('#btnGuardarMediciones, #btnDescargarImagen').prop('disabled', false);
+
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+
+        onAplicar(pxPorCm, cm);
+    });
+
+    redraw();
 }
 
 function inicializarMedicion(canvas, ctx, img, mediciones, getPxPorCm) {
@@ -316,8 +608,18 @@ function inicializarMedicion(canvas, ctx, img, mediciones, getPxPorCm) {
     let start = { x: 0, y: 0 };
     let end = { x: 0, y: 0 };
     let botonLimpiarRect = null;
+    let clavePosicionTabla = '';
+    let posicionTablaY = null;
+
+    const canvasAnalisis = document.createElement('canvas');
+    canvasAnalisis.width = img.width;
+    canvasAnalisis.height = img.height;
+    const ctxAnalisis = canvasAnalisis.getContext('2d');
+    ctxAnalisis.drawImage(img, 0, 0, canvasAnalisis.width, canvasAnalisis.height);
 
     canvas.onmousedown = function (e) {
+        if (canvas.dataset.modoMover === '1') return;
+
         drawing = true;
         start = getMousePos(canvas, e);
         end = { ...start };
@@ -332,6 +634,7 @@ function inicializarMedicion(canvas, ctx, img, mediciones, getPxPorCm) {
 
     canvas.onmouseup = function (e) {
         if (!drawing) return;
+
         drawing = false;
         end = getMousePos(canvas, e);
 
@@ -342,15 +645,21 @@ function inicializarMedicion(canvas, ctx, img, mediciones, getPxPorCm) {
                 distanciaCm: calcularDistanciaCm(start, end, getPxPorCm())
             });
         }
+
+        clavePosicionTabla = '';
         redraw();
     };
 
     canvas.onclick = function (e) {
         if (!botonLimpiarRect) return;
+
         const pos = getMousePos(canvas, e);
+
         if (
-            pos.x >= botonLimpiarRect.x && pos.x <= botonLimpiarRect.x + botonLimpiarRect.w &&
-            pos.y >= botonLimpiarRect.y && pos.y <= botonLimpiarRect.y + botonLimpiarRect.h
+            pos.x >= botonLimpiarRect.x &&
+            pos.x <= botonLimpiarRect.x + botonLimpiarRect.w &&
+            pos.y >= botonLimpiarRect.y &&
+            pos.y <= botonLimpiarRect.y + botonLimpiarRect.h
         ) {
             limpiarMediciones();
         }
@@ -361,11 +670,11 @@ function inicializarMedicion(canvas, ctx, img, mediciones, getPxPorCm) {
         ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
 
         mediciones.forEach((m, idx) => {
-            dibujarLinea(ctx, m.start, m.end, idx + 1, m.distanciaCm);
+            dibujarLinea(ctx, m.start, m.end, idx + 1);
         });
 
         if (drawing && (start.x !== end.x || start.y !== end.y)) {
-            dibujarLinea(ctx, start, end, mediciones.length + 1, calcularDistanciaCm(start, end, getPxPorCm()));
+            dibujarLinea(ctx, start, end, mediciones.length + 1);
         }
 
         drawMedicionesTable();
@@ -373,7 +682,76 @@ function inicializarMedicion(canvas, ctx, img, mediciones, getPxPorCm) {
 
     function limpiarMediciones() {
         mediciones.length = 0;
+        clavePosicionTabla = '';
         redraw();
+    }
+
+    function puntuarZona(x, y, w, h) {
+        const extra = 24;
+
+        x = Math.max(0, Math.floor(x - extra));
+        y = Math.max(0, Math.floor(y - extra));
+        w = Math.min(Math.floor(w + extra * 2), canvasAnalisis.width - x);
+        h = Math.min(Math.floor(h + extra * 2), canvasAnalisis.height - y);
+
+        if (w <= 0 || h <= 0) return Infinity;
+
+        try {
+            const data = ctxAnalisis.getImageData(x, y, w, h).data;
+            let score = 0;
+            let muestras = 0;
+
+            for (let yy = 0; yy < h; yy += 4) {
+                let brilloAnterior = null;
+
+                for (let xx = 0; xx < w; xx += 4) {
+                    const i = (yy * w + xx) * 4;
+                    const r = data[i];
+                    const g = data[i + 1];
+                    const b = data[i + 2];
+                    const brillo = (r + g + b) / 3;
+                    const max = Math.max(r, g, b);
+                    const min = Math.min(r, g, b);
+
+                    if (brillo > 210) score += 6;
+                    else if (brillo > 130) score += 2.5;
+                    else if (brillo > 55) score += 1;
+
+                    if (max - min > 60 && max > 120) score += 3;
+
+                    if (brilloAnterior !== null && Math.abs(brillo - brilloAnterior) > 55) {
+                        score += 1.5;
+                    }
+
+                    brilloAnterior = brillo;
+                    muestras++;
+                }
+            }
+
+            return muestras ? score / muestras : 0;
+        } catch (e) {
+            return Infinity;
+        }
+    }
+
+    function obtenerPosicionTabla(tablaWidth, bloqueHeight, totalRows) {
+        const margin = 18;
+        const yArriba = 56;
+        const yAbajo = canvas.height - bloqueHeight - margin;
+        const x = canvas.width - tablaWidth - margin;
+        const clave = `${totalRows}-${modoSoloGuardar ? 1 : 0}`;
+
+        if (clave === clavePosicionTabla && posicionTablaY !== null) {
+            return posicionTablaY;
+        }
+
+        const scoreArriba = puntuarZona(x, yArriba, tablaWidth, bloqueHeight);
+        const scoreAbajo = puntuarZona(x, yAbajo, tablaWidth, bloqueHeight);
+
+        posicionTablaY = scoreAbajo < scoreArriba * 0.82 ? yAbajo : yArriba;
+        clavePosicionTabla = clave;
+
+        return posicionTablaY;
     }
 
     function drawMedicionesTable() {
@@ -386,58 +764,66 @@ function inicializarMedicion(canvas, ctx, img, mediciones, getPxPorCm) {
         const tablaHeight = rowHeight * totalRows + padding * 2;
         const btnH = 32;
         const margin = 18;
-
-        const tablaY = canvas.height - tablaHeight - btnH - margin;
+        const espacioBoton = modoSoloGuardar ? 0 : btnH + 6;
+        const bloqueHeight = tablaHeight + espacioBoton;
         const x = canvas.width - tablaWidth - margin;
-        const y = tablaY;
+        const y = obtenerPosicionTabla(tablaWidth, bloqueHeight, totalRows);
 
         ctx.save();
         ctx.globalAlpha = 0.85;
-        ctx.fillStyle = "#fff";
+        ctx.fillStyle = '#fff';
         ctx.fillRect(x, y, tablaWidth, tablaHeight);
         ctx.globalAlpha = 1;
 
-        ctx.font = "bold 16px Arial";
-        ctx.fillStyle = "#222";
-        ctx.fillText("#", x + padding, y + padding + 16);
-        ctx.fillText("Distancia (cm)", x + padding + col1w, y + padding + 16);
+        ctx.font = 'bold 16px Arial';
+        ctx.fillStyle = '#222';
+        ctx.fillText('#', x + padding, y + padding + 16);
+        ctx.fillText('Distancia (cm)', x + padding + col1w, y + padding + 16);
 
-        ctx.font = "15px Arial";
+        ctx.font = '15px Arial';
+
         mediciones.forEach((m, idx) => {
-            ctx.fillText((idx + 1), x + padding, y + padding + 16 + rowHeight * (idx + 1));
+            ctx.fillText(idx + 1, x + padding, y + padding + 16 + rowHeight * (idx + 1));
             ctx.fillText(m.distanciaCm.toFixed(2), x + padding + col1w, y + padding + 16 + rowHeight * (idx + 1));
         });
 
-        const btnW = tablaWidth - 2 * padding;
+        const btnW = tablaWidth - padding * 2;
         const btnX = x + padding;
         const btnY = y + tablaHeight + 6;
 
         if (!modoSoloGuardar) {
-            ctx.fillStyle = "#ea5050";
-            ctx.strokeStyle = "#fff";
+            ctx.fillStyle = '#ea5050';
+            ctx.strokeStyle = '#fff';
             ctx.lineWidth = 2;
             ctx.globalAlpha = 0.95;
             ctx.fillRect(btnX, btnY, btnW, btnH);
             ctx.globalAlpha = 1;
             ctx.strokeRect(btnX, btnY, btnW, btnH);
 
-            ctx.font = "bold 17px Arial";
-            ctx.fillStyle = "#fff";
-            ctx.textAlign = "center";
-            ctx.fillText("Limpiar", btnX + btnW / 2, btnY + btnH / 2 + 7);
+            ctx.font = 'bold 17px Arial';
+            ctx.fillStyle = '#fff';
+            ctx.textAlign = 'center';
+            ctx.fillText('Limpiar', btnX + btnW / 2, btnY + btnH / 2 + 7);
 
-            ctx.textAlign = "start";
+            ctx.textAlign = 'start';
             botonLimpiarRect = { x: btnX, y: btnY, w: btnW, h: btnH };
+        } else {
+            botonLimpiarRect = null;
         }
+
+        ctx.restore();
     }
 
     $('#btnGuardarMediciones').off('click').on('click', function () {
         const estabaActivo = modoSoloGuardar;
         modoSoloGuardar = true;
+        clavePosicionTabla = '';
         redraw();
 
         const nuevaImagen = canvas.toDataURL('image/jpeg', 0.85);
+
         modoSoloGuardar = estabaActivo;
+        clavePosicionTabla = '';
         redraw();
 
         imagenesArray[imagenActual] = nuevaImagen;
@@ -457,15 +843,12 @@ function inicializarMedicion(canvas, ctx, img, mediciones, getPxPorCm) {
                 $('#imagenes_antiguas').val(JSON.stringify(imagenesAntiguas));
             }
 
-            const nuevoFile = dataURLToFile(nuevaImagen, nombreOriginal);
-            archivosSeleccionados.push(nuevoFile);
+            archivosSeleccionados.push(dataURLToFile(nuevaImagen, nombreOriginal));
             updateInputFiles();
-        } else {
-            if (typeof fileIdx !== 'undefined' && archivosSeleccionados[fileIdx]) {
-                nombreOriginal = archivosSeleccionados[fileIdx].name.replace(/\.[^.]+$/, '') + '.jpg';
-                archivosSeleccionados[fileIdx] = dataURLToFile(nuevaImagen, nombreOriginal);
-                updateInputFiles();
-            }
+        } else if (typeof fileIdx !== 'undefined' && archivosSeleccionados[fileIdx]) {
+            nombreOriginal = archivosSeleccionados[fileIdx].name.replace(/\.[^.]+$/, '') + '.jpg';
+            archivosSeleccionados[fileIdx] = dataURLToFile(nuevaImagen, nombreOriginal);
+            updateInputFiles();
         }
 
         $('#medirModal').modal('hide');
@@ -474,6 +857,7 @@ function inicializarMedicion(canvas, ctx, img, mediciones, getPxPorCm) {
 
     $('#btnDescargarImagen').off('click').on('click', function () {
         modoSoloGuardar = true;
+        clavePosicionTabla = '';
         redraw();
 
         setTimeout(() => {
@@ -483,28 +867,34 @@ function inicializarMedicion(canvas, ctx, img, mediciones, getPxPorCm) {
             link.click();
 
             modoSoloGuardar = false;
+            clavePosicionTabla = '';
             redraw();
         }, 50);
     });
 }
 
-function dibujarLinea(ctx, p1, p2, numero, distCm) {
-    ctx.strokeStyle = "#FFD600";
-    ctx.lineWidth = 2;
+function dibujarLinea(ctx, p1, p2, numero) {
+    ctx.save();
+    ctx.strokeStyle = "#FFD24A";
+    ctx.lineWidth = 1.5;
+    ctx.setLineDash([8, 6]);
     ctx.beginPath();
     ctx.moveTo(p1.x, p1.y);
     ctx.lineTo(p2.x, p2.y);
     ctx.stroke();
+    ctx.restore();
 
     dibujarCruz(ctx, p1.x, p1.y);
     dibujarCruz(ctx, p2.x, p2.y);
 
-    ctx.font = "bold 22px Arial";
-    ctx.fillStyle = "#FFD600";
-    ctx.fillText(numero, (p1.x + p2.x) / 2 + 8, (p1.y + p2.y) / 2 - 8);
+    ctx.save();
+    ctx.font = "bold 14px Arial";
+    ctx.fillStyle = "#FFD24A";
+    ctx.fillText(numero, (p1.x + p2.x) / 2 + 5, (p1.y + p2.y) / 2 - 5);
+    ctx.restore();
 }
 
-function dibujarCruz(ctx, x, y, color = "#FFD600", size = 16, lineW = 4) {
+function dibujarCruz(ctx, x, y, color = "#FFD24A", size = 12, lineW = 2.5) {
     ctx.save();
     ctx.strokeStyle = color;
     ctx.lineWidth = lineW;
@@ -554,19 +944,43 @@ $('#btnEditarMedirImg').on('click', function () {
 });
 
 $('#medirModal').on('hidden.bs.modal', function () {
+    const canvas = document.getElementById('canvasMedicion');
+
     if (nombreTempImagen) {
+        const imagenTemporal = nombreTempImagen;
+        nombreTempImagen = null;
+
         $.ajax({
             url: 'certificado/tipo_examen/eliminar_temp_imagen.php',
             type: 'POST',
-            data: { imagen: nombreTempImagen },
-            success: function () {
-                nombreTempImagen = null;
-            },
+            data: { imagen: imagenTemporal },
             error: function () {
                 console.error('Error al eliminar imagen temporal');
             }
         });
     }
+
+    if (canvas) {
+        canvas.onmousedown = null;
+        canvas.onmousemove = null;
+        canvas.onmouseup = null;
+        canvas.onclick = null;
+        canvas.style.filter = '';
+        canvas.style.transform = '';
+        canvas.style.transformOrigin = '';
+        canvas.dataset.modoMover = '0';
+
+        $(canvas).off('.lupaPrecision').off('.zoomPan').removeClass('modo-mover');
+    }
+
+    $(document).off('mousemove.zoomPan mouseup.zoomPan');
+
+    $('#canvasLupaMedicion').hide();
+    $('#controlesVisualizacion').hide();
+    $('#calibracionManualPanel').hide();
+    $('#estadoCalibracion').hide().text('');
+    $('#btnMoverImagen').removeClass('active');
+    $('#btnGuardarMediciones, #btnDescargarImagen').prop('disabled', false);
 
     if (document.activeElement) {
         document.activeElement.blur();
