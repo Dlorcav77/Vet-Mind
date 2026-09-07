@@ -136,6 +136,6 @@ function construir_bloque_discrepancias(array $disc): string {
         $b = $d['b'] !== '' ? $d['b'] : '(nada)';
         $lineas[] = '- Motor A dice "' . $a . '" / Motor B dice "' . $b . '"';
     }
-    return "\n\n=== NOTA: DIFERENCIAS ENTRE 2 TRANSCRIPCIONES DEL MISMO AUDIO (elige la correcta segun contexto clinico; no incluyas esta nota en el informe) ===\n"
+    return "\n\n=== NOTA: DIFERENCIAS ENTRE 2 TRANSCRIPCIONES DEL MISMO AUDIO (usa el contexto solo si una alternativa es claramente un error de transcripción. Si ambas alternativas son términos clínicamente válidos y cambian el significado del hallazgo, NO elijas silenciosamente: conserva la duda y marca el dato con flag termino_confuso para revisión. No incluyas esta nota en el informe) ===\n"
          . implode("\n", $lineas);
 }

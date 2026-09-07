@@ -168,28 +168,24 @@ Casos a reportar:
    parrafo de Yeyuno -> organo_omitido, severidad alta. Presta atencion a organos digestivos que a veces
    se pierden (Yeyuno, Ileon, Ciego, Duodeno). En "dictado" pon lo que dijo el dictado del organo; en
    "informe" indica que el organo no aparece; en "detalle" pide agregarlo.
-10. incoherencia_homogeneo (revisar SIEMPRE): el INFORME describe un organo con estructuras, lesiones,
-    nodulos, masas, calculos, urolitos, sedimento, barro biliar, contenido particulado o imagenes focales,
-    pero al mismo tiempo mantiene el descriptor "homogeneo" de la PLANTILLA. Es contradictorio.
-    - PARENQUIMA (bazo, higado, riñon, pancreas, prostata, etc.): si hay una estructura/lesion descrita en
-      ese organo, el parenquima NO puede quedar "homogeneo"; debe ser "heterogeneo".
-      Ejemplo: informe "Bazo ... parenquima homogeneo ... con visualizacion de una estructura redonda
-      hiperecoica de 0.27 por 0.32 cm" -> incoherencia_homogeneo. Alta.
-    - CONTENIDO (vesicula biliar, vejiga urinaria, estomago, etc.): si hay barro biliar, sedimento, calculos
-      o estructuras hiperecoicas en el lumen, el contenido NO puede quedar "anecoico homogeneo"; debe decir
-      solo "anecoico" mas la descripcion del hallazgo.
-      Ejemplo: informe "Vesicula biliar ... contenido anecoico homogeneo, con barro biliar moderado"
-      -> incoherencia_homogeneo. Alta.
-    - Tambien aplica al reves: si el INFORME mantiene "Pared delgada y lisa" o "sin lesiones focales" junto a
-      un hallazgo descrito en el mismo organo.
-    - NO lo marques si el organo no tiene ningun hallazgo descrito: ahi "homogeneo" de la plantilla es correcto.
-    En "informe" cita la frase contradictoria; en "detalle" indica que cambiar (homogeneo -> heterogeneo, o
-    eliminar "homogeneo" del contenido).
-    - CRITICO: el hallazgo y el descriptor "homogeneo" deben estar en EL MISMO organo. NO cruces organos.
-      Barro biliar, calculos o estructuras en la VESICULA BILIAR no afectan al HIGADO. Estructuras en el
-      RIÑON no afectan al BAZO. Antes de marcar, verifica que el hallazgo este descrito dentro del mismo
-      parrafo/organo que el "homogeneo". Si el hallazgo esta en otro organo, NO marques: es falso positivo.
-      
+10. incoherencia_homogeneo (revisar SIEMPRE): marca SOLO cuando el INFORME describe en el MISMO organo una estructura focal o material concreto incompatible con "homogeneo".
+    - PARENQUIMA (bazo, higado, riñon, pancreas, prostata, etc.): si hay una estructura, lesion, nodulo, masa o imagen focal descrita en ese organo, el parenquima NO puede quedar "homogeneo"; debe ser "heterogeneo".
+      Ejemplo: informe "Bazo ... parenquima homogeneo ... con visualizacion de una estructura redonda hiperecoica de 0.27x0.32 cm" -> incoherencia_homogeneo. Alta.
+    - CONTENIDO (vesicula biliar, vejiga urinaria, estomago, etc.): si hay barro biliar, sedimento, calculos, urolitos, contenido particulado o estructuras dentro del lumen, el contenido NO puede quedar "anecoico homogeneo"; debe eliminarse "homogeneo".
+    - NO asumas heterogeneidad por cambios DIFUSOS de ecogenicidad o ecotextura. Expresiones como "ecogenicidad aumentada/disminuida", "ecotextura granular", "ecotextura granular fina", "ecotextura granular mixta", cambios de tamaño, forma o bordes NO contradicen por si solas "parenquima homogeneo".
+      Ejemplo correcto: "Higado ... parenquima homogeneo, ecogenicidad aumentada, ecotextura granular mixta". NO reportar incoherencia_homogeneo si no existe ademas una estructura, lesion, nodulo, masa o imagen focal.
+    - Si el DICTADO o el INFORME dice explicitamente "heterogeneo", entonces "homogeneo" en el mismo atributo si es contradictorio y debe reportarse.
+    - Tambien aplica a "sin lesiones focales" cuando en ese MISMO organo existe una lesion, estructura, nodulo, masa o imagen focal descrita.
+    - CRITICO: el hallazgo y "homogeneo" deben pertenecer al MISMO organo. Nunca cruces hallazgos entre organos.
+    - Antes de marcar, identifica concretamente cual es la estructura, lesion, nodulo, masa, imagen focal o material intraluminal que provoca la contradiccion. Si no puedes identificar uno, NO reportes incoherencia_homogeneo.
+11. atributo_no_reemplazado: si el DICTADO especifica claramente el valor de un atributo y el INFORME conserva ademas uno o mas valores de ese MISMO atributo que vienen solo de la PLANTILLA, MARCALO.
+    Ejemplo: PLANTILLA "patron mucoso y gaseoso" + DICTADO "patron gaseoso" + INFORME "patron mucoso y gaseoso" -> atributo_no_reemplazado. "mucoso" viene solo de la plantilla y debio eliminarse al reemplazar el valor del atributo patron.
+    Aplica a atributos como patron, forma, bordes, ecogenicidad, ecotextura, contenido, pared/grosor y otros atributos equivalentes.
+    NO lo marques cuando el DICTADO simplemente omite ese atributo: en ese caso es correcto conservar el valor normal de la PLANTILLA.
+    NO lo marques cuando el descriptor adicional tambien aparece en el DICTADO o corresponde a otro atributo distinto.
+    Antes de reportar, identifica exactamente que valor adicional viene SOLO de la PLANTILLA y pertenece al MISMO atributo que el DICTADO reemplazo.
+    Severidad media; alta si el valor conservado contradice clinicamente lo dictado. 
+    
 NO reportes (no son problemas):
 - Organos o atributos en estado normal que vienen de la PLANTILLA y el dictado no menciono.
 - Diferencias de redaccion, plurales, mayusculas u orden de palabras.
@@ -199,7 +195,7 @@ NO reportes (no son problemas):
 Severidad: "alta" si cambia el sentido clinico; "media" si es omision parcial; "baja" si es menor.
 
 Responde EXCLUSIVAMENTE con un objeto JSON, sin texto antes ni despues. Formato exacto:
-{"items":[{"severidad":"alta|media|baja","tipo":"hallazgo_bajado|inventado|cambio_lateralidad|cambio_medida|omitido|discrepancia_negacion|organo_sin_dictado|mismas_caracteristicas_literal|organo_omitido|incoherencia_homogeneo","zona":"organo o zona","dictado":"lo que dice el dictado","informe":"lo que dice el informe","detalle":"que revisar"}]}
+{"items":[{"severidad":"alta|media|baja","tipo":"hallazgo_bajado|inventado|cambio_lateralidad|cambio_medida|omitido|discrepancia_negacion|organo_sin_dictado|mismas_caracteristicas_literal|organo_omitido|incoherencia_homogeneo|atributo_no_reemplazado","zona":"organo o zona","dictado":"lo que dice el dictado","informe":"lo que dice el informe","detalle":"que revisar"}]}
 Si no encuentras problemas, responde exactamente {"items":[]}.
 SYS;
 

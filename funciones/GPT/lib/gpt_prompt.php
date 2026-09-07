@@ -112,6 +112,13 @@ function gpt_build_prompt(mysqli $mysqli, array $input): array
         - SINÓNIMOS DE ALTERADO: "engrosado/engrosada" = grosor/pared aumentada. "distendido/distendida" y "severamente distendido" son estados alterados: NUNCA los reduzcas a "semi distendida" ni a "conservado". Si el DICTADO dice "estómago severamente distendido", el informe DEBE decir "severamente distendido", no "semi distendido" ni "conservado". Si dice "vejiga distendida", va "distendida", no "semi distendida" de la plantilla.
         - Esto aplica AUNQUE el órgano venga mal transcrito (ej. "Vaso" por "Bazo"): traslada el hallazgo al órgano correcto.
         - ATRIBUTO POR ATRIBUTO: cuando el DICTADO da un atributo de un órgano (bordes, ecogenicidad, forma, tamaño, contenido), usa el valor del DICTADO para ESE atributo, NO el de la PLANTILLA. Ejemplo: dictado "hígado bordes redondeados" → el informe debe decir "bordes redondeados", NUNCA "aguzado" porque lo diga la plantilla.
+        - REEMPLAZO COMPLETO DEL VALOR DE UN ATRIBUTO: si el DICTADO especifica el valor de un atributo, reemplaza el valor correspondiente de la PLANTILLA y NO conserves calificadores adicionales de la plantilla que el DICTADO no mencionó. Ejemplo: PLANTILLA "patrón mucoso y gaseoso" + DICTADO "patrón gaseoso" → "patrón gaseoso", NO "patrón mucoso y gaseoso". Esto aplica cuando el DICTADO está dando explícitamente el valor de ese mismo atributo; no mezcles automáticamente el valor dictado con descriptores normales de la PLANTILLA.
+        - ATRIBUTO ABREVIADO SEGÚN PLANTILLA: el DICTADO puede mencionar un atributo de forma abreviada omitiendo una parte del nombre que ya está definida en la PLANTILLA. Si dentro del mismo órgano existe una correspondencia única y clara, CONSERVA el nombre completo del atributo de la PLANTILLA y reemplaza solo su estado con lo dictado. NO elimines calificadores anatómicos que identifican el atributo.
+          Ejemplos:
+          - Riñón, PLANTILLA "ecogenicidad cortical conservada" + DICTADO "ecogenicidad aumentada" → "ecogenicidad cortical aumentada".
+          - Riñón, PLANTILLA "límite corticomedular definido" + DICTADO "límite definido" → conserva "límite corticomedular definido"; no lo reduzcas a "límite definido".
+          - Si el DICTADO dice "límite difuso" → "límite corticomedular difuso".
+          Esta regla aplica solo cuando la correspondencia entre el atributo abreviado del DICTADO y el atributo de la PLANTILLA es inequívoca dentro de ese órgano. Si hay más de un atributo posible, no adivines y marca la duda.
         - URÉTER Y ESTRUCTURAS CON HALLAZGO: si el DICTADO describe el uréter como distendido, dilatado, visible, o le da una medida, el informe DEBE reflejar ese hallazgo en el lado que corresponda. NUNCA dejes "No se visualiza uréter" de la plantilla cuando el DICTADO dice que el uréter SÍ se ve o está alterado. Respeta el lado (izquierdo/derecho) que indique el DICTADO.
         - GROSOR = PARED (tubo digestivo y vejiga). "grosor" del DICTADO y "pared" de la PLANTILLA son EL MISMO atributo. Si el DICTADO dice "grosor aumentado" (o engrosado/disminuido), ese estado MANDA: el informe DEBE decir "pared aumentada" / "pared engrosada", NUNCA "pared conservada". La medida numérica que acompaña NO normaliza el hallazgo: "grosor aumentado en 0,42 cm" → "pared aumentada de 0,42 cm", JAMÁS "pared conservada de 0,42 cm". Revisa esto órgano por órgano en Estómago, Duodeno, Yeyuno, Íleon, Colon y Vejiga: si el DICTADO marcó el grosor alterado, la pared NO puede quedar conservada.
       3. PARTE DE LA PLANTILLA, NO REESCRIBAS NI PIERDAS ÓRGANOS. Para cada órgano arranca de la frase completa de la PLANTILLA y cambia SOLO el atributo que el DICTADO contradiga. No acortes ni reescribas el órgano desde cero. Lo que el DICTADO no menciona, queda como en la PLANTILLA (estado normal). NUNCA elimines ni omitas un órgano que está en la PLANTILLA: el informe final debe contener TODOS los órganos/secciones de la PLANTILLA, más los que el DICTADO agregue. Si un órgano de la PLANTILLA no se dictó, va igual en estado normal.
@@ -146,12 +153,31 @@ function gpt_build_prompt(mysqli $mysqli, array $input): array
 
       === TRANSCRIPCIÓN CLÍNICA ===
       - Transcribe solo contenido clínico. Ignora publicidad, marcas, instrucciones al usuario, conversaciones ajenas, descripciones de equipos o frases de demostración.
-      - Respeta números y unidades tal como vienen (coma o punto decimal). No transformes cm a mm ni viceversa. No cambies un valor sospechoso por el que parezca correcto.
+      - MEDIDAS Y UNIDADES:
+        - No transformes cm a mm ni mm a cm.
+        - Normaliza siempre el separador decimal a punto: "0,42 cm" → "0.42 cm".
+        - Si una medida viene SIN unidad, revisa todas las demás medidas explícitas del DICTADO. Si todas las unidades explícitas usan exclusivamente "cm", completa esa medida con "cm". Si todas usan exclusivamente "mm", completa con "mm".
+        - Si en el mismo DICTADO aparecen medidas explícitas tanto en "cm" como en "mm", NO infieras la unidad de una medida que venga sin ella: conserva el número sin unidad y márcalo falta_unidad.
+        - Si ninguna otra medida del DICTADO permite determinar una unidad predominante, tampoco la inventes: conserva el número y márcalo falta_unidad.
+        - Esta inferencia se hace SOLO usando las unidades explícitas presentes en el DICTADO actual; nunca uses la PLANTILLA BASE para decidir la unidad.
+        - No cambies un valor sospechoso por el que parezca correcto.
+
+      - MEDIDAS DE VARIAS DIMENSIONES: si el DICTADO da una medida con dos o tres dimensiones ("0,85 por 1 cm", "0,5 x 0,58 cm", "1 por 1,3 cm"), CONSÉRVALAS TODAS y normaliza su formato usando "x" sin espacios y punto decimal: "0,85 por 1 cm" → "0.85x1 cm"; "0,5 x 0,58 cm" → "0.5x0.58 cm"; "1 por 1,3 cm" → "1x1.3 cm". NUNCA recortes una dimensión.
       - LEGIBLE vs ILEGIBLE:
         - LEGIBLE: se entiende qué número es, aunque sea raro. Escríbelo tal cual. Si es muy improbable, márcalo valor_sospechoso, pero el número SÍ va.
         - ILEGIBLE: no se puede determinar el número (balbuceo, números pegados, frase cortada). Pon "XX" en su lugar y márcalo medida_ilegible. Conserva el resto de la descripción.
         - El criterio para XX es "¿se entiende qué número es?", NO "¿es normal?".
       - TÉRMINO CONFUSO (importante): si una palabra NO numérica no tiene sentido clínico o parece error de dictado (ej. "dispuso" donde correspondería "difuso", "anécdotas", etc.), CONSÉRVALA tal cual y márcala con flag termino_confuso, explicando la duda en Observaciones. NUNCA la reemplaces por la que tú creas correcta ni la dejes pasar sin flag.
+      - DISCREPANCIA ENTRE TÉRMINO CLÍNICO Y RUIDO: cuando las dos transcripciones difieren y una alternativa es un término clínico válido y coherente con la frase, mientras la otra es claramente ruido, una conjunción, palabra incompleta o término sin significado clínico en ese contexto, usa el término clínico. No lo omitas.
+        Ejemplo: "bordes regulares y homogéneo" / "bordes regulares hipoecoico homogéneo" → usa "bordes regulares, hipoecoico, homogéneo". La alternativa "y" no reemplaza ni elimina el descriptor clínico "hipoecoico".
+        Esta regla NO aplica cuando ambas alternativas son términos clínicos válidos con significados diferentes; en ese caso conserva la duda y usa flag termino_confuso.
+      - FIDELIDAD DE DESCRIPTORES ECOGRÁFICOS: conserva EXACTAMENTE el descriptor clínico usado por el DICTADO. La PLANTILLA puede indicar qué atributo se está describiendo, pero NUNCA puede sustituir el valor o descriptor dado por el DICTADO aunque ambos parezcan clínicamente equivalentes.
+        - Si el DICTADO dice "hiperecoico", escribe "hiperecoico"; NO lo conviertas en "ecogenicidad aumentada".
+        - Si dice "hipoecoico", escribe "hipoecoico"; NO lo conviertas en "ecogenicidad disminuida".
+        - Si dice "ecogenicidad aumentada", escribe "ecogenicidad aumentada"; NO la conviertas en "hiperecoica".
+        - Si dice "ecogenicidad disminuida", escribe "ecogenicidad disminuida"; NO la conviertas en "hipoecoica".
+        - Si dice "isoecoico", conserva "isoecoico".
+        Ejemplo obligatorio: PLANTILLA "ecogenicidad hipoecoica respecto al bazo" + DICTADO "ecogenicidad disminuida respecto al bazo" → "ecogenicidad disminuida respecto al bazo".
       - Si el DICTADO se autocorrige sobre un mismo dato ("0.79... no, era 0.57", "perdón, mejor dicho..."), usa SIEMPRE el último valor.
       - No muevas hallazgos, medidas ni descripciones entre órganos, zonas o lateralidades.
       - MEDIDAS DE VARIAS DIMENSIONES: si el DICTADO da una medida con dos o tres dimensiones ("0,85 por 1 cm", "0,5 x 0,58 cm", "1 por 1,3 cm"), CONSÉRVALAS TODAS. NUNCA recortes a una sola dimensión (no escribas "0,85 cm" cuando el dictado dijo "0,85 por 1 cm"). "por" y "x" son válidos como separador; mantén el formato del dictado. Perder una dimensión es un error grave.
@@ -161,12 +187,14 @@ function gpt_build_prompt(mysqli $mysqli, array $input): array
 
       === ESTILO ===
       - Unidades siempre abreviadas: "cm" y "mm", nunca "centímetros"/"milímetros", aunque el DICTADO use la palabra completa. No cambies el valor ni la magnitud, solo abrevia.
-      - Transcribe la ecogenicidad tal como viene; no completes componentes no dichos. Si solo se dicta "ecogenicidad cortical aumentada", escribe solo la cortical, no agregues "y medular". Menciona cortical y medular juntas solo si el DICTADO nombra ambas.
-
-      === CONCLUSIÓN ===
+      - ECOGENICIDAD: conserva los calificadores anatómicos que ya definan el atributo en la PLANTILLA cuando el DICTADO use una forma abreviada inequívoca. Ejemplo: PLANTILLA "ecogenicidad cortical conservada" + DICTADO "ecogenicidad aumentada" → "ecogenicidad cortical aumentada". No agregues componentes nuevos que no existan en la PLANTILLA ni en el DICTADO; por ejemplo, no agregues "medular" si ninguno de los dos la menciona.
+      === CONCLUSIÓN, IMPRESIÓN DIAGNÓSTICA Y SUGERENCIAS ===
       - No agregues conclusión si el DICTADO no la trae, no la pide y la PLANTILLA no la tiene.
       - Si el DICTADO trae conclusión explícita, inclúyela solo con los hallazgos mencionados.
       - Si la PLANTILLA ya trae sección de conclusión, complétala solo con hallazgos del DICTADO.
+      - IMPRESIÓN DIAGNÓSTICA y SUGERENCIAS son secciones reservadas de la PLANTILLA. Si vienen vacías en la PLANTILLA, CONSÉRVALAS vacías exactamente en su posición y formato original.
+      - NUNCA completes IMPRESIÓN DIAGNÓSTICA ni SUGERENCIAS deduciendo contenido a partir de los hallazgos del informe.
+      - No elimines estas secciones aunque estén vacías.
       - Nunca inventes diagnósticos, interpretaciones ni recomendaciones no dictadas.
 
       === FLAGS ===
