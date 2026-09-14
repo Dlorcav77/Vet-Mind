@@ -6,7 +6,7 @@ require_once __DIR__ . '/funciones/session/csrf.php';
 iniciarSesionSegura();
 
 /*
- * El formulario de login contiene un token CSRF ligado
+ * El formulario 2de login contiene un token CSRF ligado
  * a la sesión actual. Nunca debe reutilizarse desde caché.
  */
 header(
