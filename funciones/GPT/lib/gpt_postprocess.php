@@ -247,6 +247,120 @@ function gpt_quitar_bloque_observaciones(string $html): string
 }
 
 /**
+ * Extrae los flags y observaciones ya postprocesados como datos estructurados.
+ * No modifica el HTML.
+ */
+function gpt_extraer_observaciones(string $html): array
+{
+    $obsPorNumero = [];
+
+    // 1. Extraer las líneas de "Observaciones del Asistente".
+    if (preg_match('#<p>\s*<strong>\s*Observaciones del Asistente:\s*</strong>(.*?)</p>#is', $html, $mb)) {
+        $partes = preg_split('#<br\s*/?>#i', $mb[1]);
+
+        foreach ($partes as $linea) {
+            $plain = html_entity_decode(
+                strip_tags((string)$linea),
+                ENT_QUOTES | ENT_HTML5,
+                'UTF-8'
+            );
+            $plain = trim(preg_replace('/\s+/u', ' ', $plain) ?? $plain);
+
+            if (preg_match('/^\((\d+)\)\s*(.*)$/u', $plain, $m)) {
+                $obsPorNumero[(int)$m[1]] = trim($m[2]);
+            }
+        }
+    }
+
+    // 2. Buscar los flags solamente en el cuerpo del informe.
+    $cuerpo = gpt_quitar_bloque_observaciones($html);
+
+    if (!preg_match_all(
+        '#<sup\b[^>]*class=["\'][^"\']*\bflag\b[^"\']*["\'][^>]*>.*?</sup>#is',
+        $cuerpo,
+        $flags,
+        PREG_OFFSET_CAPTURE
+    )) {
+        return [];
+    }
+
+    $resultado = [];
+
+    foreach ($flags[0] as $flagMatch) {
+        $tag = (string)$flagMatch[0];
+        $offset = (int)$flagMatch[1];
+
+        $numero = 0;
+        if (preg_match('/data-flag=["\'](\d+)["\']/i', $tag, $m)) {
+            $numero = (int)$m[1];
+        }
+
+        if ($numero <= 0) {
+            continue;
+        }
+
+        $tipo = 'valor_sospechoso';
+        if (preg_match('/data-tipo=["\']([^"\']+)["\']/i', $tag, $m)) {
+            $tipo = strtolower(trim($m[1]));
+        }
+
+        // 3. Obtener como contexto el párrafo donde está físicamente el flag.
+        $contexto = '';
+        $antes = substr($cuerpo, 0, $offset);
+
+        if (
+            preg_match_all('/<p(?:\s|>)/i', $antes, $inicios, PREG_OFFSET_CAPTURE)
+            && !empty($inicios[0])
+        ) {
+            $ultimoInicio = end($inicios[0]);
+            $inicioParrafo = (int)$ultimoInicio[1];
+            $finParrafo = stripos($cuerpo, '</p>', $offset);
+
+            if ($finParrafo !== false) {
+                $fragmento = substr(
+                    $cuerpo,
+                    $inicioParrafo,
+                    ($finParrafo + 4) - $inicioParrafo
+                );
+
+                // Quitar los indicadores (N) del contexto.
+                $fragmento = preg_replace(
+                    '#<sup\b[^>]*class=["\'][^"\']*\bflag\b[^"\']*["\'][^>]*>.*?</sup>#is',
+                    '',
+                    $fragmento
+                ) ?? $fragmento;
+
+                $contexto = html_entity_decode(
+                    strip_tags($fragmento),
+                    ENT_QUOTES | ENT_HTML5,
+                    'UTF-8'
+                );
+
+                $contexto = trim(
+                    preg_replace('/\s+/u', ' ', $contexto) ?? $contexto
+                );
+            }
+        }
+
+        $texto = $obsPorNumero[$numero] ?? '';
+
+        if ($texto === '') {
+            $texto = gpt_placeholder_observacion($numero, $tipo);
+            $texto = preg_replace('/^\(\d+\)\s*/u', '', $texto) ?? $texto;
+        }
+
+        $resultado[] = [
+            'numero'   => $numero,
+            'tipo'     => $tipo,
+            'texto'    => $texto,
+            'contexto' => $contexto,
+        ];
+    }
+
+    return $resultado;
+}
+
+/**
  * Texto mínimo cuando el modelo dejó un flag sin su observación.
  * No inventa hallazgos: solo señala que ese punto quedó marcado y debe revisarse.
  */

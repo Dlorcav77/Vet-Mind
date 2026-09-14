@@ -150,13 +150,22 @@ function obtenerFlujoIdIA(nuevo) {
     return window.__flujoIdIA;
 }
 
-// Llama a la IA revisora y pinta el panel (no editable) arriba del informe.
-// Llama a la IA revisora y pinta el panel (no editable) arriba del informe.
-function ejecutarRevisor(dictado, informeHtml, plantillaBase) {
-    const $panel = $('#revisor-panel');
+function ejecutarRevisor(dictado, informeHtml, plantillaBase, observacionesGenerador) {
+    const $bloque = $('#revision_ia_bloque');
+    const $panel = $('#revision_ia_panel');
+    const $estado = $('#revision_ia_estado');
+    const $toggle = $('#revision_ia_toggle');
     const flujoId = obtenerFlujoIdIA(false);
 
-    $panel.html('<div style="padding:12px 14px;color:#64748b">Revisando informe…</div>').show();
+    if (window.VetmindRevision && typeof window.VetmindRevision.limpiar === 'function') {
+        window.VetmindRevision.limpiar();
+    }
+
+    $bloque.show();
+    $estado.text('Revisión IA · Revisando…');
+    $toggle.css({background:'#f8fafc',borderColor:'#e2e8f0',color:'#64748b'}).prop('disabled', true);
+    $panel.hide().empty();
+    $('#revision_ia_caret').text('▸');
 
     return $.post('/funciones/GPT/proceso_ia/proceso_revisor.php', {
         flujo_id: flujoId,
@@ -167,70 +176,270 @@ function ejecutarRevisor(dictado, informeHtml, plantillaBase) {
     .done(function (resp) {
         if (!resp || resp.status !== 'success') {
             const msg = (resp && resp.message) ? resp.message : 'No se pudo completar la revisión.';
-            $panel.html('<div style="padding:12px 14px;background:#fef2f2;color:#991b1b">⚠ Revisor: ' + $('<div>').text(msg).html() + '</div>');
+            $estado.text('⚠ No se pudo completar la revisión');
+            $panel.html('<div style="padding:10px 12px;color:#991b1b">' + $('<div>').text(msg).html() + '</div>');
+            $toggle.prop('disabled', false);
             return;
         }
-        if (resp.rid) { $('#rid_revision').val(resp.rid); }
-        const items = Array.isArray(resp.items) ? resp.items : [];
+
+        if (resp.rid) $('#rid_revision').val(resp.rid);
+
+        const itemsRevisor = Array.isArray(resp.items) ? resp.items : [];
+        const organos = Array.isArray(resp.organos) ? resp.organos : [];
+        const observaciones = Array.isArray(observacionesGenerador) ? observacionesGenerador : [];
+
+        const norm = function (v) {
+            return String(v || '')
+                .normalize('NFD')
+                .replace(/[\u0300-\u036f]/g, '')
+                .toLowerCase()
+                .replace(/\s+/g, ' ')
+                .trim();
+        };
+
+        const organosVisuales = organos.map(function (organo) {
+            return {
+                organo: organo.organo,
+                atributos: Array.isArray(organo.atributos) ? organo.atributos : [],
+                alertas: []
+            };
+        });
+
+        const buscarOrgano = function (texto) {
+            const pista = norm(texto);
+            if (!pista) return -1;
+
+            const candidatos = [];
+
+            organosVisuales.forEach(function (organo, indice) {
+                const nombre = norm(organo.organo);
+                if (nombre && pista.includes(nombre)) {
+                    candidatos.push({
+                        indice: indice,
+                        largo: nombre.length
+                    });
+                }
+            });
+
+            if (!candidatos.length) return -1;
+
+            candidatos.sort(function (a, b) {
+                return b.largo - a.largo;
+            });
+
+            return candidatos[0].indice;
+        };
+
+        const items = itemsRevisor.map(function (item) {
+            return Object.assign({}, item);
+        });
+
+        // Alertas encontradas por el revisor.
+        itemsRevisor.forEach(function (item) {
+            let indice = buscarOrgano(item.zona);
+
+            if (indice === -1) {
+                const zona = norm(item.zona);
+
+                indice = organosVisuales.findIndex(function (organo) {
+                    const nombre = norm(organo.organo);
+                    return nombre && (zona.includes(nombre) || nombre.includes(zona));
+                });
+            }
+
+            if (indice === -1) return;
+
+            organosVisuales[indice].alertas.push({
+                severidad: item.severidad || 'media',
+                tipo: item.tipo || 'Revisar',
+                detalle: item.detalle || '',
+                dictado: item.dictado || '',
+                informe: item.informe || ''
+            });
+        });
+
+        // Flags/observaciones que ya detectó la IA generadora.
+        observaciones.forEach(function (obs) {
+            const indice = buscarOrgano(obs.contexto);
+
+            const item = {
+                severidad: 'media',
+                tipo: obs.tipo || 'observacion_generador',
+                zona: indice !== -1 ? organosVisuales[indice].organo : 'Informe',
+                dictado: '',
+                informe: obs.contexto || '',
+                detalle: obs.texto || 'Punto marcado por el generador para revisión.'
+            };
+
+            items.push(item);
+
+            if (indice === -1) return;
+
+            organosVisuales[indice].alertas.push({
+                severidad: 'media',
+                tipo: 'Generador · ' + (obs.tipo || 'revisar'),
+                detalle: obs.texto || 'Punto marcado por el generador para revisión.',
+                informe: obs.contexto || ''
+            });
+        });
+
+        if (
+            window.VetmindRevision
+            && typeof window.VetmindRevision.aplicar === 'function'
+            && organosVisuales.length
+        ) {
+            window.VetmindRevision.aplicar({
+                organos: organosVisuales
+            });
+        }
+
         if (items.length === 0) {
-            $panel.html('<div style="padding:12px 14px;background:#ecfdf5;color:#065f46">✓ El revisor no encontró inconsistencias entre el dictado y el informe.</div>');
+            $estado.text('✓ Revisión IA · Sin observaciones');
+            $toggle.css({background:'#ecfdf5',borderColor:'#a7f3d0',color:'#065f46'}).prop('disabled', true);
             return;
         }
-        const esc = function (v) { return $('<div>').text(v || '').html(); };
+
+        $estado.text('⚠ Revisión IA · ' + items.length + ' observación' + (items.length === 1 ? '' : 'es'));
+        $toggle.css({background:'#fffbeb',borderColor:'#fde68a',color:'#92400e'}).prop('disabled', false);
+
+        const esc = function (v) {
+            return $('<div>').text(v || '').html();
+        };
+
         let filas = '';
+
         items.forEach(function (it, idx) {
             const sev = (it.severidad || 'media').toLowerCase();
-            const bg = sev === 'alta' ? '#fee2e2;color:#991b1b' : (sev === 'media' ? '#fef3c7;color:#92400e' : '#e2e8f0;color:#475569');
-            const sevBadge = '<span style="display:inline-block;font-size:11px;padding:2px 8px;border-radius:6px;font-weight:600;background:' + bg + '">' + esc(sev) + '</span>';
+            const bg = sev === 'alta'
+                ? '#fee2e2;color:#991b1b'
+                : (sev === 'media'
+                    ? '#fef3c7;color:#92400e'
+                    : '#e2e8f0;color:#475569');
 
-            // Fila resumen (una línea, clickeable).
-            filas += '<tr class="rev-row" data-idx="' + idx + '" style="cursor:pointer">'
-                + '<td style="padding:8px 10px;border-bottom:1px solid #f1f5f9;vertical-align:top;width:18px;color:#94a3b8"><span class="rev-caret">▸</span></td>'
-                + '<td style="padding:8px 10px;border-bottom:1px solid #f1f5f9;vertical-align:top;white-space:nowrap">' + sevBadge + '</td>'
-                + '<td style="padding:8px 10px;border-bottom:1px solid #f1f5f9;vertical-align:top;white-space:nowrap;font-weight:600;color:#334155">' + esc(it.tipo) + '</td>'
-                + '<td style="padding:8px 10px;border-bottom:1px solid #f1f5f9;vertical-align:top;color:#334155">' + esc(it.zona) + '</td>'
-                + '</tr>';
+            const badge = '<span style="display:inline-block;font-size:11px;padding:2px 8px;border-radius:6px;font-weight:600;background:' + bg + '">' + esc(sev) + '</span>';
 
-            // Fila detalle (oculta por defecto): 3 cards.
-            const card = function (titulo, valor, color, bgCard, bdr) {
-                return '<div style="flex:1;min-width:200px;background:' + bgCard + ';border:1px solid ' + bdr + ';border-radius:8px;padding:10px 12px">'
-                    + '<div style="font-size:10px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;color:' + color + ';margin-bottom:4px">' + titulo + '</div>'
-                    + '<div style="font-size:13px;line-height:1.45;color:#334155">' + esc(valor) + '</div>'
-                    + '</div>';
-            };
-            filas += '<tr class="rev-detail" data-idx="' + idx + '" style="display:none">'
-                + '<td></td>'
-                + '<td colspan="3" style="padding:2px 10px 14px;border-bottom:1px solid #f1f5f9">'
-                + '<div style="display:flex;flex-wrap:wrap;gap:10px">'
-                + card('Dictado', it.dictado, '#0369a1', '#f0f9ff', '#bae6fd')
-                + card('Informe', it.informe, '#92400e', '#fffbeb', '#fde68a')
-                + card('Revisar', it.detalle, '#9a3412', '#fff7ed', '#fed7aa')
+            filas += '<div class="rev-row" data-idx="' + idx + '" style="padding:8px 10px;border-bottom:1px solid #f1f5f9;cursor:pointer">'
+                + '<div style="display:flex;align-items:center;gap:10px">'
+                + '<span class="rev-caret" style="color:#94a3b8">▸</span>'
+                + badge
+                + '<strong style="color:#334155">' + esc(it.zona || it.tipo) + '</strong>'
+                + '<span style="color:#64748b">' + esc(it.tipo) + '</span>'
                 + '</div>'
-                + '</td>'
-                + '</tr>';
+                + '</div>'
+                + '<div class="rev-detail" data-idx="' + idx + '" style="display:none;padding:10px 12px;background:#fff">'
+                + '<div style="margin-bottom:6px"><strong>Dictado:</strong> ' + esc(it.dictado) + '</div>'
+                + '<div style="margin-bottom:6px"><strong>Informe:</strong> ' + esc(it.informe) + '</div>'
+                + '<div><strong>Revisar:</strong> ' + esc(it.detalle) + '</div>'
+                + '</div>';
         });
-        $panel.html(
-            '<div style="padding:10px 14px;background:#fff7ed;color:#9a3412;font-weight:600;border-bottom:1px solid #e2e8f0">⚠ El revisor detectó ' + items.length + ' punto(s) a revisar (no se modificó el informe)</div>'
-            + '<div style="overflow:auto"><table style="width:100%;border-collapse:collapse">'
-            + '<tr style="background:#f8fafc;color:#475569">'
-            + '<th style="padding:6px 10px"></th><th style="text-align:left;padding:6px 10px">Sev.</th><th style="text-align:left;padding:6px 10px">Tipo</th><th style="text-align:left;padding:6px 10px">Zona</th>'
-            + '</tr>' + filas + '</table></div>'
-        );
 
-        // Toggle: al clickear una fila resumen, despliega/oculta su detalle.
+        $panel.html(filas);
+
         $panel.off('click', '.rev-row').on('click', '.rev-row', function () {
             const idx = $(this).data('idx');
             const $detail = $panel.find('.rev-detail[data-idx="' + idx + '"]');
-            const $caret = $(this).find('.rev-caret');
             const visible = $detail.is(':visible');
+
             $detail.toggle(!visible);
-            $caret.text(visible ? '▸' : '▾');
+            $(this).find('.rev-caret').text(visible ? '▸' : '▾');
         });
     })
     .fail(function () {
-        $panel.html('<div style="padding:12px 14px;background:#fef2f2;color:#991b1b">⚠ No se pudo conectar al revisor.</div>');
+        $estado.text('⚠ No se pudo conectar al revisor');
+        $panel.html('<div style="padding:10px 12px;color:#991b1b">No se pudo conectar al revisor.</div>');
+        $toggle.prop('disabled', false);
     });
 }
+
+function limpiarContenidoInformeIA(html) {
+    return (html || '')
+        .replace(/<span[^>]*class=['"]vm-discrepancia['"][^>]*>(.*?)<\/span>/gi, '$1')
+        .replace(/<span[^>]*style=['"]?color:(orange|blue);?['"]?[^>]*>(.*?)<\/span>/gi, '$2')
+        .replace(/(?:<[^>]+>)?Observaciones del Asistente:?<\/?.*?>?(?:<br\s*\/?>)?[\s\S]*$/i, '')
+        .replace(/<sup\b[^>]*class=['"]flag['"][^>]*>.*?<\/sup>/gi, '')
+        .replace(/\s*\(\d+\)/g, '')
+        .replace(/CONCLUSION:\s*((?:- .*?\.)(?:\s*- .*?\.)*)/i, function (match, contenido) {
+            const lineas = contenido.split(/\s*-\s+/).filter(Boolean).map(l => '&nbsp;&nbsp;- ' + l.trim() + '<br>').join('');
+            return 'CONCLUSION:<br>' + lineas;
+        })
+        .trim();
+}
+
+function prepararAudioRevision(audioFile) {
+    if (window.__audioRevisionObjectUrl) {
+        URL.revokeObjectURL(window.__audioRevisionObjectUrl);
+        window.__audioRevisionObjectUrl = null;
+    }
+
+    if (audioFile) {
+        window.__audioRevisionObjectUrl = URL.createObjectURL(audioFile);
+        window.__audioRevisionSrc = window.__audioRevisionObjectUrl;
+        return;
+    }
+
+    window.__audioRevisionSrc = ($('#audioPlayback').attr('src') || '').trim();
+}
+
+function inicializarAudioRevision() {
+    const src = (window.__audioRevisionSrc || '').trim();
+    const audio = document.getElementById('revision_audio');
+    if (!audio || !src) {
+        $('#revision_audio_barra').attr('style', 'display:none!important;');
+        return;
+    }
+
+    audio.src = src;
+    audio.load();
+    $('#revision_audio_barra').attr('style', 'display:flex!important;padding:8px 10px;border:1px solid #e2e8f0;border-radius:8px;background:#f8fafc;');
+
+    const formato = function (seg) {
+        if (!isFinite(seg)) seg = 0;
+        const m = Math.floor(seg / 60);
+        const s = Math.floor(seg % 60);
+        return String(m).padStart(2, '0') + ':' + String(s).padStart(2, '0');
+    };
+
+    const actualizar = function () {
+        const dur = isFinite(audio.duration) ? audio.duration : 0;
+        const actual = isFinite(audio.currentTime) ? audio.currentTime : 0;
+        $('#revision_audio_seek').val(dur > 0 ? (actual / dur) * 100 : 0);
+        $('#revision_audio_tiempo').text(formato(actual) + ' / ' + formato(dur));
+        $('#revision_audio_play').text(audio.paused ? '▶' : '⏸');
+    };
+
+    $('#revision_audio_play').off('.revisionAudio').on('click.revisionAudio', function () {
+        if (audio.paused) audio.play(); else audio.pause();
+    });
+
+    $('#revision_audio_back').off('.revisionAudio').on('click.revisionAudio', function () {
+        audio.currentTime = Math.max(0, audio.currentTime - 5);
+    });
+
+    $('#revision_audio_forward').off('.revisionAudio').on('click.revisionAudio', function () {
+        audio.currentTime = Math.min(audio.duration || 0, audio.currentTime + 5);
+    });
+
+    $('#revision_audio_seek').off('.revisionAudio').on('input.revisionAudio', function () {
+        if (isFinite(audio.duration) && audio.duration > 0) audio.currentTime = audio.duration * (parseFloat(this.value) / 100);
+    });
+
+    $('#revision_audio_speed').off('.revisionAudio').on('change.revisionAudio', function () {
+        audio.playbackRate = parseFloat(this.value) || 1;
+    });
+
+    $(audio).off('.revisionAudio')
+        .on('loadedmetadata.revisionAudio timeupdate.revisionAudio play.revisionAudio pause.revisionAudio ended.revisionAudio', actualizar);
+
+    actualizar();
+}
+
+$(document).off('click.revisionIA', '#revision_ia_toggle').on('click.revisionIA', '#revision_ia_toggle', function () {
+    if ($(this).prop('disabled')) return;
+    const $panel = $('#revision_ia_panel');
+    const visible = $panel.is(':visible');
+    $panel.toggle(!visible);
+    $('#revision_ia_caret').text(visible ? '▸' : '▾');
+});
 
 // Resalta en el informe las palabras que vinieron de una discrepancia entre los 2 motores.
 // Solo color (no número, no observación). El vet ve dónde hubo duda y revisa.
@@ -393,6 +602,8 @@ $('#procesarIA').on('click', function () {
     let audioTmp = ($('#audio_tmp').val() || '').trim();
     let audioFilename = $('#bloque-audio').data('audioFilename');
 
+    prepararAudioRevision(audioFile);
+
     if (!audioFile && !audioTmp && !audioFilename) {
         Swal.fire('Error', 'Debes subir o grabar un audio antes de procesar.', 'warning');
         $btnProcesar.prop('disabled', false);
@@ -474,12 +685,37 @@ $('#procesarIA').on('click', function () {
 
         if (respGPT.status === 'success') {
             if (respGPT.rid) { $('#rid_ia').val(respGPT.rid); }
-            const informeResaltado = resaltarDiscrepancias(respGPT.content, window.__ultimasDiscrepancias || []);
-            mostrarModalIA(informeResaltado);
-            // Revisor: usa el informe ORIGINAL (sin el resaltado), para no confundirlo.
+
             const dictadoCompleto = (window.__ultimoDictadoIA || '').trim();
             const plantillaBase = $('#plantillaBase').val();
-            ejecutarRevisor(dictadoCompleto, respGPT.content, plantillaBase);
+            const informeOriginal = respGPT.content;
+            const informeLimpio = limpiarContenidoInformeIA(informeOriginal);
+
+            const observacionesGenerador = Array.isArray(respGPT.observaciones)
+                ? respGPT.observaciones
+                : [];
+
+            audio_manual_setMode('manual');
+            aplicarContenidoInforme(informeLimpio);
+
+            $('#revision_ia_bloque').show();
+            $('#revision_ia_estado').text('Revisión IA · Revisando…');
+            $('#revision_ia_toggle')
+                .css({background:'#f8fafc', borderColor:'#e2e8f0', color:'#64748b'})
+                .prop('disabled', true);
+            $('#revision_ia_panel').hide().empty();
+            $('#revision_ia_caret').text('▸');
+
+            inicializarAudioRevision();
+
+            setTimeout(function () {
+                ejecutarRevisor(
+                    dictadoCompleto,
+                    informeOriginal,
+                    plantillaBase,
+                    observacionesGenerador
+                );
+            }, 100);
         } else if (respGPT.status === 'dry_run') {
             const html = respGPT.debug_html || respGPT.content_demo || '<p><strong>DEBUG:</strong> Dry-run activo.</p>';
             mostrarModalDebug(html);

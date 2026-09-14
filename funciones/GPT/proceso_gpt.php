@@ -284,6 +284,8 @@ $ctxPaciente = [
 ];
 $content = gpt_postprocess_html($content, $incluir_conclusion, $ctxPaciente);
 
+$observaciones = gpt_extraer_observaciones($content);
+
 // 9. métricas
 $usage = $result['usage'] ?? [];
 $prompt_tokens     = (int)($usage['prompt_tokens']     ?? ($usage['input_tokens']  ?? 0));
@@ -355,9 +357,10 @@ if ($mysqli instanceof mysqli) {
 
 // 10. respuesta final
 echo json_encode([
-    'status'  => 'success',
-    'content' => $content,
-    'rid'     => $rid,
+    'status'        => 'success',
+    'content'       => $content,
+    'observaciones' => $observaciones,
+    'rid'           => $rid,
     'usage'   => [
         'prompt_tokens'     => $prompt_tokens,
         'completion_tokens' => $completion_tokens,
