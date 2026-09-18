@@ -1,6 +1,9 @@
 let nombresHighlights = [];
 let datosRevisionActual = null;
 let alertaAbierta = null;
+let timerReaplicarRevision = null;
+let editorRevisionEscuchado = null;
+let observerRevisionEditor = null;
 
 function normalizar(valor) {
     return String(valor || '').trim().toLowerCase();
@@ -222,6 +225,44 @@ function actualizarPosicionAlertas() {
     cerrarDetalleAlerta();
 }
 
+function activarReaplicacionEnEdicion() {
+    const raiz = obtenerRaizEditor();
+    if (!raiz) return;
+
+    if (editorRevisionEscuchado !== raiz) {
+        if (editorRevisionEscuchado) {
+            editorRevisionEscuchado.removeEventListener('input', programarReaplicacionRevision);
+        }
+
+        editorRevisionEscuchado = raiz;
+        editorRevisionEscuchado.addEventListener('input', programarReaplicacionRevision);
+    }
+
+    if (observerRevisionEditor) observerRevisionEditor.disconnect();
+
+    observerRevisionEditor = new MutationObserver(function () {
+        programarReaplicacionRevision();
+    });
+
+    observerRevisionEditor.observe(raiz, {
+        subtree: true,
+        childList: true,
+        characterData: true,
+        attributes: true,
+        attributeFilter: ['style', 'class']
+    });
+}
+
+function programarReaplicacionRevision() {
+    if (!datosRevisionActual) return;
+
+    clearTimeout(timerReaplicarRevision);
+
+    timerReaplicarRevision = setTimeout(function () {
+        if (!datosRevisionActual) return;
+        aplicar(datosRevisionActual);
+    }, 120);
+}
 
 function aplicar(datos) {
     limpiarHighlights();
@@ -235,6 +276,7 @@ function aplicar(datos) {
     if (!datos || !Array.isArray(datos.organos)) return false;
 
     datosRevisionActual = datos;
+    activarReaplicacionEnEdicion();
 
     const porOrigen = {
         plantilla: [],
@@ -272,6 +314,8 @@ function limpiar() {
     limpiarHighlights();
     cerrarDetalleAlerta();
     datosRevisionActual = null;
+
+    clearTimeout(timerReaplicarRevision);
 
     const overlay = document.getElementById('vm_revision_overlay');
     if (overlay) overlay.remove();

@@ -36,6 +36,7 @@ require_once($FUNC_DIR . "/logs/logger.php");
 // helpers
 require_once($GPT_DIR . "/lib/gpt_prompt.php");
 require_once($GPT_DIR . "/lib/gpt_postprocess.php");
+require_once($GPT_DIR . "/lib/gpt_origen.php");
 require_once($GPT_DIR . "/lib/ia_store.php");
 
 date_default_timezone_set('America/Santiago');
@@ -267,6 +268,14 @@ $ctxPaciente = [
 
 $content = gpt_postprocess_html($content, $incluir_conclusion, $ctxPaciente);
 
+$observaciones = gpt_extraer_observaciones($content);
+
+$origenVisual = gpt_clasificar_origen_informe(
+    $texto_dictado,
+    (string)$input['plantilla_base'],
+    $content
+);
+
 // 9. métricas
 $usage = $result['usage'] ?? [];
 
@@ -366,10 +375,12 @@ if ($mysqli instanceof mysqli) {
 
 // 10. respuesta final
 echo json_encode([
-    'status'  => 'success',
-    'content' => $content,
-    'rid'     => $rid,
-    'usage'   => [
+    'status'        => 'success',
+    'content'       => $content,
+    'observaciones' => $observaciones,
+    'organos'       => $origenVisual['organos'] ?? [],
+    'rid'           => $rid,
+    'usage'         => [
         'provider'          => 'grok',
         'model'             => GROK_MODEL,
         'prompt_tokens'     => $prompt_tokens,

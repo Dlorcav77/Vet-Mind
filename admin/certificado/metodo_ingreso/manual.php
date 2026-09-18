@@ -82,6 +82,7 @@ $contenidoInforme = isset($fila['contenido_html']) ? (string)$fila['contenido_ht
                     <option value="2.5">2.5</option>
                     <option value="3">3</option>
                 </select>
+
                 <div class="vm-color-control" title="Color de texto">
                     <input
                         type="color"
@@ -256,6 +257,26 @@ $contenidoInforme = isset($fila['contenido_html']) ? (string)$fila['contenido_ht
                         <path d="M17 11H9.5C6.46 11 4 13.46 4 16.5"></path>
                     </svg>
                 </button>
+            </div>
+
+            <div class="vm-toolbar-divider"></div>
+
+            <div class="vm-toolbar-visual" title="Zoom visual del editor">
+                <svg class="vm-toolbar-zoom-icon" viewBox="0 0 24 24" aria-hidden="true">
+                    <circle cx="10.5" cy="10.5" r="6.5"></circle>
+                    <line x1="15.5" y1="15.5" x2="20" y2="20"></line>
+                </svg>
+
+                <select
+                    id="contenido_html_zoom"
+                    class="form-select form-select-sm vm-toolbar-select vm-toolbar-select-zoom"
+                    aria-label="Zoom visual del informe"
+                >
+                    <option value="0.9">90%</option>
+                    <option value="1" selected>100%</option>
+                    <option value="1.1">110%</option>
+                    <option value="1.25">125%</option>
+                </select>
             </div>
         </div>
 

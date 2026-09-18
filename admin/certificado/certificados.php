@@ -124,7 +124,7 @@ $destacado_titulo_inicial = trim(
 </script>
 
 <script src="certificado/common/js/editor.js?v=4"></script>
-<script src="certificado/metodo_ingreso/js/ia.js?v=22"></script>
+<script src="certificado/metodo_ingreso/js/ia.js?v=<?php echo time(); ?>"></script>
 <script src="certificado/preview/js/preview.js?v=4"></script>
 <script src="certificado/common/js/destacado.js?v=1"></script>
 <script src="certificado/guardar/js/guardar.js?v=23"></script>

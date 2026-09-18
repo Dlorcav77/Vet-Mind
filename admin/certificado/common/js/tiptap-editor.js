@@ -1,4 +1,15 @@
 //admin/certificado/common/tiptap-editor.js
+
+/*
+ * IMPORTANTE:
+ * Este archivo es el código fuente editable.
+ * El navegador ejecuta tiptap-editor.bundle.js.
+ *
+ * Todo cambio realizado aquí debe replicarse/regenerarse también
+ * en tiptap-editor.bundle.js y aumentar su ?v= en la carga PHP.
+ */
+
+
 import { Editor, Extension, Node, mergeAttributes } from 'https://esm.sh/@tiptap/core@2.22.3';
 import StarterKit from 'https://esm.sh/@tiptap/starter-kit@2.22.3';
 import Placeholder from 'https://esm.sh/@tiptap/extension-placeholder@2.22.3';
@@ -659,7 +670,7 @@ const XxFaltanteMark = Node.create({
       editor.view.dispatch(tr);
     }
 
-    editor.commands.focus();
+    editor.commands.setTextSelection(1);
   }
 
   function applyLineHeight(editor, value) {
@@ -667,12 +678,43 @@ const XxFaltanteMark = Node.create({
       return;
     }
 
-    if (!value || value === '1.15') {
-      editor.chain().focus().unsetLineHeight().run();
+    const { empty } = editor.state.selection;
+
+    // Con selección manual: aplicar solamente a los bloques seleccionados.
+    if (!empty) {
+      if (!value || value === '1.15') {
+        editor.chain().focus().unsetLineHeight().run();
+      } else {
+        editor.chain().focus().setLineHeight(value).run();
+      }
+
       return;
     }
 
-    editor.chain().focus().setLineHeight(value).run();
+    // Sin selección: aplicar globalmente solo a los párrafos.
+    // Los títulos h1/h2/h3 quedan intactos.
+    const state = editor.state;
+    const tr = state.tr;
+
+    state.doc.descendants((node, pos) => {
+      if (node.type.name !== 'paragraph') {
+        return;
+      }
+
+      const lineHeight = (!value || value === '1.15') ? null : value;
+      const attrs = {
+        ...node.attrs,
+        lineHeight
+      };
+
+      tr.setNodeMarkup(pos, undefined, attrs, node.marks);
+    });
+
+    if (tr.docChanged) {
+      editor.view.dispatch(tr);
+    }
+
+    editor.commands.setTextSelection(1);
   }
 
   function applyTextColor(editor, value) {
@@ -898,13 +940,15 @@ const XxFaltanteMark = Node.create({
       elements.fontSizeSelect.addEventListener('change', function () {
         const selectTarget = this.getAttribute('data-editor-target') || target;
         const editor = getEditorByTarget(selectTarget);
+        const teniaSeleccion = editor ? !editor.state.selection.empty : false;
 
         applyFontSize(editor, this.value);
         syncEditorToTextarea(selectTarget);
         updateToolbarState(selectTarget);
 
         if (editor) {
-          editor.commands.focus();
+          if (teniaSeleccion) editor.commands.focus();
+          else editor.commands.blur();
         }
       });
     }
@@ -919,13 +963,15 @@ const XxFaltanteMark = Node.create({
       elements.lineHeightSelect.addEventListener('change', function () {
         const selectTarget = this.getAttribute('data-editor-target') || target;
         const editor = getEditorByTarget(selectTarget);
+        const teniaSeleccion = editor ? !editor.state.selection.empty : false;
 
         applyLineHeight(editor, this.value);
         syncEditorToTextarea(selectTarget);
         updateToolbarState(selectTarget);
 
         if (editor) {
-          editor.commands.focus();
+          if (teniaSeleccion) editor.commands.focus();
+          else editor.commands.blur();
         }
       });
     }
@@ -1188,6 +1234,9 @@ const XxFaltanteMark = Node.create({
 
     if (mainEditor) {
       mainEditor.commands.setContent(value, false);
+      mainEditor.commands.setTextSelection(1);
+      mainEditor.commands.blur();
+
       syncEditorToTextarea('main');
       updateToolbarState('main');
       return;

@@ -15,7 +15,7 @@
     gap: .55rem;
     padding: .8rem .9rem;
     border-bottom: 1px solid #e7ebf0;
-    background: linear-gradient(180deg, #f8fafc 0%, #eef2f6 100%);
+    background: #e2e8f0;
 }
 
 .vm-toolbar-group {
@@ -797,8 +797,10 @@ mark.xx-faltante {
     align-items: center;
     gap: 7px;
     width: min(620px, 100%);
+    height: 42px;
     min-width: 0;
-    padding: 6px 9px;
+    padding: 3px 9px;
+    overflow: visible;
     background: linear-gradient(180deg, #334155 0%, #1f2937 100%);
     border: 1px solid #475569;
     border-radius: 999px;
@@ -853,22 +855,28 @@ mark.xx-faltante {
 }
 
 .vm-review-audio-play {
-    width: 48px;
-    height: 48px;
+    width: 52px;
+    height: 52px;
     background: #06b6d4;
-    border-color: #06b6d4;
+    border: 2px solid #263648;
     color: #fff;
     box-shadow: 0 3px 11px rgba(6, 182, 212, .30);
 }
 
 .vm-review-audio-play svg {
-    width: 32px;
-    height: 30px;
+    width: 40px;
+    height: 40px;
 }
 
 .vm-review-audio-play.is-pause svg {
-    width: 30px;
-    height: 30px;
+    width: 38px;
+    height: 38px;
+}
+
+.vm-review-audio-play {
+    position: relative;
+    z-index: 3;
+    touch-action: manipulation;
 }
 
 .vm-review-audio-play:hover {
@@ -906,12 +914,14 @@ mark.xx-faltante {
 
 .vm-review-audio-speed {
     flex: 0 0 auto;
-    width: 56px;
+    width: 72px;
     height: 30px;
-    padding: 2px 20px 2px 7px;
+    padding: 2px 12px 2px 7px;
     border: 1px solid #475569;
     border-radius: 8px;
     background-color: #0f172a;
+    background-position: right 4px center;
+    background-size: 9px 7px;
     color: #e2e8f0;
     font-size: 12px;
     cursor: pointer;
@@ -1216,11 +1226,11 @@ mark.xx-faltante {
 }
 
 #contenido_html_editor {
-    background: #f3f5f8;
+    background: #eef6fb;
 }
 
 #contenido_html_editor .ProseMirror {
-    background: #f3f5f8;
+    background: #eef6fb;
     padding: 10px 8px 16px;
 }
 
@@ -1229,7 +1239,7 @@ mark.xx-faltante {
     margin: 0 4px 5px !important;
     padding: 6px 48px 6px 9px;
     background: #fff;
-    border: 1px solid #e1e6ec;
+    border: 1px solid #dbe4ec;
     border-radius: 7px;
     box-shadow: 0 1px 2px rgba(15, 23, 42, .035);
 }
@@ -1250,6 +1260,7 @@ mark.xx-faltante {
 }
 
 .vm-review-audio-volume-btn {
+    position: relative;
     flex: 0 0 auto;
     width: 24px;
     height: 24px;
@@ -1262,6 +1273,19 @@ mark.xx-faltante {
 
 .vm-review-audio-volume-btn:hover {
     color: #fff;
+}
+
+.vm-review-audio-volume-btn.is-muted::after {
+    content: "";
+    position: absolute;
+    left: 3px;
+    top: 11px;
+    width: 19px;
+    height: 2px;
+    border-radius: 2px;
+    background: #f8fafc;
+    transform: rotate(-45deg);
+    transform-origin: center;
 }
 
 .vm-review-audio-volume-btn svg {
@@ -1283,3 +1307,130 @@ mark.xx-faltante {
     accent-color: #38bdf8;
 }
 
+#contenido_html_toolbar.vm-tiptap-toolbar {
+    flex-wrap: nowrap;
+    gap: .35rem;
+    padding: .55rem .65rem;
+    overflow-x: auto;
+    overflow-y: hidden;
+    scrollbar-width: thin;
+}
+
+#contenido_html_toolbar .vm-toolbar-group {
+    flex: 0 0 auto;
+    gap: .25rem;
+}
+
+#contenido_html_toolbar .vm-toolbar-divider {
+    flex: 0 0 auto;
+    height: 24px;
+    margin: 0;
+}
+
+#contenido_html_toolbar .vm-toolbar-icon-btn {
+    min-width: 36px;
+    height: 34px;
+    padding: 0 .5rem;
+    border-radius: 10px;
+}
+
+#contenido_html_toolbar .vm-toolbar-list-btn {
+    min-width: 44px;
+}
+
+#contenido_html_toolbar .vm-color-control {
+    min-height: 34px;
+}
+
+#contenido_html_toolbar .vm-color-input {
+    width: 38px;
+    height: 34px;
+    border-radius: 10px;
+}
+
+#contenido_html_heading {
+    width: 92px;
+    min-width: 92px;
+    max-width: 92px;
+}
+
+#contenido_html_font_size {
+    width: 60px;
+    min-width: 60px;
+    max-width: 60px;
+}
+
+#contenido_html_line_height {
+    width: 62px;
+    min-width: 62px;
+    max-width: 62px;
+}
+
+#contenido_html_zoom {
+    width: 66px;
+    min-width: 66px;
+    max-width: 66px;
+}
+
+#contenido_html_toolbar .vm-toolbar-select {
+    padding-left: 9px;
+    padding-right: 22px;
+    background-position: right 6px center;
+    background-size: 10px 8px;
+}
+
+#contenido_html_heading {
+    width: 92px;
+    min-width: 92px;
+    max-width: 92px;
+}
+
+#contenido_html_font_size {
+    width: 58px;
+    min-width: 58px;
+    max-width: 58px;
+}
+
+#contenido_html_line_height {
+    width: 66px;
+    min-width: 66px;
+    max-width: 66px;
+}
+
+#contenido_html_zoom {
+    width: 70px;
+    min-width: 70px;
+    max-width: 70px;
+}
+
+.vm-toolbar-visual {
+    position: sticky;
+    right: 0;
+    z-index: 5;
+    flex: 0 0 auto;
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    margin-left: auto;
+    padding: 4px 5px 4px 8px;
+    border: 1px solid #475569;
+    border-radius: 999px;
+    background: linear-gradient(180deg, #334155 0%, #1f2937 100%);
+    box-shadow: 0 2px 6px rgba(15, 23, 42, .12);
+}
+
+.vm-toolbar-zoom-icon {
+    flex: 0 0 auto;
+    width: 18px;
+    height: 18px;
+    fill: none;
+    stroke: #cbd5e1;
+    stroke-width: 2;
+    stroke-linecap: round;
+}
+
+#contenido_html_zoom {
+    width: 70px;
+    min-width: 70px;
+    max-width: 70px;
+}

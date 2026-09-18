@@ -73,7 +73,7 @@ require_once($GPT_DIR . "/lib/ia_store.php");
 // - 'gpt'    => usa GPT normal en este mismo archivo
 // - 'claude' => deriva a funciones/GPT/proceso_claude.php
 // - 'grok'   => deriva a funciones/GPT/proceso_grok.php
-$motor = 'gpt';
+$motor = 'grok';
 
 // Normalizar por seguridad
 $motor = strtolower(trim($motor));

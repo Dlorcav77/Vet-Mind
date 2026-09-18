@@ -309,7 +309,7 @@ function ejecutarRevisor(dictado, informeHtml, plantillaBase, observacionesGener
             'vm-revision-status-warning',
             false
         );
-        
+
         let filas = '';
 
         items.forEach(function (it, idx) {
@@ -451,8 +451,24 @@ function inicializarAudioRevision() {
         }
     };
 
-    $('#revision_audio_play').off('.revisionAudio').on('click.revisionAudio', function () {
-        if (audio.paused) audio.play(); else audio.pause();
+    $('#revision_audio_play').off('.revisionAudio').on('click.revisionAudio', function (e) {
+        e.preventDefault();
+        e.stopPropagation();
+
+        if (!audio.paused) {
+            audio.pause();
+            actualizar();
+            return;
+        }
+
+        const promesa = audio.play();
+        actualizar();
+
+        if (promesa && typeof promesa.catch === 'function') {
+            promesa.catch(function () {
+                actualizar();
+            });
+        }
     });
 
     $('#revision_audio_back').off('.revisionAudio').on('click.revisionAudio', function () {
@@ -490,6 +506,21 @@ function inicializarAudioRevision() {
 
     actualizar();
 }
+
+function aplicarZoomInforme(valor) {
+    const zoom = parseFloat(valor) || 1;
+    const editor = document.querySelector('#contenido_html_editor .ProseMirror');
+    if (!editor) return;
+
+    editor.style.zoom = String(zoom);
+    editor.style.width = '';
+}
+
+$(document)
+    .off('change.vmEditorZoom', '#contenido_html_zoom')
+    .on('change.vmEditorZoom', '#contenido_html_zoom', function () {
+        aplicarZoomInforme(this.value);
+});
 
 $(document).off('click.revisionIA', '#revision_ia_toggle').on('click.revisionIA', '#revision_ia_toggle', function () {
     if ($(this).prop('disabled')) return;

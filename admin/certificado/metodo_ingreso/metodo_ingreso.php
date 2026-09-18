@@ -6,7 +6,7 @@ $isManualInitial = $initialMode === 'manual';
 ?>
 
 
-<link rel="stylesheet" href="certificado/metodo_ingreso/css/metodo_ingreso.css?v=10">
+<link rel="stylesheet" href="certificado/metodo_ingreso/css/metodo_ingreso.css?v=<?php echo time(); ?>">
 <div class="vm-ingreso-topbar mb-2">
     <div id="audio_manual_segmented" class="btn-group vm-ingreso-modo" role="group" aria-label="Modo de ingreso">
         <button type="button" class="btn btn-outline-info <?= $isManualInitial ? '' : 'active' ?>" id="audio_manual_audioBtn">🎤 Audio</button>
@@ -71,7 +71,7 @@ $isManualInitial = $initialMode === 'manual';
 <?php include __DIR__ . '/audio.php'; ?>
 <?php include __DIR__ . '/manual.php'; ?>
 
-<script type="module" src="certificado/common/js/tiptap-editor.bundle.js?v=3"></script>
-<script type="module" src="certificado/common/js/revision-visual.js?v=7"></script>
+<script type="module" src="certificado/common/js/tiptap-editor.bundle.js?v=<?php echo time(); ?>"></script>
+<script type="module" src="certificado/common/js/revision-visual.js?v=<?php echo time(); ?>"></script>
 <script src="certificado/metodo_ingreso/js/audio.js?v=2"></script>
-<script src="certificado/metodo_ingreso/js/metodo_ingreso.js?v=11"></script>
+<script src="certificado/metodo_ingreso/js/metodo_ingreso.js?v=<?php echo time(); ?>"></script>
