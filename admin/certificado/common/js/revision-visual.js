@@ -1,9 +1,13 @@
 let nombresHighlights = [];
 let datosRevisionActual = null;
 let alertaAbierta = null;
+let notaAbierta = null;
+let notasOrganos = {};
 let timerReaplicarRevision = null;
 let editorRevisionEscuchado = null;
 let observerRevisionEditor = null;
+let observerNotasEditor = null;
+let timerNotasEditor = null;
 
 function normalizar(valor) {
     return String(valor || '').trim().toLowerCase();
@@ -26,6 +30,34 @@ function obtenerBloquesTexto() {
 function buscarBloqueOrgano(nombre) {
     const buscado = normalizar(nombre);
     return obtenerBloquesTexto().find(b => normalizar(b.texto).includes(buscado)) || null;
+}
+
+function obtenerNombreCard(el) {
+    if (!el) return '';
+
+    const texto = (el.textContent || '').trim();
+    if (!texto) return '';
+
+    const strong = el.querySelector('strong');
+    if (strong) {
+        return (strong.textContent || '').trim().replace(/:$/, '');
+    }
+
+    const match = texto.match(/^([^:]{2,60}):/);
+    return match ? match[1].trim() : '';
+}
+
+function obtenerCardsInforme() {
+    const raiz = obtenerRaizEditor();
+    if (!raiz) return [];
+
+    return Array.from(raiz.children)
+        .filter(el => el.tagName === 'P')
+        .map(el => ({
+            el,
+            organo: obtenerNombreCard(el)
+        }))
+        .filter(card => card.organo);
 }
 
 function buscarRangoDom(contenedor, textoBuscado) {
@@ -110,6 +142,136 @@ function cerrarDetalleAlerta() {
     alertaAbierta = null;
 }
 
+function claveNotaOrgano(organo) {
+    return normalizar(organo || '');
+}
+
+function cerrarEditorNota() {
+    document.querySelectorAll('.vm-revision-nota-editor').forEach(el => el.remove());
+    document.querySelectorAll('.vm-revision-nota-btn.active').forEach(el => el.classList.remove('active'));
+
+    const raiz = obtenerRaizEditor();
+    if (raiz) {
+        raiz.querySelectorAll('[data-vm-nota-editando="1"]').forEach(el => {
+            el.removeAttribute('data-vm-nota-editando');
+        });
+    }
+
+    notaAbierta = null;
+}
+
+function actualizarCardNota(organo) {
+    const clave = claveNotaOrgano(organo);
+    const overlay = document.getElementById('vm_revision_overlay');
+    if (!overlay) return;
+
+    const contenedor = Array.from(overlay.querySelectorAll('.vm-revision-organo-acciones'))
+        .find(el => claveNotaOrgano(el.dataset.organo) === clave);
+
+    const boton = contenedor?.querySelector('.vm-revision-nota-btn');
+    if (!boton) return;
+
+    boton.classList.toggle('tiene-nota', !!notasOrganos[clave]);
+}
+
+function mostrarEditorNota(boton, organo) {
+    const clave = claveNotaOrgano(organo);
+    const contenedor = boton.closest('.vm-revision-organo-acciones');
+    if (!contenedor) return;
+
+    const inputAbierto = document.querySelector('.vm-revision-nota-input');
+
+    if (notaAbierta === clave && inputAbierto) {
+        inputAbierto.focus();
+        return;
+    }
+
+    if (notaAbierta && inputAbierto) {
+        const textoAnterior = inputAbierto.value.trim();
+
+        if (textoAnterior) {
+            notasOrganos[notaAbierta] = textoAnterior;
+        } else {
+            delete notasOrganos[notaAbierta];
+        }
+    }
+
+    cerrarEditorNota();
+
+    notaAbierta = clave;
+
+    clearTimeout(timerNotasEditor);
+    clearTimeout(timerReaplicarRevision);
+
+    boton.classList.add('active');
+
+    const resumen = contenedor.querySelector('.vm-revision-nota-resumen');
+    if (resumen) resumen.remove();
+
+    const panel = document.createElement('div');
+    panel.className = 'vm-revision-nota-editor';
+
+    const input = document.createElement('input');
+    input.type = 'text';
+    input.className = 'vm-revision-nota-input';
+    input.placeholder = 'Escribir observación...';
+    input.value = notasOrganos[clave] || '';
+
+    panel.appendChild(input);
+    contenedor.appendChild(panel);
+
+    ['pointerdown', 'mousedown', 'click'].forEach(evento => {
+        input.addEventListener(evento, function (e) {
+            e.stopPropagation();
+        });
+    });
+
+    let finalizado = false;
+
+    function guardar() {
+        if (finalizado) return;
+        finalizado = true;
+
+        const texto = input.value.trim();
+
+        if (texto) {
+            notasOrganos[clave] = texto;
+        } else {
+            delete notasOrganos[clave];
+        }
+
+        cerrarEditorNota();
+        pintarAlertas(datosRevisionActual);
+    }
+
+    input.addEventListener('keydown', function (e) {
+        if (e.key === 'Enter') {
+            e.preventDefault();
+            guardar();
+        }
+
+        if (e.key === 'Escape') {
+            e.preventDefault();
+            finalizado = true;
+            cerrarEditorNota();
+            pintarAlertas(datosRevisionActual);
+        }
+    });
+
+    input.addEventListener('blur', function () {
+        setTimeout(function () {
+            if (document.body.contains(input) && notaAbierta === clave) {
+                guardar();
+            }
+        }, 0);
+    });
+
+    setTimeout(() => {
+        input.focus();
+        input.setSelectionRange(input.value.length, input.value.length);
+    }, 0);
+}
+
 function mostrarDetalleAlerta(badge, organo) {
     if (alertaAbierta === organo.organo) {
         cerrarDetalleAlerta();
@@ -163,38 +325,79 @@ function mostrarDetalleAlerta(badge, organo) {
     detalle.style.right = '10px';
 }
 
-function pintarAlertas(datos) {
+function pintarAlertas(datos = null) {
     const overlay = obtenerOverlay();
     if (!overlay) return;
 
     overlay.innerHTML = '';
 
-    (datos.organos || []).forEach((organo, idx) => {
-        const bloque = buscarBloqueOrgano(organo.organo);
-        if (!bloque) return;
+    const revision = Array.isArray(datos?.organos) ? datos.organos : [];
 
-        const alertas = Array.isArray(organo.alertas) ? organo.alertas : [];
-        if (!alertas.length) return;
+    obtenerCardsInforme().forEach(card => {
+        const clave = claveNotaOrgano(card.organo);
 
-        const badge = document.createElement('button');
-        badge.type = 'button';
-        badge.className = 'vm-revision-alerta-badge';
-        badge.dataset.indice = idx;
-        badge.textContent = '⚠ ' + alertas.length;
-        badge.title = organo.organo + ': ' + alertas.length + ' observación' + (alertas.length === 1 ? '' : 'es');
-        badge.addEventListener('click', function () {
-            mostrarDetalleAlerta(badge, organo);
+        const organoRevision = revision.find(item =>
+            claveNotaOrgano(item.organo) === clave
+        );
+
+        const alertas = Array.isArray(organoRevision?.alertas)
+            ? organoRevision.alertas
+            : [];
+
+        const contenedor = document.createElement('div');
+        contenedor.className = 'vm-revision-organo-acciones';
+        contenedor.dataset.organo = card.organo;
+
+        if (alertas.length) {
+            const badge = document.createElement('button');
+            badge.type = 'button';
+            badge.className = 'vm-revision-alerta-badge';
+            badge.textContent = '⚠ ' + alertas.length;
+            badge.title = card.organo + ': ' + alertas.length + ' observación' + (alertas.length === 1 ? '' : 'es');
+
+            badge.addEventListener('click', function () {
+                cerrarEditorNota();
+                mostrarDetalleAlerta(badge, organoRevision);
+            });
+
+            contenedor.appendChild(badge);
+        }
+
+        const nota = document.createElement('button');
+        nota.type = 'button';
+        nota.className = 'vm-revision-nota-btn' + (notasOrganos[clave] ? ' tiene-nota' : '');
+        nota.title = notasOrganos[clave] ? 'Editar nota' : 'Agregar nota';
+        nota.setAttribute('aria-label', nota.title);
+        nota.innerHTML = `
+            <svg viewBox="0 0 24 24" aria-hidden="true">
+                <path d="M21 15a4 4 0 0 1-4 4H8l-5 3V7a4 4 0 0 1 4-4h10a4 4 0 0 1 4 4z"></path>
+            </svg>
+        `;
+
+        nota.addEventListener('pointerdown', function (e) {
+            e.preventDefault();
+            e.stopPropagation();
+            cerrarDetalleAlerta();
+            mostrarEditorNota(nota, card.organo);
         });
 
-        overlay.appendChild(badge);
+        contenedor.appendChild(nota);
+
+        if (notasOrganos[clave]) {
+            const resumen = document.createElement('div');
+            resumen.className = 'vm-revision-nota-resumen';
+            resumen.textContent = notasOrganos[clave];
+            resumen.title = notasOrganos[clave];
+            contenedor.appendChild(resumen);
+        }
+
+        overlay.appendChild(contenedor);
     });
 
     actualizarPosicionAlertas();
 }
 
 function actualizarPosicionAlertas() {
-    if (!datosRevisionActual) return;
-
     const wrapper = document.getElementById('contenido_html_editor_wrapper');
     const editor = document.getElementById('contenido_html_editor');
     const overlay = document.getElementById('vm_revision_overlay');
@@ -204,22 +407,24 @@ function actualizarPosicionAlertas() {
     const wrapperRect = wrapper.getBoundingClientRect();
     const editorRect = editor.getBoundingClientRect();
 
-    overlay.querySelectorAll('.vm-revision-alerta-badge').forEach(badge => {
-        const indice = parseInt(badge.dataset.indice, 10);
-        const organo = datosRevisionActual.organos[indice];
-        const bloque = organo ? buscarBloqueOrgano(organo.organo) : null;
+    overlay.querySelectorAll('.vm-revision-organo-acciones').forEach(contenedor => {
+        const organo = contenedor.dataset.organo || '';
+        const bloque = buscarBloqueOrgano(organo);
 
         if (!bloque) {
-            badge.style.display = 'none';
+            contenedor.style.display = 'none';
             return;
         }
 
         const rect = bloque.el.getBoundingClientRect();
         const visible = rect.bottom >= editorRect.top && rect.top <= editorRect.bottom;
 
-        badge.style.display = visible ? '' : 'none';
-        badge.style.top = (rect.top - wrapperRect.top + 5) + 'px';
-        badge.style.right = '20px';
+        contenedor.style.display = visible ? '' : 'none';
+        contenedor.style.top = (rect.top - wrapperRect.top) + 'px';
+        contenedor.style.left = (rect.left - wrapperRect.left) + 'px';
+        contenedor.style.right = 'auto';
+        contenedor.style.width = rect.width + 'px';
+        contenedor.style.height = rect.height + 'px';
     });
 
     cerrarDetalleAlerta();
@@ -254,14 +459,59 @@ function activarReaplicacionEnEdicion() {
 }
 
 function programarReaplicacionRevision() {
-    if (!datosRevisionActual) return;
+    if (!datosRevisionActual || notaAbierta) return;
 
     clearTimeout(timerReaplicarRevision);
 
     timerReaplicarRevision = setTimeout(function () {
-        if (!datosRevisionActual) return;
+        if (!datosRevisionActual || notaAbierta) return;
         aplicar(datosRevisionActual);
     }, 120);
+}
+
+function programarPintadoNotas() {
+    if (notaAbierta || datosRevisionActual) return;
+
+    clearTimeout(timerNotasEditor);
+
+    timerNotasEditor = setTimeout(function () {
+        if (notaAbierta || datosRevisionActual) return;
+        pintarAlertas(null);
+    }, 100);
+}
+
+function inicializarNotasOrganos() {
+    const conectar = function () {
+        const raiz = obtenerRaizEditor();
+        if (!raiz) return false;
+
+        pintarAlertas(datosRevisionActual);
+
+        if (observerNotasEditor) observerNotasEditor.disconnect();
+
+        observerNotasEditor = new MutationObserver(function () {
+            programarPintadoNotas();
+        });
+
+        observerNotasEditor.observe(raiz, {
+            subtree: true,
+            childList: true,
+            characterData: true
+        });
+
+        return true;
+    };
+
+    if (conectar()) return;
+
+    const observerInicio = new MutationObserver(function () {
+        if (conectar()) observerInicio.disconnect();
+    });
+
+    observerInicio.observe(document.body, {
+        childList: true,
+        subtree: true
+    });
 }
 
 function aplicar(datos) {
@@ -385,6 +635,12 @@ function prueba() {
             }
         ]
     });
+}
+
+if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', inicializarNotasOrganos);
+} else {
+    inicializarNotasOrganos();
 }
 
 window.VetmindRevision = {

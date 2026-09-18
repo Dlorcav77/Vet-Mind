@@ -1237,11 +1237,11 @@ mark.xx-faltante {
 #contenido_html_editor .ProseMirror > p {
     position: relative;
     margin: 0 4px 5px !important;
-    padding: 6px 48px 6px 9px;
+    padding: 6px 48px 6px 9px !important;
     background: #fff;
     border: 1px solid #dbe4ec;
     border-radius: 7px;
-    box-shadow: 0 1px 2px rgba(15, 23, 42, .035);
+    box-shadow: 0 1px 2px rgba(15,23,42,.035);
 }
 
 #contenido_html_editor .ProseMirror > p:first-child {
@@ -1433,4 +1433,128 @@ mark.xx-faltante {
     width: 70px;
     min-width: 70px;
     max-width: 70px;
+}
+
+.vm-revision-organo-acciones {
+    position: absolute;
+    z-index: 8;
+    pointer-events: none;
+}
+
+.vm-revision-organo-acciones > button,
+.vm-revision-nota-editor,
+.vm-revision-nota-resumen {
+    pointer-events: auto;
+}
+
+.vm-revision-nota-btn {
+    position: absolute;
+    top: 5px;
+    right: 6px;
+    z-index: 3;
+    width: 24px;
+    height: 24px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0;
+    border: 0;
+    background: transparent;
+    color: #64748b;
+    cursor: pointer;
+    transition: color .15s ease;
+}
+
+.vm-revision-nota-btn svg {
+    width: 18px;
+    height: 18px;
+    fill: none;
+    stroke: currentColor;
+    stroke-width: 1.8;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+}
+
+.vm-revision-nota-btn:hover,
+.vm-revision-nota-btn.active {
+    background: transparent;
+    color: #168b7c;
+}
+
+.vm-revision-nota-btn.tiene-nota {
+    background: transparent;
+    color: #0f766e;
+}
+
+.vm-revision-nota-btn.tiene-nota svg {
+    fill: currentColor;
+    stroke: currentColor;
+}
+
+.vm-revision-nota-btn.tiene-nota::after {
+    content: none;
+}
+
+.vm-revision-organo-acciones .vm-revision-alerta-badge {
+    position: absolute;
+    top: 6px;
+    right: 40px;
+}
+
+.vm-revision-nota-editor,
+.vm-revision-nota-resumen {
+    position: absolute;
+    right: 0;
+    bottom: 0;
+    top: auto;
+    width: 280px;
+    max-width: calc(100% - 55px);
+    height: 20px;
+    box-sizing: border-box;
+    pointer-events: auto;
+    z-index: 2;
+}
+
+.vm-revision-nota-editor {
+    padding: 0;
+    border: 0;
+    background: transparent;
+    box-shadow: none;
+}
+
+.vm-revision-nota-input {
+    position: relative;
+    z-index: 4;
+    pointer-events: auto;
+    cursor: text;
+    user-select: text;
+    width: 100%;
+    height: 20px;
+    padding: 1px 7px;
+    border: 1px solid rgba(121,200,188,.55);
+    border-radius: 6px 0 7px 0;
+    background: rgba(238,249,247,.78);
+    color: #475569;
+    font-size: 10px;
+    line-height: 16px;
+    outline: none;
+}
+
+.vm-revision-nota-input:focus {
+    border-color: rgba(121,200,188,.75);
+    background: rgba(238,249,247,.9);
+    box-shadow: none;
+}
+
+.vm-revision-nota-resumen {
+    padding: 1px 7px;
+    overflow: hidden;
+    border: 1px solid rgba(131,202,190,.55);
+    border-radius: 6px 0 7px 0;
+    background: rgba(229,247,243,.78);
+    color: #356d65;
+    font-size: 10px;
+    line-height: 16px;
+    text-overflow: ellipsis;
+    white-space: nowrap;
 }
