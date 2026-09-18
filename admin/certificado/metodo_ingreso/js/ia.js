@@ -150,22 +150,29 @@ function obtenerFlujoIdIA(nuevo) {
     return window.__flujoIdIA;
 }
 
-function ejecutarRevisor(dictado, informeHtml, plantillaBase, observacionesGenerador) {
+function ejecutarRevisor(dictado, informeHtml, plantillaBase, observacionesGenerador, organosOrigen) {
     const $bloque = $('#revision_ia_bloque');
-    const $panel = $('#revision_ia_panel');
     const $estado = $('#revision_ia_estado');
     const $toggle = $('#revision_ia_toggle');
+    const $modalBody = $('#revision_ia_modal_body');
     const flujoId = obtenerFlujoIdIA(false);
 
-    if (window.VetmindRevision && typeof window.VetmindRevision.limpiar === 'function') {
-        window.VetmindRevision.limpiar();
-    }
+    const setEstado = function (texto, clase, disabled) {
+        $estado.text(texto);
+        $toggle
+            .removeClass('vm-revision-status-pending vm-revision-status-warning vm-revision-status-ok vm-revision-status-error')
+            .addClass(clase)
+            .prop('disabled', disabled);
+    };
+
+    const esc = function (v) {
+        return $('<div>').text(v || '').html();
+    };
 
     $bloque.show();
-    $estado.text('Revisión IA · Revisando…');
-    $toggle.css({background:'#f8fafc',borderColor:'#e2e8f0',color:'#64748b'}).prop('disabled', true);
-    $panel.hide().empty();
-    $('#revision_ia_caret').text('▸');
+    $('#revision_ia_leyenda').show();
+    setEstado('Revisión IA · Revisando…', 'vm-revision-status-pending', true);
+    $modalBody.empty();
 
     return $.post('/funciones/GPT/proceso_ia/proceso_revisor.php', {
         flujo_id: flujoId,
@@ -176,16 +183,15 @@ function ejecutarRevisor(dictado, informeHtml, plantillaBase, observacionesGener
     .done(function (resp) {
         if (!resp || resp.status !== 'success') {
             const msg = (resp && resp.message) ? resp.message : 'No se pudo completar la revisión.';
-            $estado.text('⚠ No se pudo completar la revisión');
-            $panel.html('<div style="padding:10px 12px;color:#991b1b">' + $('<div>').text(msg).html() + '</div>');
-            $toggle.prop('disabled', false);
+            setEstado('⚠ No se pudo completar la revisión', 'vm-revision-status-error', false);
+            $modalBody.html('<div class="alert alert-danger mb-0">' + esc(msg) + '</div>');
             return;
         }
 
         if (resp.rid) $('#rid_revision').val(resp.rid);
 
         const itemsRevisor = Array.isArray(resp.items) ? resp.items : [];
-        const organos = Array.isArray(resp.organos) ? resp.organos : [];
+        const organos = Array.isArray(organosOrigen) ? organosOrigen : [];
         const observaciones = Array.isArray(observacionesGenerador) ? observacionesGenerador : [];
 
         const norm = function (v) {
@@ -213,6 +219,7 @@ function ejecutarRevisor(dictado, informeHtml, plantillaBase, observacionesGener
 
             organosVisuales.forEach(function (organo, indice) {
                 const nombre = norm(organo.organo);
+
                 if (nombre && pista.includes(nombre)) {
                     candidatos.push({
                         indice: indice,
@@ -234,7 +241,6 @@ function ejecutarRevisor(dictado, informeHtml, plantillaBase, observacionesGener
             return Object.assign({}, item);
         });
 
-        // Alertas encontradas por el revisor.
         itemsRevisor.forEach(function (item) {
             let indice = buscarOrgano(item.zona);
 
@@ -258,7 +264,6 @@ function ejecutarRevisor(dictado, informeHtml, plantillaBase, observacionesGener
             });
         });
 
-        // Flags/observaciones que ya detectó la IA generadora.
         observaciones.forEach(function (obs) {
             const indice = buscarOrgano(obs.contexto);
 
@@ -294,60 +299,89 @@ function ejecutarRevisor(dictado, informeHtml, plantillaBase, observacionesGener
         }
 
         if (items.length === 0) {
-            $estado.text('✓ Revisión IA · Sin observaciones');
-            $toggle.css({background:'#ecfdf5',borderColor:'#a7f3d0',color:'#065f46'}).prop('disabled', true);
+            setEstado('✓ Revisión IA · Sin observaciones', 'vm-revision-status-ok', true);
+            $modalBody.html('<div class="alert alert-success mb-0">No se detectaron observaciones en la revisión.</div>');
             return;
         }
 
-        $estado.text('⚠ Revisión IA · ' + items.length + ' observación' + (items.length === 1 ? '' : 'es'));
-        $toggle.css({background:'#fffbeb',borderColor:'#fde68a',color:'#92400e'}).prop('disabled', false);
-
-        const esc = function (v) {
-            return $('<div>').text(v || '').html();
-        };
-
+        setEstado(
+            '⚠ Revisión IA · ' + items.length + ' observación' + (items.length === 1 ? '' : 'es'),
+            'vm-revision-status-warning',
+            false
+        );
+        
         let filas = '';
 
         items.forEach(function (it, idx) {
             const sev = (it.severidad || 'media').toLowerCase();
-            const bg = sev === 'alta'
-                ? '#fee2e2;color:#991b1b'
+            const claseSeveridad = sev === 'alta'
+                ? 'vm-revision-modal-badge-alta'
                 : (sev === 'media'
-                    ? '#fef3c7;color:#92400e'
-                    : '#e2e8f0;color:#475569');
+                    ? 'vm-revision-modal-badge-media'
+                    : 'vm-revision-modal-badge-baja');
 
-            const badge = '<span style="display:inline-block;font-size:11px;padding:2px 8px;border-radius:6px;font-weight:600;background:' + bg + '">' + esc(sev) + '</span>';
+            let campos = '';
 
-            filas += '<div class="rev-row" data-idx="' + idx + '" style="padding:8px 10px;border-bottom:1px solid #f1f5f9;cursor:pointer">'
-                + '<div style="display:flex;align-items:center;gap:10px">'
-                + '<span class="rev-caret" style="color:#94a3b8">▸</span>'
-                + badge
-                + '<strong style="color:#334155">' + esc(it.zona || it.tipo) + '</strong>'
-                + '<span style="color:#64748b">' + esc(it.tipo) + '</span>'
+            if (it.dictado) {
+                campos += '<div class="vm-revision-modal-campo">'
+                    + '<strong>Dictado</strong>'
+                    + '<span>' + esc(it.dictado) + '</span>'
+                    + '</div>';
+            }
+
+            if (it.informe) {
+                campos += '<div class="vm-revision-modal-campo">'
+                    + '<strong>Informe</strong>'
+                    + '<span>' + esc(it.informe) + '</span>'
+                    + '</div>';
+            }
+
+            if (it.detalle) {
+                campos += '<div class="vm-revision-modal-revisar">'
+                    + '<div class="vm-revision-modal-campo">'
+                    + '<strong>Revisar</strong>'
+                    + '<span>' + esc(it.detalle) + '</span>'
+                    + '</div>'
+                    + '</div>';
+            }
+
+            filas += '<article class="vm-revision-modal-item">'
+                + '<button type="button" class="vm-revision-modal-item-header" data-revision-idx="' + idx + '" aria-expanded="false">'
+                + '<span class="vm-revision-modal-badge ' + claseSeveridad + '">' + esc(sev) + '</span>'
+                + '<span class="vm-revision-modal-zona">' + esc(it.zona || it.tipo || 'Informe') + '</span>'
+                + '<span class="vm-revision-modal-tipo">' + esc(it.tipo || '') + '</span>'
+                + '<span class="vm-revision-modal-caret" aria-hidden="true">⌄</span>'
+                + '</button>'
+                + '<div class="vm-revision-modal-item-body" data-revision-body="' + idx + '">'
+                + campos
                 + '</div>'
-                + '</div>'
-                + '<div class="rev-detail" data-idx="' + idx + '" style="display:none;padding:10px 12px;background:#fff">'
-                + '<div style="margin-bottom:6px"><strong>Dictado:</strong> ' + esc(it.dictado) + '</div>'
-                + '<div style="margin-bottom:6px"><strong>Informe:</strong> ' + esc(it.informe) + '</div>'
-                + '<div><strong>Revisar:</strong> ' + esc(it.detalle) + '</div>'
-                + '</div>';
+                + '</article>';
         });
 
-        $panel.html(filas);
+        $modalBody.html(
+            '<div class="vm-revision-modal-resumen">'
+            + 'Se encontraron ' + items.length + ' punto' + (items.length === 1 ? '' : 's') + ' para revisar.'
+            + '</div>'
+            + filas
+        );
 
-        $panel.off('click', '.rev-row').on('click', '.rev-row', function () {
-            const idx = $(this).data('idx');
-            const $detail = $panel.find('.rev-detail[data-idx="' + idx + '"]');
-            const visible = $detail.is(':visible');
+        $modalBody
+            .off('click.revisionAccordion', '.vm-revision-modal-item-header')
+            .on('click.revisionAccordion', '.vm-revision-modal-item-header', function () {
+                const idx = $(this).data('revision-idx');
+                const $body = $modalBody.find('[data-revision-body="' + idx + '"]');
+                const abierto = $(this).attr('aria-expanded') === 'true';
 
-            $detail.toggle(!visible);
-            $(this).find('.rev-caret').text(visible ? '▸' : '▾');
-        });
+                $(this)
+                    .attr('aria-expanded', abierto ? 'false' : 'true')
+                    .toggleClass('is-open', !abierto);
+
+                $body.toggleClass('is-open', !abierto);
+            });
     })
     .fail(function () {
-        $estado.text('⚠ No se pudo conectar al revisor');
-        $panel.html('<div style="padding:10px 12px;color:#991b1b">No se pudo conectar al revisor.</div>');
-        $toggle.prop('disabled', false);
+        setEstado('⚠ No se pudo conectar al revisor', 'vm-revision-status-error', false);
+        $modalBody.html('<div class="alert alert-danger mb-0">No se pudo conectar al revisor.</div>');
     });
 }
 
@@ -384,13 +418,13 @@ function inicializarAudioRevision() {
     const src = (window.__audioRevisionSrc || '').trim();
     const audio = document.getElementById('revision_audio');
     if (!audio || !src) {
-        $('#revision_audio_barra').attr('style', 'display:none!important;');
+        $('#revision_audio_barra').removeClass('is-visible');
         return;
     }
 
     audio.src = src;
     audio.load();
-    $('#revision_audio_barra').attr('style', 'display:flex!important;padding:8px 10px;border:1px solid #e2e8f0;border-radius:8px;background:#f8fafc;');
+    $('#revision_audio_barra').addClass('is-visible');
 
     const formato = function (seg) {
         if (!isFinite(seg)) seg = 0;
@@ -399,12 +433,22 @@ function inicializarAudioRevision() {
         return String(m).padStart(2, '0') + ':' + String(s).padStart(2, '0');
     };
 
+    const iconoPlay = '<svg viewBox="0 0 24 24" aria-hidden="true"><polygon points="9,7 18,12 9,17"></polygon></svg>';
+    const iconoPause = '<svg viewBox="0 0 24 24" aria-hidden="true"><rect x="8" y="7" width="3" height="10" rx="1"></rect><rect x="13" y="7" width="3" height="10" rx="1"></rect></svg>';
+
     const actualizar = function () {
         const dur = isFinite(audio.duration) ? audio.duration : 0;
         const actual = isFinite(audio.currentTime) ? audio.currentTime : 0;
+        const $play = $('#revision_audio_play');
+
         $('#revision_audio_seek').val(dur > 0 ? (actual / dur) * 100 : 0);
         $('#revision_audio_tiempo').text(formato(actual) + ' / ' + formato(dur));
-        $('#revision_audio_play').text(audio.paused ? '▶' : '⏸');
+
+        if (audio.paused) {
+            $play.removeClass('is-pause').html(iconoPlay).attr('title', 'Reproducir').attr('aria-label', 'Reproducir');
+        } else {
+            $play.addClass('is-pause').html(iconoPause).attr('title', 'Pausar').attr('aria-label', 'Pausar');
+        }
     };
 
     $('#revision_audio_play').off('.revisionAudio').on('click.revisionAudio', function () {
@@ -427,6 +471,20 @@ function inicializarAudioRevision() {
         audio.playbackRate = parseFloat(this.value) || 1;
     });
 
+    $('#revision_audio_volume').off('.revisionAudio').on('input.revisionAudio', function () {
+        audio.volume = Math.max(0, Math.min(1, parseFloat(this.value) / 100));
+        audio.muted = false;
+        $('#revision_audio_mute').removeClass('is-muted');
+    });
+
+    $('#revision_audio_mute').off('.revisionAudio').on('click.revisionAudio', function () {
+        audio.muted = !audio.muted;
+        $(this)
+            .toggleClass('is-muted', audio.muted)
+            .attr('title', audio.muted ? 'Activar sonido' : 'Silenciar')
+            .attr('aria-label', audio.muted ? 'Activar sonido' : 'Silenciar');
+    });
+
     $(audio).off('.revisionAudio')
         .on('loadedmetadata.revisionAudio timeupdate.revisionAudio play.revisionAudio pause.revisionAudio ended.revisionAudio', actualizar);
 
@@ -435,11 +493,13 @@ function inicializarAudioRevision() {
 
 $(document).off('click.revisionIA', '#revision_ia_toggle').on('click.revisionIA', '#revision_ia_toggle', function () {
     if ($(this).prop('disabled')) return;
-    const $panel = $('#revision_ia_panel');
-    const visible = $panel.is(':visible');
-    $panel.toggle(!visible);
-    $('#revision_ia_caret').text(visible ? '▸' : '▾');
+    $('#modalRevisionIA').modal('show');
 });
+
+$(document).off('click.revisionIAModal', '#revision_ia_modal_cerrar, #revision_ia_modal_cerrar_x')
+    .on('click.revisionIAModal', '#revision_ia_modal_cerrar, #revision_ia_modal_cerrar_x', function () {
+        $('#modalRevisionIA').modal('hide');
+    });
 
 // Resalta en el informe las palabras que vinieron de una discrepancia entre los 2 motores.
 // Solo color (no número, no observación). El vet ve dónde hubo duda y revisa.
@@ -695,16 +755,39 @@ $('#procesarIA').on('click', function () {
                 ? respGPT.observaciones
                 : [];
 
+            const organosOrigen = Array.isArray(respGPT.organos)
+                ? respGPT.organos
+                : [];
+
             audio_manual_setMode('manual');
             aplicarContenidoInforme(informeLimpio);
 
+            setTimeout(function () {
+                if (
+                    window.VetmindRevision
+                    && typeof window.VetmindRevision.aplicar === 'function'
+                    && organosOrigen.length
+                ) {
+                    window.VetmindRevision.aplicar({
+                        organos: organosOrigen.map(function (organo) {
+                            return {
+                                organo: organo.organo,
+                                atributos: Array.isArray(organo.atributos) ? organo.atributos : [],
+                                alertas: []
+                            };
+                        })
+                    });
+                }
+            }, 0);
+
             $('#revision_ia_bloque').show();
+            $('#revision_ia_leyenda').show();
             $('#revision_ia_estado').text('Revisión IA · Revisando…');
             $('#revision_ia_toggle')
-                .css({background:'#f8fafc', borderColor:'#e2e8f0', color:'#64748b'})
+                .removeClass('vm-revision-status-warning vm-revision-status-ok vm-revision-status-error')
+                .addClass('vm-revision-status-pending')
                 .prop('disabled', true);
-            $('#revision_ia_panel').hide().empty();
-            $('#revision_ia_caret').text('▸');
+            $('#revision_ia_modal_body').empty();
 
             inicializarAudioRevision();
 
@@ -713,7 +796,8 @@ $('#procesarIA').on('click', function () {
                     dictadoCompleto,
                     informeOriginal,
                     plantillaBase,
-                    observacionesGenerador
+                    observacionesGenerador,
+                    organosOrigen
                 );
             }, 100);
         } else if (respGPT.status === 'dry_run') {

@@ -47,7 +47,7 @@ $destacado_titulo_inicial = trim(
     (string)($fila['destacado_titulo'] ?? '')
 );
 ?>
-<link rel="stylesheet" href="certificado/common/css/certificado.css?v=2">
+<link rel="stylesheet" href="certificado/common/css/certificado.css?v=3">
 <div class="card" id="certificado" data-page-id="certificado">
     <div class="card-header pb-1">
         <div class="cert-header-top">
@@ -124,7 +124,7 @@ $destacado_titulo_inicial = trim(
 </script>
 
 <script src="certificado/common/js/editor.js?v=4"></script>
-<script src="certificado/metodo_ingreso/js/ia.js?v=18"></script>
+<script src="certificado/metodo_ingreso/js/ia.js?v=22"></script>
 <script src="certificado/preview/js/preview.js?v=4"></script>
 <script src="certificado/common/js/destacado.js?v=1"></script>
 <script src="certificado/guardar/js/guardar.js?v=23"></script>

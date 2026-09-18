@@ -8,38 +8,28 @@
 $contenidoInforme = isset($fila['contenido_html']) ? (string)$fila['contenido_html'] : '';
 ?>
 <div id="bloque-manual" class="col-12 mb-1" style="<?= $isManualInitial ? '' : 'display:none;' ?>">
-    <div id="revision_ia_bloque" class="mb-2" style="display:none;">
-        <div id="revision_audio_barra" class="d-flex align-items-center gap-2 flex-wrap mb-2" style="display:none!important;padding:8px 10px;border:1px solid #e2e8f0;border-radius:8px;background:#f8fafc;">
-            <button type="button" id="revision_audio_play" class="btn btn-sm btn-outline-secondary" title="Reproducir/Pausar">▶</button>
-            <button type="button" id="revision_audio_back" class="btn btn-sm btn-outline-secondary" title="Retroceder 5 segundos">−5s</button>
-            <button type="button" id="revision_audio_forward" class="btn btn-sm btn-outline-secondary" title="Avanzar 5 segundos">+5s</button>
-            <input type="range" id="revision_audio_seek" min="0" max="100" value="0" step="0.1" style="flex:1;min-width:180px;">
-            <span id="revision_audio_tiempo" class="small text-muted" style="white-space:nowrap;">00:00 / 00:00</span>
-            <select id="revision_audio_speed" class="form-select form-select-sm" style="width:76px;">
-                <option value="0.75">0.75x</option>
-                <option value="1" selected>1x</option>
-                <option value="1.25">1.25x</option>
-                <option value="1.5">1.5x</option>
-                <option value="2">2x</option>
-            </select>
-            <audio id="revision_audio" preload="metadata"></audio>
+    <div class="vm-informe-cabecera">
+        <div class="vm-informe-cabecera-izq">
+            <label for="contenido_html_editor" class="form-label fw-bold mb-0">Contenido del Informe</label>
         </div>
 
-        <button type="button" id="revision_ia_toggle" class="btn w-100 text-start d-flex justify-content-between align-items-center" style="padding:8px 12px;border:1px solid #fde68a;background:#fffbeb;color:#92400e;border-radius:8px;" disabled>
-            <span id="revision_ia_estado">Revisión IA pendiente</span>
-            <span id="revision_ia_caret">▸</span>
-        </button>
-        <div id="revision_ia_panel" style="display:none;margin-top:4px;border:1px solid #e2e8f0;border-radius:8px;overflow:hidden;font-size:13px;"></div>
-        <div id="revision_ia_leyenda" class="vm-revision-leyenda">
-            <span><i class="vm-leyenda-color vm-leyenda-plantilla"></i>Plantilla</span>
-            <span><i class="vm-leyenda-color vm-leyenda-dictado"></i>Dictado</span>
-            <span><i class="vm-leyenda-color vm-leyenda-mixto"></i>Mixto</span>
-            <span><i class="vm-leyenda-color vm-leyenda-desconocido"></i>Origen dudoso</span>
-            <span class="vm-leyenda-discrepancia">Duda transcripción</span>
+        <div class="vm-informe-cabecera-centro">
+            <div id="revision_ia_leyenda" class="vm-revision-leyenda" style="display:none;">
+                <span><i class="vm-leyenda-color vm-leyenda-plantilla"></i>Plantilla</span>
+                <span><i class="vm-leyenda-color vm-leyenda-dictado"></i>Dictado</span>
+                <span><i class="vm-leyenda-color vm-leyenda-desconocido"></i>Origen dudoso</span>
+                <span class="vm-leyenda-discrepancia">Duda transcripción</span>
+            </div>
+        </div>
+
+        <div class="vm-informe-cabecera-der">
+            <div id="revision_ia_bloque" style="display:none;">
+                <button type="button" id="revision_ia_toggle" class="vm-revision-status vm-revision-status-pending" disabled>
+                    <span id="revision_ia_estado">Revisión IA pendiente</span>
+                </button>
+            </div>
         </div>
     </div>
-
-    <label for="contenido_html_editor" class="form-label fw-bold">Contenido del Informe</label>
 
     <div id="contenido_html_editor_wrapper" class="vm-tiptap-wrapper">
         <div id="contenido_html_toolbar" class="vm-tiptap-toolbar" style="display:none;">
@@ -282,4 +272,24 @@ $contenidoInforme = isset($fila['contenido_html']) ? (string)$fila['contenido_ht
         id="contenido_html"
         rows="10"
     ><?= htmlspecialchars($contenidoInforme, ENT_QUOTES, 'UTF-8') ?></textarea>
+</div>
+
+<div class="modal fade" id="modalRevisionIA" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-xl modal-dialog-centered modal-dialog-scrollable">
+        <div class="modal-content vm-revision-modal">
+            <div class="modal-header vm-revision-modal-header">
+                <div>
+                    <h5 class="modal-title mb-1">Revisión del informe</h5>
+                    <div class="vm-revision-modal-subtitulo">Observaciones detectadas durante la revisión automática</div>
+                </div>
+                <button type="button" id="revision_ia_modal_cerrar_x" class="vm-revision-modal-close" aria-label="Cerrar">×</button>
+            </div>
+
+            <div id="revision_ia_modal_body" class="modal-body vm-revision-modal-body"></div>
+
+            <div class="modal-footer vm-revision-modal-footer">
+                <button type="button" id="revision_ia_modal_cerrar" class="btn btn-secondary">Cerrar</button>
+            </div>
+        </div>
+    </div>
 </div>

@@ -55,6 +55,15 @@ function buscarRangoDom(contenedor, textoBuscado) {
     return range;
 }
 
+// function limpiarTarjetasOrganos() {
+//     const raiz = obtenerRaizEditor();
+//     if (!raiz) return;
+
+//     raiz.querySelectorAll('.vm-revision-organo-card').forEach(el => {
+//         el.classList.remove('vm-revision-organo-card');
+//     });
+// }
+
 function limpiarHighlights() {
     if (!window.CSS || !CSS.highlights) return;
 
@@ -161,13 +170,6 @@ function pintarAlertas(datos) {
         const bloque = buscarBloqueOrgano(organo.organo);
         if (!bloque) return;
 
-        if (idx > 0) {
-            const separador = document.createElement('div');
-            separador.className = 'vm-revision-separador';
-            separador.dataset.indice = idx;
-            overlay.appendChild(separador);
-        }
-
         const alertas = Array.isArray(organo.alertas) ? organo.alertas : [];
         if (!alertas.length) return;
 
@@ -213,25 +215,8 @@ function actualizarPosicionAlertas() {
         const visible = rect.bottom >= editorRect.top && rect.top <= editorRect.bottom;
 
         badge.style.display = visible ? '' : 'none';
-        badge.style.top = (rect.top - wrapperRect.top + 1) + 'px';
-        badge.style.right = '16px';
-    });
-
-    overlay.querySelectorAll('.vm-revision-separador').forEach(separador => {
-        const indice = parseInt(separador.dataset.indice, 10);
-        const organo = datosRevisionActual.organos[indice];
-        const bloque = organo ? buscarBloqueOrgano(organo.organo) : null;
-
-        if (!bloque) {
-            separador.style.display = 'none';
-            return;
-        }
-
-        const rect = bloque.el.getBoundingClientRect();
-        const visible = rect.bottom >= editorRect.top && rect.top <= editorRect.bottom;
-
-        separador.style.display = visible ? '' : 'none';
-        separador.style.top = (rect.top - wrapperRect.top - 4) + 'px';
+        badge.style.top = (rect.top - wrapperRect.top + 5) + 'px';
+        badge.style.right = '20px';
     });
 
     cerrarDetalleAlerta();
@@ -254,7 +239,6 @@ function aplicar(datos) {
     const porOrigen = {
         plantilla: [],
         dictado: [],
-        mixto: [],
         desconocido: []
     };
 
