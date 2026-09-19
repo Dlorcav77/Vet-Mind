@@ -697,6 +697,27 @@ $configuracion_informe_id = intval($_POST['configuracion_informe_id'] ?? 0);
 $modo_manual             = isset($_POST['toggle_manual']) && $_POST['toggle_manual'] == '1';
 $borrador_id = (int)($_POST['borrador_id'] ?? 0);
 
+$notasOrganosRecibidas = array_key_exists('notas_organos', $_POST);
+$notasOrganos = [];
+
+if ($notasOrganosRecibidas) {
+    $notasOrganosRaw = trim((string)($_POST['notas_organos'] ?? ''));
+
+    if ($notasOrganosRaw !== '') {
+        $notasOrganosTmp = json_decode($notasOrganosRaw, true);
+
+        if (!is_array($notasOrganosTmp)) {
+            echo json_encode([
+                'status' => 'error',
+                'message' => 'Las notas del informe tienen un formato inválido.'
+            ], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+            exit;
+        }
+
+        $notasOrganos = $notasOrganosTmp;
+    }
+}
+
 $borrador_scope_key = (
     $action === 'modificar' && $id > 0
 )
@@ -1893,6 +1914,127 @@ if ($action === 'ingresar') {
 }
 
 if ($stmt->execute()) {
+    $certId = 0;
+
+    if ($action === 'ingresar') {
+        $certId = (int)$stmt->insert_id;
+    } elseif ($action === 'modificar' && $id > 0) {
+        $certId = (int)$id;
+    }
+
+    if ($certId <= 0) {
+        rollbackCertificadoSiActivo($mysqli, $transaccionActiva);
+        limpiarArchivosNuevosCertificado($imagenesNuevas, $pdfPathFisico);
+
+        echo json_encode([
+            'status' => 'error',
+            'message' => 'No se pudo determinar el certificado para guardar las notas.'
+        ], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+        exit;
+    }
+
+    if ($notasOrganosRecibidas) {
+        $stmtNotasDelete = $mysqli->prepare("
+            DELETE FROM certificado_notas
+            WHERE certificado_id = ?
+              AND usuario_id = ?
+        ");
+
+        if (!$stmtNotasDelete) {
+            rollbackCertificadoSiActivo($mysqli, $transaccionActiva);
+            limpiarArchivosNuevosCertificado($imagenesNuevas, $pdfPathFisico);
+
+            error_log('[updCertificados][notas][delete_prepare] ' . $mysqli->error);
+
+            echo json_encode([
+                'status' => 'error',
+                'message' => 'No se pudieron preparar las notas del certificado.'
+            ], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+            exit;
+        }
+
+        $stmtNotasDelete->bind_param("ii", $certId, $veterinario);
+
+        if (!$stmtNotasDelete->execute()) {
+            error_log('[updCertificados][notas][delete_execute] ' . $stmtNotasDelete->error);
+            $stmtNotasDelete->close();
+
+            rollbackCertificadoSiActivo($mysqli, $transaccionActiva);
+            limpiarArchivosNuevosCertificado($imagenesNuevas, $pdfPathFisico);
+
+            echo json_encode([
+                'status' => 'error',
+                'message' => 'No se pudieron actualizar las notas del certificado.'
+            ], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+            exit;
+        }
+
+        $stmtNotasDelete->close();
+
+        if (!empty($notasOrganos)) {
+            $stmtNota = $mysqli->prepare("
+                INSERT INTO certificado_notas
+                    (certificado_id, usuario_id, organo_clave, organo_nombre, nota, created_at, updated_at)
+                VALUES (?, ?, ?, ?, ?, NOW(), NOW())
+            ");
+
+            if (!$stmtNota) {
+                rollbackCertificadoSiActivo($mysqli, $transaccionActiva);
+                limpiarArchivosNuevosCertificado($imagenesNuevas, $pdfPathFisico);
+
+                error_log('[updCertificados][notas][insert_prepare] ' . $mysqli->error);
+
+                echo json_encode([
+                    'status' => 'error',
+                    'message' => 'No se pudieron preparar las notas del certificado.'
+                ], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+                exit;
+            }
+
+            foreach ($notasOrganos as $clave => $valor) {
+                $clave = mb_substr(trim((string)$clave), 0, 191, 'UTF-8');
+
+                if (is_array($valor)) {
+                    $organoNombre = trim((string)($valor['organo'] ?? $clave));
+                    $notaTexto = trim((string)($valor['nota'] ?? ''));
+                } else {
+                    $organoNombre = $clave;
+                    $notaTexto = trim((string)$valor);
+                }
+
+                $organoNombre = mb_substr($organoNombre, 0, 255, 'UTF-8');
+
+                if ($clave === '' || $notaTexto === '') {
+                    continue;
+                }
+
+                $stmtNota->bind_param(
+                    "iisss",
+                    $certId,
+                    $veterinario,
+                    $clave,
+                    $organoNombre,
+                    $notaTexto
+                );
+
+                if (!$stmtNota->execute()) {
+                    error_log('[updCertificados][notas][insert_execute] ' . $stmtNota->error);
+                    $stmtNota->close();
+
+                    rollbackCertificadoSiActivo($mysqli, $transaccionActiva);
+                    limpiarArchivosNuevosCertificado($imagenesNuevas, $pdfPathFisico);
+
+                    echo json_encode([
+                        'status' => 'error',
+                        'message' => 'No se pudieron guardar las notas del certificado.'
+                    ], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+                    exit;
+                }
+            }
+
+            $stmtNota->close();
+        }
+    }
     if ($transaccionActiva) {
         if (!$mysqli->commit()) {
             rollbackCertificadoSiActivo($mysqli, $transaccionActiva);
@@ -1945,14 +2087,6 @@ if ($stmt->execute()) {
                 $imagenEliminar
             );
         }
-    }
-
-    $certId = 0;
-
-    if ($action === 'ingresar') {
-        $certId = (int)$stmt->insert_id;
-    } elseif ($action === 'modificar' && $id > 0) {
-        $certId = (int)$id;
     }
 
     $audioResultado = null;

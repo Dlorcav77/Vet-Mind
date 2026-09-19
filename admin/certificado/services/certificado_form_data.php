@@ -30,6 +30,7 @@ if (!function_exists('certificado_get_form_data')) {
 
         $imagenesGuardadas = [];
         $mostrarImagenesAntiguas = false;
+        $notas_organos = [];
 
         if ($action === 'modificar') {
             $accion = 'Modificar';
@@ -51,6 +52,40 @@ if (!function_exists('certificado_get_form_data')) {
             $stmt->execute();
             $res = $stmt->get_result();
             $row = $res->fetch_assoc();
+
+            if ($id > 0) {
+                $stmtNotas = $mysqli->prepare("
+                    SELECT organo_clave, organo_nombre, nota
+                    FROM certificado_notas
+                    WHERE certificado_id = ?
+                    AND usuario_id = ?
+                    ORDER BY id ASC
+                ");
+
+                if ($stmtNotas) {
+                    $stmtNotas->bind_param("ii", $id, $usuario_id);
+
+                    if ($stmtNotas->execute()) {
+                        $resNotas = $stmtNotas->get_result();
+
+                        while ($rowNota = $resNotas->fetch_assoc()) {
+                            $clave = trim((string)$rowNota['organo_clave']);
+                            $nota = trim((string)$rowNota['nota']);
+
+                            if ($clave === '' || $nota === '') {
+                                continue;
+                            }
+
+                            $notas_organos[$clave] = [
+                                'organo' => trim((string)$rowNota['organo_nombre']),
+                                'nota' => $nota
+                            ];
+                        }
+                    }
+
+                    $stmtNotas->close();
+                }
+            }
 
             if (is_array($row)) {
                 $fila = $row;
@@ -359,6 +394,7 @@ if (!function_exists('certificado_get_form_data')) {
             'borrador_id'                     => $borrador_id,
             'borrador_updated_at'             => $borrador_updated_at,
             'borrador_payload'                => $borrador_payload,
+            'notas_organos'                   => $notas_organos,
             'borrador_scope_key'              => $scopeKey,
             'modo_ingreso_contenido_inicial'  => $modo_ingreso_contenido_inicial,
             'toggle_manual_inicial'           => $toggle_manual_inicial,

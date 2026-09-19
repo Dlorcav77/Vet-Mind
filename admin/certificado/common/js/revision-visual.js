@@ -3,6 +3,7 @@ let datosRevisionActual = null;
 let alertaAbierta = null;
 let notaAbierta = null;
 let notasOrganos = {};
+let nombresNotasOrganos = {};
 let timerReaplicarRevision = null;
 let editorRevisionEscuchado = null;
 let observerRevisionEditor = null;
@@ -32,18 +33,68 @@ function buscarBloqueOrgano(nombre) {
     return obtenerBloquesTexto().find(b => normalizar(b.texto).includes(buscado)) || null;
 }
 
+function normalizarComparacion(valor) {
+    return normalizar(valor)
+        .normalize('NFD')
+        .replace(/[\u0300-\u036f]/g, '')
+        .replace(/\s+/g, ' ');
+}
+
 function obtenerNombreCard(el) {
     if (!el) return '';
 
-    const texto = (el.textContent || '').trim();
+    const texto = (el.textContent || '').trim().replace(/\s+/g, ' ');
     if (!texto) return '';
 
-    const strong = el.querySelector('strong');
-    if (strong) {
-        return (strong.textContent || '').trim().replace(/:$/, '');
+    const textoNorm = normalizarComparacion(texto);
+    const candidatos = [];
+
+    if (Array.isArray(datosRevisionActual?.organos)) {
+        datosRevisionActual.organos.forEach(item => {
+            const nombre = String(item?.organo || '').trim();
+            if (nombre) candidatos.push(nombre);
+        });
     }
 
-    const match = texto.match(/^([^:]{2,60}):/);
+    Object.values(nombresNotasOrganos).forEach(nombre => {
+        nombre = String(nombre || '').trim();
+        if (nombre) candidatos.push(nombre);
+    });
+
+    const candidatosUnicos = Array.from(new Set(candidatos))
+        .sort((a, b) => b.length - a.length);
+
+    for (const nombre of candidatosUnicos) {
+        const nombreNorm = normalizarComparacion(nombre);
+
+        if (!textoNorm.startsWith(nombreNorm)) continue;
+
+        const siguiente = textoNorm.charAt(nombreNorm.length);
+
+        if (!siguiente || /[\s:.,;-]/.test(siguiente)) {
+            return nombre;
+        }
+    }
+
+    const etiqueta = el.querySelector('strong, em');
+
+    if (etiqueta) {
+        const nombre = (etiqueta.textContent || '')
+            .trim()
+            .replace(/:$/, '')
+            .replace(/\s+/g, ' ');
+
+        if (
+            nombre.length >= 2 &&
+            nombre.length <= 100 &&
+            normalizarComparacion(nombre) !== textoNorm &&
+            textoNorm.startsWith(normalizarComparacion(nombre))
+        ) {
+            return nombre;
+        }
+    }
+
+    const match = texto.match(/^([^:]{2,100}):/);
     return match ? match[1].trim() : '';
 }
 
@@ -53,11 +104,18 @@ function obtenerCardsInforme() {
 
     return Array.from(raiz.children)
         .filter(el => el.tagName === 'P')
-        .map(el => ({
-            el,
-            organo: obtenerNombreCard(el)
-        }))
-        .filter(card => card.organo);
+        .map((el, indice) => {
+            const organo = obtenerNombreCard(el);
+
+            return {
+                el,
+                indice,
+                organo: organo || ('Párrafo ' + (indice + 1)),
+                clave: organo
+                    ? claveNotaOrgano(organo)
+                    : 'parrafo:' + indice
+            };
+        });
 }
 
 function buscarRangoDom(contenedor, textoBuscado) {
@@ -146,6 +204,72 @@ function claveNotaOrgano(organo) {
     return normalizar(organo || '');
 }
 
+function cargarNotasDesdeHidden() {
+    const hidden = document.getElementById('notas_organos');
+    if (!hidden || !hidden.value.trim()) return;
+
+    try {
+        const datos = JSON.parse(hidden.value);
+
+        if (!datos || typeof datos !== 'object' || Array.isArray(datos)) {
+            return;
+        }
+
+        Object.entries(datos).forEach(([clave, valor]) => {
+            const claveNormalizada = claveNotaOrgano(clave);
+            const nota = typeof valor === 'string'
+                ? valor.trim()
+                : String(valor?.nota || '').trim();
+
+            const organo = typeof valor === 'object' && valor
+                ? String(valor.organo || '').trim()
+                : '';
+
+            if (nota) {
+                notasOrganos[claveNormalizada] = nota;
+            }
+
+            if (organo) {
+                nombresNotasOrganos[claveNormalizada] = organo;
+            }
+        });
+    } catch (e) {
+        notasOrganos = {};
+    }
+}
+
+function sincronizarNotasHidden() {
+    const hidden = document.getElementById('notas_organos');
+    if (!hidden) return;
+
+    const nombres = {};
+
+    obtenerCardsInforme().forEach(card => {
+        nombres[card.clave] = card.organo;
+    });
+
+    const salida = {};
+
+    Object.entries(notasOrganos).forEach(([clave, valor]) => {
+        const nota = String(valor || '').trim();
+        if (!nota) return;
+
+        salida[clave] = {
+            organo: nombres[clave] || nombresNotasOrganos[clave] || clave,
+            nota: nota
+        };
+    });
+
+    const nuevoValor = JSON.stringify(salida);
+
+    if (hidden.value === nuevoValor) return;
+
+    hidden.value = nuevoValor;
+    hidden.dispatchEvent(new Event('input', { bubbles: true }));
+}
+
+cargarNotasDesdeHidden();
+
 function cerrarEditorNota() {
     document.querySelectorAll('.vm-revision-nota-editor').forEach(el => el.remove());
     document.querySelectorAll('.vm-revision-nota-btn.active').forEach(el => el.classList.remove('active'));
@@ -174,8 +298,8 @@ function actualizarCardNota(organo) {
     boton.classList.toggle('tiene-nota', !!notasOrganos[clave]);
 }
 
-function mostrarEditorNota(boton, organo) {
-    const clave = claveNotaOrgano(organo);
+function mostrarEditorNota(boton, organo, claveCard = '') {
+    const clave = claveCard || claveNotaOrgano(organo);
     const contenedor = boton.closest('.vm-revision-organo-acciones');
     if (!contenedor) return;
 
@@ -194,6 +318,8 @@ function mostrarEditorNota(boton, organo) {
         } else {
             delete notasOrganos[notaAbierta];
         }
+
+        sincronizarNotasHidden();
     }
 
     cerrarEditorNota();
@@ -240,6 +366,7 @@ function mostrarEditorNota(boton, organo) {
             delete notasOrganos[clave];
         }
 
+        sincronizarNotasHidden();
         cerrarEditorNota();
         pintarAlertas(datosRevisionActual);
     }
@@ -334,7 +461,7 @@ function pintarAlertas(datos = null) {
     const revision = Array.isArray(datos?.organos) ? datos.organos : [];
 
     obtenerCardsInforme().forEach(card => {
-        const clave = claveNotaOrgano(card.organo);
+        const clave = card.clave;
 
         const organoRevision = revision.find(item =>
             claveNotaOrgano(item.organo) === clave
@@ -347,6 +474,9 @@ function pintarAlertas(datos = null) {
         const contenedor = document.createElement('div');
         contenedor.className = 'vm-revision-organo-acciones';
         contenedor.dataset.organo = card.organo;
+
+        contenedor.dataset.clave = clave;
+        contenedor.dataset.indice = String(card.indice);
 
         if (alertas.length) {
             const badge = document.createElement('button');
@@ -378,7 +508,7 @@ function pintarAlertas(datos = null) {
             e.preventDefault();
             e.stopPropagation();
             cerrarDetalleAlerta();
-            mostrarEditorNota(nota, card.organo);
+            mostrarEditorNota(nota, card.organo, clave);
         });
 
         contenedor.appendChild(nota);
@@ -406,17 +536,18 @@ function actualizarPosicionAlertas() {
 
     const wrapperRect = wrapper.getBoundingClientRect();
     const editorRect = editor.getBoundingClientRect();
+    const cards = obtenerCardsInforme();
 
     overlay.querySelectorAll('.vm-revision-organo-acciones').forEach(contenedor => {
-        const organo = contenedor.dataset.organo || '';
-        const bloque = buscarBloqueOrgano(organo);
+        const indice = Number(contenedor.dataset.indice);
+        const card = Number.isInteger(indice) ? cards[indice] : null;
 
-        if (!bloque) {
+        if (!card?.el) {
             contenedor.style.display = 'none';
             return;
         }
 
-        const rect = bloque.el.getBoundingClientRect();
+        const rect = card.el.getBoundingClientRect();
         const visible = rect.bottom >= editorRect.top && rect.top <= editorRect.bottom;
 
         contenedor.style.display = visible ? '' : 'none';

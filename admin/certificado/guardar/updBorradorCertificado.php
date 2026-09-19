@@ -121,9 +121,14 @@ if ($actionFormulario === 'modificar') {
 
 $manual = [];
 
-foreach ($_POST as $k => $v) {
-    if (strpos($k, 'manual_') === 0) {
-        $manual[substr($k, 7)] = is_array($v) ? $v : trim((string)$v);
+$notasOrganos = [];
+$notasOrganosRaw = trim((string)($_POST['notas_organos'] ?? ''));
+
+if ($notasOrganosRaw !== '') {
+    $notasOrganosTmp = json_decode($notasOrganosRaw, true);
+
+    if (is_array($notasOrganosTmp)) {
+        $notasOrganos = $notasOrganosTmp;
     }
 }
 
@@ -141,6 +146,7 @@ $payload = [
     'toggle_audio_manual' => isset($_POST['toggle_audio_manual']) && (string)$_POST['toggle_audio_manual'] === '1' ? 1 : 0,
     'contenido_html' => trim((string)($_POST['contenido_html'] ?? '')),
     'manual_data' => $manual,
+    'notas_organos' => $notasOrganos,
     'plantillaBase' => trim((string)($_POST['plantillaBase'] ?? '')),
     'rid_ia' => trim((string)($_POST['rid_ia'] ?? '')),
     'rid_revision' => trim((string)($_POST['rid_revision'] ?? '')),
