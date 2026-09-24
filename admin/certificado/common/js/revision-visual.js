@@ -669,11 +669,25 @@ function programarPintadoNotas() {
 
 function inicializarNotasOrganos() {
     let editorConectado = null;
+    let hiddenNotasConectado = null;
+    let hiddenRevisionConectado = null;
 
     function conectar() {
         const raiz = obtenerRaizEditor();
+        if (!raiz) return;
 
-        if (raiz === editorConectado) return;
+        const hiddenNotas = document.getElementById('notas_organos');
+        const hiddenRevision = document.getElementById('revision_visual');
+
+        if (
+            raiz === editorConectado &&
+            hiddenNotas === hiddenNotasConectado &&
+            hiddenRevision === hiddenRevisionConectado
+        ) return;
+
+        const cambioFormulario =
+            hiddenNotas !== hiddenNotasConectado ||
+            hiddenRevision !== hiddenRevisionConectado;
 
         if (observerNotasEditor) {
             observerNotasEditor.disconnect();
@@ -681,7 +695,19 @@ function inicializarNotasOrganos() {
         }
 
         editorConectado = raiz;
-        if (!raiz) return;
+        hiddenNotasConectado = hiddenNotas;
+        hiddenRevisionConectado = hiddenRevision;
+
+        if (cambioFormulario) {
+            notaAbierta = null;
+            notasOrganos = {};
+            nombresNotasOrganos = {};
+            datosRevisionActual = null;
+
+            limpiarHighlights();
+            cerrarDetalleAlerta();
+            cargarNotasDesdeHidden();
+        }
 
         if (!cargarRevisionInicialDesdeHidden()) {
             pintarAlertas(datosRevisionActual);
