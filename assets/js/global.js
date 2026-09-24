@@ -77,7 +77,7 @@ function initDataTables() {
             const titulo = $(this).text().trim().toLowerCase();
 
             if (titulo === 'acciones') {
-                $(this).addClass('dt-col-acciones');
+                $(this).addClass('dt-col-acciones all');
 
                 $tabla.find('tbody tr').each(function () {
                     $(this)

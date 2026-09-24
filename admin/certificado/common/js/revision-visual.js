@@ -668,15 +668,24 @@ function programarPintadoNotas() {
 }
 
 function inicializarNotasOrganos() {
-    const conectar = function () {
+    let editorConectado = null;
+
+    function conectar() {
         const raiz = obtenerRaizEditor();
-        if (!raiz) return false;
+
+        if (raiz === editorConectado) return;
+
+        if (observerNotasEditor) {
+            observerNotasEditor.disconnect();
+            observerNotasEditor = null;
+        }
+
+        editorConectado = raiz;
+        if (!raiz) return;
 
         if (!cargarRevisionInicialDesdeHidden()) {
             pintarAlertas(datosRevisionActual);
         }
-
-        if (observerNotasEditor) observerNotasEditor.disconnect();
 
         observerNotasEditor = new MutationObserver(function () {
             programarPintadoNotas();
@@ -687,20 +696,16 @@ function inicializarNotasOrganos() {
             childList: true,
             characterData: true
         });
+    }
 
-        return true;
-    };
-
-    if (conectar()) return;
-
-    const observerInicio = new MutationObserver(function () {
-        if (conectar()) observerInicio.disconnect();
-    });
+    const observerInicio = new MutationObserver(conectar);
 
     observerInicio.observe(document.body, {
         childList: true,
         subtree: true
     });
+
+    conectar();
 }
 
 function aplicar(datos, persistir = true) {
