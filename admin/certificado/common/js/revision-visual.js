@@ -835,8 +835,495 @@ if (document.readyState === 'loading') {
     inicializarNotasOrganos();
 }
 
+
+function importarInformeCopiado(paquete) {
+    if (
+        paquete?.tipo !== 'vetmind-informe' ||
+        paquete.version !== 1 ||
+        typeof paquete.html !== 'string'
+    ) {
+        return false;
+    }
+
+    // Cerrar cualquier nota o advertencia que esté abierta.
+    cerrarEditorNota();
+    cerrarDetalleAlerta();
+
+    // El informe copiado sustituye las notas anteriores.
+    notasOrganos = {};
+    nombresNotasOrganos = {};
+
+    const notas = paquete.notas || {};
+
+    Object.entries(notas).forEach(([clave, entrada]) => {
+        const texto = typeof entrada === 'string'
+            ? entrada.trim()
+            : String(entrada?.nota || '').trim();
+
+        if (!texto) return;
+
+        const organo = typeof entrada === 'object' && entrada
+            ? String(entrada.organo || '').trim()
+            : '';
+
+        const claveDestino = clave.startsWith('parrafo:')
+            ? clave
+            : claveNotaOrgano(clave);
+
+        notasOrganos[claveDestino] = texto;
+
+        if (organo) {
+            nombresNotasOrganos[claveDestino] = organo;
+        }
+    });
+
+    sincronizarNotasHidden();
+
+    // Restaurar colores y advertencias, si existen.
+    if (Array.isArray(paquete.revision?.organos)) {
+        aplicar(paquete.revision);
+    } else {
+        limpiarHighlights();
+        datosRevisionActual = null;
+        sincronizarRevisionHidden(null);
+        pintarAlertas(null);
+    }
+
+    return true;
+}
+
+
 window.VetmindRevision = {
     aplicar,
     limpiar,
-    prueba
+    prueba,
+    importar: importarInformeCopiado,
+
+    exportar() {
+        // Guardar en el campo oculto las notas actuales.
+        sincronizarNotasHidden();
+
+        let revision = null;
+        let notas = {};
+
+        try {
+            const raw = document
+                .getElementById('revision_visual')
+                ?.value;
+
+            if (raw) {
+                const datos = JSON.parse(raw);
+
+                if (Array.isArray(datos?.organos)) {
+                    revision = datos;
+                }
+            }
+
+            if (
+                !revision &&
+                Array.isArray(datosRevisionActual?.organos)
+            ) {
+                revision = datosRevisionActual;
+            }
+        } catch (error) {
+            console.error(
+                'Error al exportar la revisión:',
+                error
+            );
+        }
+
+        try {
+            const raw = document
+                .getElementById('notas_organos')
+                ?.value;
+
+            if (raw) {
+                const datos = JSON.parse(raw);
+
+                if (
+                    datos &&
+                    typeof datos === 'object' &&
+                    !Array.isArray(datos)
+                ) {
+                    notas = datos;
+                }
+            }
+        } catch (error) {
+            console.error(
+                'Error al exportar las notas:',
+                error
+            );
+        }
+
+        return {
+            version: 1,
+            revision,
+            notas
+        };
+    }
 };
+
+
+/*
+ * Pegado de informes copiados desde VetMind.
+ * Los pegados normales siguen funcionando sin cambios.
+ */
+if (window.__vmPasteConRevision) {
+    document.removeEventListener(
+        'paste',
+        window.__vmPasteConRevision,
+        true
+    );
+}
+
+window.__vmPasteConRevision = function (evento) {
+    const contenedor = document.getElementById(
+        'contenido_html_editor'
+    );
+
+    if (
+        !contenedor ||
+        !contenedor.contains(evento.target)
+    ) {
+        return;
+    }
+
+    const html = evento.clipboardData?.getData('text/html') || '';
+
+    if (!html.includes('data-vetmind-informe')) {
+        return; // Pegado normal, incluido contenido de Word.
+    }
+
+    const plantilla = document.createElement('template');
+    plantilla.innerHTML = html;
+
+    const nodo = plantilla.content.querySelector(
+        '[data-vetmind-informe]'
+    );
+
+    if (!nodo) return;
+
+    // Evita que Tiptap pegue los comentarios como párrafos.
+    evento.preventDefault();
+    evento.stopImmediatePropagation();
+
+    let paquete;
+
+    try {
+        paquete = JSON.parse(
+            decodeURIComponent(
+                nodo.getAttribute('data-vetmind-informe')
+            )
+        );
+    } catch (error) {
+        console.error('Contenido VetMind inválido:', error);
+        alert('No se pudieron recuperar los datos del informe.');
+        return;
+    }
+
+    if (
+        paquete?.tipo !== 'vetmind-informe' ||
+        paquete.version !== 1 ||
+        typeof paquete.html !== 'string' ||
+        !paquete.html.trim()
+    ) {
+        alert('El informe copiado no tiene un formato válido.');
+        return;
+    }
+
+    const tiptap = window.VetmindTiptap;
+    const revision = window.VetmindRevision;
+    const editor = tiptap?.getMainEditor?.();
+
+    if (
+        !editor ||
+        typeof tiptap.setMainEditorHTML !== 'function' ||
+        typeof revision?.importar !== 'function'
+    ) {
+        alert('El editor todavía no está preparado.');
+        return;
+    }
+
+    /*
+     * Esta operación importa un informe completo.
+     * No mezcla automáticamente dos informes diferentes.
+     */
+    if (
+        !editor.isEmpty &&
+        !confirm(
+            'Este pegado reemplazará el informe actual, ' +
+            'incluidas sus notas y advertencias. ¿Continuar?'
+        )
+    ) {
+        return;
+    }
+
+    try {
+        // Usar el HTML ORIGINAL, no el HTML preparado para Word.
+        tiptap.setMainEditorHTML(paquete.html);
+
+        // Reconstruir notas, colores y advertencias.
+        if (!revision.importar(paquete)) {
+            throw new Error('No se pudo restaurar la revisión.');
+        }
+
+        tiptap.syncMainEditorToTextarea?.();
+
+        console.info('Informe VetMind importado correctamente.', {
+            comentarios: Object.keys(paquete.notas || {}).length,
+            organosConRevision:
+                paquete.revision?.organos?.length ?? 0
+        });
+    } catch (error) {
+        console.error('Error al importar informe:', error);
+        alert('No se pudo completar la importación.');
+    }
+};
+
+document.addEventListener(
+    'paste',
+    window.__vmPasteConRevision,
+    true
+);
+
+
+
+/*
+ * Copiar informe completo:
+ * - HTML enriquecido para Word.
+ * - Datos estructurados para restaurar la revisión en VetMind.
+ */
+function prepararInformeParaPortapapeles() {
+    const htmlOriginal = window.VetmindTiptap?.getMainEditorHTML();
+
+    if (!htmlOriginal || !htmlOriginal.trim()) {
+        throw new Error('No hay contenido en el informe.');
+    }
+
+    const datos = window.VetmindRevision.exportar();
+
+    const paquete = {
+        tipo: 'vetmind-informe',
+        version: 1,
+        html: htmlOriginal,
+        revision: datos.revision,
+        notas: datos.notas
+    };
+
+    // Trabajar sobre una copia, sin modificar el editor.
+    const contenido = document.createElement('div');
+    contenido.innerHTML = htmlOriginal;
+
+    const parrafos = Array.from(contenido.children)
+        .filter(el => el.tagName === 'P');
+
+    const cards = obtenerCardsInforme();
+
+    cards.forEach((card, indice) => {
+        const parrafo = parrafos[indice];
+        if (!parrafo) return;
+
+        const organoRevision = (datos.revision?.organos || [])
+            .find(item =>
+                claveNotaOrgano(item.organo) === card.clave
+            );
+
+        // Incorporar los colores directamente al HTML de Word.
+        const colores = {
+            plantilla: '#fef08a',
+            dictado: '#bbf7d0',
+            desconocido: '#e5e7eb'
+        };
+
+        (organoRevision?.atributos || []).forEach(atributo => {
+            if (!atributo.texto) return;
+
+            const rango = buscarRangoDom(
+                parrafo,
+                atributo.texto
+            );
+
+            if (!rango) return;
+
+            const marca = document.createElement('span');
+
+            marca.style.backgroundColor =
+                colores[atributo.origen] ||
+                colores.desconocido;
+
+            marca.appendChild(rango.extractContents());
+            rango.insertNode(marca);
+        });
+
+        let ultimo = parrafo;
+
+        // Advertencias visibles debajo del órgano.
+        (organoRevision?.alertas || []).forEach(alerta => {
+            const bloque = document.createElement('p');
+
+            bloque.style.cssText = [
+                'margin:3px 0 3px 18px',
+                'padding:5px 8px',
+                'background-color:#fffbeb',
+                'border-left:3px solid #f59e0b',
+                'color:#92400e',
+                'font-size:11px'
+            ].join(';');
+
+            const titulo = document.createElement('strong');
+            titulo.textContent = 'Advertencia: ';
+
+            bloque.appendChild(titulo);
+            bloque.appendChild(
+                document.createTextNode(
+                    alerta.detalle ||
+                    alerta.texto ||
+                    'Revisar.'
+                )
+            );
+
+            ultimo.after(bloque);
+            ultimo = bloque;
+        });
+
+        // Comentario guardado del órgano.
+        const entradaNota = datos.notas?.[card.clave];
+
+        const textoNota = typeof entradaNota === 'string'
+            ? entradaNota.trim()
+            : String(entradaNota?.nota || '').trim();
+
+        if (textoNota) {
+            const bloque = document.createElement('p');
+
+            bloque.style.cssText = [
+                'margin:3px 0 5px 18px',
+                'padding:5px 8px',
+                'background-color:#ecfdf5',
+                'border-left:3px solid #0f766e',
+                'color:#0f766e',
+                'font-size:11px'
+            ].join(';');
+
+            const titulo = document.createElement('strong');
+            titulo.textContent = 'Comentario: ';
+
+            bloque.appendChild(titulo);
+            bloque.appendChild(
+                document.createTextNode(textoNota)
+            );
+
+            ultimo.after(bloque);
+        }
+    });
+
+    // El atributo permite reconocer posteriormente
+    // que el HTML procede de VetMind.
+    const envoltorio = document.createElement('div');
+
+    envoltorio.setAttribute(
+        'data-vetmind-informe',
+        encodeURIComponent(JSON.stringify(paquete))
+    );
+
+    while (contenido.firstChild) {
+        envoltorio.appendChild(contenido.firstChild);
+    }
+
+    const textoPlano = Array.from(envoltorio.children)
+        .map(el => (el.textContent || '').trim())
+        .filter(Boolean)
+        .join('\n');
+
+    return {
+        html: envoltorio.outerHTML,
+        textoPlano,
+        paquete
+    };
+}
+
+// Evitar registrar dos veces el controlador.
+$(document)
+    .off('click.vmCopiarInforme', '#vm_copiar_informe_revision')
+    .on(
+        'click.vmCopiarInforme',
+        '#vm_copiar_informe_revision',
+        async function (e) {
+            e.preventDefault();
+
+            const boton = this;
+
+            try {
+                const copia =
+                    prepararInformeParaPortapapeles();
+
+                if (
+                    !navigator.clipboard?.write ||
+                    typeof ClipboardItem === 'undefined'
+                ) {
+                    throw new Error(
+                        'Este navegador no admite copia HTML enriquecida.'
+                    );
+                }
+
+                await navigator.clipboard.write([
+                    new ClipboardItem({
+                        'text/html': new Blob(
+                            [copia.html],
+                            { type: 'text/html' }
+                        ),
+                        'text/plain': new Blob(
+                            [copia.textoPlano],
+                            { type: 'text/plain' }
+                        )
+                    })
+                ]);
+
+                boton.title = 'Informe copiado';
+
+                // Eliminar un aviso anterior si se vuelve a copiar.
+                document.getElementById('vm-copia-aviso')?.remove();
+
+                if (boton._vmCopyFeedbackTimer) {
+                    clearTimeout(boton._vmCopyFeedbackTimer);
+                }
+
+                // Mostrar confirmación junto al botón.
+                const aviso = document.createElement('div');
+
+                aviso.id = 'vm-copia-aviso';
+                aviso.className = 'vm-copy-toast';
+                aviso.setAttribute('role', 'status');
+                aviso.textContent = '✓ Informe copiado';
+
+                const rect = boton.getBoundingClientRect();
+
+                aviso.style.top = (rect.bottom + 8) + 'px';
+                aviso.style.right =
+                    Math.max(8, window.innerWidth - rect.right) + 'px';
+
+                document.body.appendChild(aviso);
+
+                boton.classList.add('is-copied');
+                boton.title = 'Informe copiado';
+
+                boton._vmCopyFeedbackTimer = setTimeout(() => {
+                    aviso.remove();
+                    boton.classList.remove('is-copied');
+
+                    boton.title =
+                        'Copiar informe con revisión para VetMind o Word';
+                }, 1800);
+            } catch (error) {
+                console.error(
+                    'Error al copiar el informe:',
+                    error
+                );
+
+                alert(
+                    'No se pudo copiar el informe: ' +
+                    error.message
+                );
+            }
+        }
+    );

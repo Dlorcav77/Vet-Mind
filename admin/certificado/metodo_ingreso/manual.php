@@ -277,9 +277,20 @@ $contenidoInforme = isset($fila['contenido_html']) ? (string)$fila['contenido_ht
                     <option value="1.1">110%</option>
                     <option value="1.25">125%</option>
                 </select>
+                <button
+                    type="button"
+                    id="vm_copiar_informe_revision"
+                    class="vm-toolbar-copy-btn"
+                    title="Copiar informe con revisión para VetMind o Word"
+                    aria-label="Copiar informe con revisión"
+                >
+                    <svg viewBox="0 0 24 24" aria-hidden="true">
+                        <rect x="8" y="8" width="12" height="12" rx="2"></rect>
+                        <path d="M16 8V6a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v8a2 2 0 0 0 2 2h2"></path>
+                    </svg>
+                </button>
             </div>
         </div>
-
         <div
             id="contenido_html_editor"
             class="form-control vm-tiptap-editor"

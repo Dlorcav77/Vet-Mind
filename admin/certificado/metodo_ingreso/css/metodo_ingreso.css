@@ -1637,3 +1637,87 @@ mark.xx-faltante {
     text-overflow: ellipsis;
     white-space: nowrap;
 }
+
+/* Zoom y Copiar dentro de una misma cápsula */
+.vm-toolbar-visual {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    white-space: nowrap;
+}
+
+.vm-toolbar-visual .vm-toolbar-copy-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+
+    width: 29px;
+    height: 24px;
+    padding: 0 2px 0 8px;
+
+    border: 0;
+    border-left: 1px solid rgba(255, 255, 255, 0.3);
+    border-radius: 0;
+    box-shadow: none;
+
+    background: transparent;
+    color: #ffffff;
+    cursor: pointer;
+}
+
+.vm-toolbar-visual .vm-toolbar-copy-btn svg {
+    width: 17px;
+    height: 17px;
+    fill: none;
+    stroke: currentColor;
+    stroke-width: 1.8;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+}
+
+.vm-toolbar-visual .vm-toolbar-copy-btn:hover {
+    color: #a7f3d0;
+}
+
+/* Confirmación discreta al copiar */
+.vm-toolbar-visual .vm-toolbar-copy-btn.is-copied {
+    color: #a7f3d0;
+}
+
+.vm-copy-toast {
+    position: fixed;
+    z-index: 10000;
+    pointer-events: none;
+
+    padding: 2px 6px;
+    border: 1px solid #a7f3d0;
+    border-radius: 6px;
+
+    background: #ecfdf5;
+    color: #0f766e;
+
+    font-size: 10px;
+    font-weight: 500;
+    white-space: nowrap;
+
+    box-shadow: 0 2px 6px rgba(15, 118, 110, 0.08);
+
+    animation: vmCopyToast 1.8s ease forwards;
+}
+
+@keyframes vmCopyToast {
+    0% {
+        opacity: 0;
+        transform: translateY(-4px);
+    }
+
+    15%, 75% {
+        opacity: 1;
+        transform: translateY(0);
+    }
+
+    100% {
+        opacity: 0;
+        transform: translateY(-4px);
+    }
+}
