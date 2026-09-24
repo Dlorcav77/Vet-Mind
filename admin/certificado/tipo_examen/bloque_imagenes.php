@@ -6,7 +6,7 @@
  * @var string $mostrarImagenesAntiguas
  */
 ?>
-<link rel="stylesheet" href="certificado/tipo_examen/css/imagenes.css?v=4">
+<link rel="stylesheet" href="certificado/tipo_examen/css/imagenes.css?v=<?= vetmind_asset_version() ?>">
 <div id="imagenesColumna" style="display:none;">
     <div class="d-flex justify-content-between align-items-center mb-2 gap-2 flex-wrap">
         <label for="columnasImagenes" class="form-label fw-bold mb-0">Imágenes</label>

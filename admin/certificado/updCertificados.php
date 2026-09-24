@@ -35,7 +35,16 @@ validarTokenCsrf();
 
 $action = trim((string)($_POST['action'] ?? ''));
 $id = (int)($_POST['id'] ?? 0);
+
+/*
+ * $veterinario:
+ * usuario que está ejecutando la acción.
+ *
+ * $veterinarioCertificado:
+ * propietario real del informe.
+ */
 $veterinario = (int)($_SESSION['usuario_id'] ?? 0);
+$veterinarioCertificado = $veterinario;
 
 if ($veterinario <= 0) {
     http_response_code(401);
@@ -74,17 +83,82 @@ if ($action === 'modificar' || $action === 'eliminar') {
         ], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
         exit;
     }
+}
 
-    $stmtOwner = $mysqli->prepare(
-        "SELECT id
-         FROM certificados
-         WHERE id = ?
-           AND veterinario_id = ?
-         LIMIT 1"
+if ($action === 'modificar') {
+    $stmtAcceso = $mysqli->prepare("
+        SELECT c.veterinario_id
+        FROM certificados c
+
+        LEFT JOIN certificado_compartidos cc
+            ON cc.certificado_id = c.id
+            AND cc.usuario_id = ?
+            AND cc.estado = 'activo'
+
+        WHERE
+            c.id = ?
+            AND (
+                c.veterinario_id = ?
+                OR (
+                    cc.id IS NOT NULL
+                    AND cc.puede_editar = 1
+                )
+            )
+
+        LIMIT 1
+    ");
+
+    if (!$stmtAcceso) {
+        error_log('[updCertificados][permiso_modificar] ' . $mysqli->error);
+
+        echo json_encode([
+            'status' => 'error',
+            'message' => 'No se pudo validar el permiso del certificado.'
+        ], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+        exit;
+    }
+
+    $stmtAcceso->bind_param(
+        'iii',
+        $veterinario,
+        $id,
+        $veterinario
     );
+
+    $stmtAcceso->execute();
+
+    $rowAcceso = $stmtAcceso
+        ->get_result()
+        ->fetch_assoc();
+
+    $stmtAcceso->close();
+
+    if (!$rowAcceso) {
+        http_response_code(403);
+
+        echo json_encode([
+            'status' => 'error',
+            'message' => 'Certificado no encontrado o sin permisos para editar.'
+        ], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+        exit;
+    }
+
+    $veterinarioCertificado =
+        (int)$rowAcceso['veterinario_id'];
+}
+
+if ($action === 'eliminar') {
+    $stmtOwner = $mysqli->prepare("
+        SELECT id
+        FROM certificados
+        WHERE id = ?
+          AND veterinario_id = ?
+        LIMIT 1
+    ");
 
     if (!$stmtOwner) {
         error_log('[updCertificados][ownership] ' . $mysqli->error);
+
         echo json_encode([
             'status' => 'error',
             'message' => 'No se pudo validar el certificado.'
@@ -92,13 +166,20 @@ if ($action === 'modificar' || $action === 'eliminar') {
         exit;
     }
 
-    $stmtOwner->bind_param('ii', $id, $veterinario);
+    $stmtOwner->bind_param(
+        'ii',
+        $id,
+        $veterinario
+    );
+
     $stmtOwner->execute();
+
     $resOwner = $stmtOwner->get_result();
     $stmtOwner->close();
 
     if ($resOwner->num_rows === 0) {
         http_response_code(403);
+
         echo json_encode([
             'status' => 'error',
             'message' => 'Certificado no encontrado o sin permisos.'
@@ -784,7 +865,7 @@ if (!$modo_manual) {
         exit;
     }
 
-    $stmtPaciente->bind_param('ii', $paciente_id, $veterinario);
+    $stmtPaciente->bind_param('ii', $paciente_id, $veterinarioCertificado);
     $stmtPaciente->execute();
     $resPaciente = $stmtPaciente->get_result();
     $stmtPaciente->close();
@@ -825,7 +906,7 @@ if (!$stmtPlantilla) {
     exit;
 }
 
-$stmtPlantilla->bind_param('ii', $plantilla_informe_id, $veterinario);
+$stmtPlantilla->bind_param('ii', $plantilla_informe_id, $veterinarioCertificado);
 $stmtPlantilla->execute();
 $resPlantilla = $stmtPlantilla->get_result();
 $stmtPlantilla->close();
@@ -864,7 +945,7 @@ if (!$stmtConfiguracion) {
     exit;
 }
 
-$stmtConfiguracion->bind_param('ii', $configuracion_informe_id, $veterinario);
+$stmtConfiguracion->bind_param('ii', $configuracion_informe_id, $veterinarioCertificado);
 $stmtConfiguracion->execute();
 $resConfiguracion = $stmtConfiguracion->get_result();
 $stmtConfiguracion->close();
@@ -903,7 +984,7 @@ if ($recinto === '' && $configuracion_informe_id > 0) {
     ");
 
     if ($stmtRecintoDef) {
-        $stmtRecintoDef->bind_param("ii", $configuracion_informe_id, $veterinario);
+        $stmtRecintoDef->bind_param("ii", $configuracion_informe_id, $veterinarioCertificado);
         $stmtRecintoDef->execute();
         $rowRecintoDef = $stmtRecintoDef->get_result()->fetch_assoc();
 
@@ -970,7 +1051,7 @@ $prev_manual_data = null;
 if ($action === 'modificar' && $id > 0) {
     $q = $mysqli->prepare("SELECT manual_data FROM certificados WHERE id = ? AND veterinario_id = ?");
     if ($q) {
-        $q->bind_param("ii", $id, $veterinario);
+        $q->bind_param("ii", $id, $veterinarioCertificado);
         $q->execute();
         $r = $q->get_result();
         if ($rowPrev = $r->fetch_assoc()) {
@@ -1043,7 +1124,7 @@ if ($modo_manual && $guardarMascota && !empty($manual)) {
         $stmtTutorExistente->bind_param(
             "ii",
             $tutorExistenteId,
-            $veterinario
+            $veterinarioCertificado
         );
 
         if (!$stmtTutorExistente->execute()) {
@@ -1123,7 +1204,7 @@ if ($modo_manual && $guardarMascota && !empty($manual)) {
         $stmtTutorNuevo->bind_param(
             "si",
             $tutorNombre,
-            $veterinario
+            $veterinarioCertificado
         );
 
         if (!$stmtTutorNuevo->execute()) {
@@ -1231,7 +1312,7 @@ if ($modo_manual && $guardarMascota && !empty($manual)) {
         $sexo,
         $fecha_nacimiento,
         $tutorId,
-        $veterinario,
+        $veterinarioCertificado,
         $n_chip
     );
 
@@ -1330,7 +1411,7 @@ if (
         $stmtImgs->bind_param(
             'ii',
             $id,
-            $veterinario
+            $veterinarioCertificado
         );
 
         $stmtImgs->execute();
@@ -1511,7 +1592,7 @@ if (
         $extension = $extensionesPermitidas[$tipoImagen];
 
         $nombreArchivo =
-            "img_{$veterinario}_" .
+            "img_{$veterinarioCertificado}_" .
             bin2hex(random_bytes(12)) .
             "." .
             $extension;
@@ -1596,7 +1677,7 @@ if (!is_writable($pdfDir)) {
 }
 
 $pdfFilename =
-    "cert_{$veterinario}_" .
+    "cert_{$veterinarioCertificado}_" .
     bin2hex(random_bytes(12)) .
     ".pdf";
 
@@ -1604,7 +1685,7 @@ $pdfPathFisico = $pdfDir . $pdfFilename;
 
 try {
     $html = buildInformeHtml(
-        $veterinario,
+        $veterinarioCertificado,
         $configuracion_informe_id,
         $paciente_id,
         $fecha_examen,
@@ -1759,7 +1840,7 @@ if ($action === 'ingresar') {
     $stmtPrev->bind_param(
         "ii",
         $id,
-        $veterinario
+        $veterinarioCertificado
     );
 
     if (!$stmtPrev->execute()) {
@@ -1898,7 +1979,7 @@ if ($action === 'ingresar') {
         $es_destacado,
         $destacado_titulo,
         $id,
-        $veterinario
+        $veterinarioCertificado
     );
 } else {
     rollbackCertificadoSiActivo(
@@ -2163,7 +2244,8 @@ if ($stmt->execute()) {
         'message' => 'Certificado guardado correctamente.',
         'rutaPdf' => $rutaPdf,
         'id' => $certId,
-        'audio' => $audioResultado
+        'audio' => $audioResultado,
+        'abrir_pdf' => ($veterinario === $veterinarioCertificado) ? 1 : 0
     ], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
 } else {
     rollbackCertificadoSiActivo($mysqli, $transaccionActiva);

@@ -423,4 +423,4 @@ $usuarioActual = (int)($usuario_id ?? ($_SESSION['usuario_id'] ?? 0));
   window.ALMACENAMIENTO_USUARIO_ID = <?= (int)$usuarioActual ?>;
 </script>
 
-<script src="almacenamiento/js/almacenamiento.js?v=5"></script>
+<script src="almacenamiento/js/almacenamiento.js?v=<?= vetmind_asset_version() ?>"></script>

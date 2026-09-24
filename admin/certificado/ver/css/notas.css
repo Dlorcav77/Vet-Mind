@@ -1,0 +1,123 @@
+#verInformeContenido .vm-ver-nota-seccion {
+    position: relative;
+    padding-right: 38px !important;
+}
+
+.vm-ver-nota-btn {
+    position: absolute;
+    top: 4px;
+    right: 6px;
+    display: inline-flex;
+    align-items: center;
+    gap: 3px;
+    padding: 2px 4px;
+    border: 0;
+    background: transparent;
+    color: #64748b;
+    font-size: 15px;
+    line-height: 1;
+    cursor: pointer;
+}
+
+.vm-ver-nota-btn:hover,
+.vm-ver-nota-btn.tiene-notas {
+    color: #0f766e;
+}
+
+.vm-ver-nota-btn span {
+    font-size: 10px;
+    font-weight: 700;
+}
+
+.vm-ver-nota-panel {
+    position: fixed;
+    z-index: 1090;
+    width: 300px;
+    max-width: calc(100vw - 16px);
+    padding: 8px;
+    border: 1px solid #dbe4ec;
+    border-radius: 8px;
+    background: #fff;
+    box-shadow: 0 6px 20px rgba(15,23,42,.15);
+}
+
+.vm-ver-nota-listado {
+    max-height: 150px;
+    overflow-y: auto;
+    margin-bottom: 7px;
+}
+
+.vm-ver-nota-item {
+    padding: 6px 7px;
+    margin-bottom: 5px;
+    border-radius: 6px;
+    background: #f8fafc;
+}
+
+.vm-ver-nota-item:last-child {
+    margin-bottom: 0;
+}
+
+.vm-ver-nota-autor {
+    margin-bottom: 1px;
+    font-size: 10px;
+    font-weight: 700;
+    color: #475569;
+}
+
+.vm-ver-nota-texto {
+    font-size: 12px;
+    line-height: 1.35;
+    color: #334155;
+}
+
+.vm-ver-nota-editor {
+    display: flex;
+    align-items: flex-end;
+    gap: 5px;
+}
+
+.vm-ver-nota-editor textarea {
+    min-height: 48px;
+    max-height: 90px;
+    resize: vertical;
+    font-size: 12px;
+}
+
+.vm-ver-nota-editor-acciones {
+    display: flex;
+    gap: 3px;
+}
+
+.vm-ver-nota-accion {
+    width: 28px;
+    height: 28px;
+    padding: 0;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 5px;
+    background: #fff;
+    font-size: 12px;
+    cursor: pointer;
+}
+
+.vm-ver-nota-guardar {
+    border: 1px solid #0d6efd;
+    color: #0d6efd;
+}
+
+.vm-ver-nota-guardar:hover {
+    background: #0d6efd;
+    color: #fff;
+}
+
+.vm-ver-nota-eliminar {
+    border: 1px solid #dc3545;
+    color: #dc3545;
+}
+
+.vm-ver-nota-eliminar:hover {
+    background: #dc3545;
+    color: #fff;
+}

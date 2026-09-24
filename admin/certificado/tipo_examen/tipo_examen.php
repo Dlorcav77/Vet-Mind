@@ -23,7 +23,15 @@ if (!isset($tipos_estudio)) {
         ORDER BY te.nombre ASC, pi.nombre ASC
     ";
     $stmt = $mysqli->prepare($query);
-    $stmt->bind_param("i", $usuario_id);
+
+    $veterinarioTipoExamen = (
+        isset($veterinario_contexto) &&
+        (int)$veterinario_contexto > 0
+    )
+        ? (int)$veterinario_contexto
+        : (int)$usuario_id;
+
+    $stmt->bind_param("i", $veterinarioTipoExamen);
     $stmt->execute();
     $res = $stmt->get_result();
 
@@ -71,7 +79,7 @@ if (!function_exists('valorManualCertificado')) {
 }
 ?>
 
-<link rel="stylesheet" href="certificado/tipo_examen/css/tipo_examen.css?v=3">
+<link rel="stylesheet" href="certificado/tipo_examen/css/tipo_examen.css?v=<?= vetmind_asset_version() ?>">
 <div class="col-12" id="bloque_tipo_examen">
     <div class="vm-campos-generales mb-1" id="fila_campos_generales">
         <?php foreach ($campos_permitidos_catalogo ?? [] as $campoInforme): ?>
@@ -213,5 +221,5 @@ if (!function_exists('valorManualCertificado')) {
     </div>
 </div>
 
-<script src="certificado/tipo_examen/js/tipo_examen.js?v=10"></script>
-<script src="certificado/tipo_examen/js/imagenes.js?v=19"></script>
+<script src="certificado/tipo_examen/js/tipo_examen.js?v=<?= vetmind_asset_version() ?>"></script>
+<script src="certificado/tipo_examen/js/imagenes.js?v=<?= vetmind_asset_version() ?>"></script>

@@ -10,6 +10,48 @@ let observerRevisionEditor = null;
 let observerNotasEditor = null;
 let timerNotasEditor = null;
 
+function sincronizarRevisionHidden(datos, notificar = true) {
+    const hidden = document.getElementById('revision_visual');
+    if (!hidden) return;
+
+    const nuevoValor = datos && Array.isArray(datos.organos)
+        ? JSON.stringify(datos)
+        : '';
+
+    if (hidden.value === nuevoValor) return;
+
+    hidden.value = nuevoValor;
+
+    if (notificar) {
+        hidden.dispatchEvent(new Event('input', { bubbles: true }));
+    }
+}
+
+function cargarRevisionInicialDesdeHidden() {
+    if (datosRevisionActual) return false;
+
+    const hidden = document.getElementById('revision_visual');
+    const raw = String(hidden?.value || '').trim();
+
+    if (!raw) return false;
+
+    try {
+        const datos = JSON.parse(raw);
+
+        if (
+            !datos ||
+            !Array.isArray(datos.organos)
+        ) {
+            return false;
+        }
+
+        return aplicar(datos, false);
+    } catch (e) {
+        console.warn('VetmindRevision: revisión guardada inválida.');
+        return false;
+    }
+}
+
 function normalizar(valor) {
     return String(valor || '').trim().toLowerCase();
 }
@@ -482,8 +524,15 @@ function pintarAlertas(datos = null) {
             const badge = document.createElement('button');
             badge.type = 'button';
             badge.className = 'vm-revision-alerta-badge';
-            badge.textContent = '⚠ ' + alertas.length;
             badge.title = card.organo + ': ' + alertas.length + ' observación' + (alertas.length === 1 ? '' : 'es');
+            badge.setAttribute('aria-label', badge.title);
+            badge.innerHTML = `
+                <svg viewBox="0 0 24 24" aria-hidden="true">
+                    <path d="M12 3L2.8 20h18.4L12 3z"></path>
+                    <path d="M12 9v5"></path>
+                    <circle cx="12" cy="17" r=".8"></circle>
+                </svg>
+            `;
 
             badge.addEventListener('click', function () {
                 cerrarEditorNota();
@@ -548,7 +597,14 @@ function actualizarPosicionAlertas() {
         }
 
         const rect = card.el.getBoundingClientRect();
-        const visible = rect.bottom >= editorRect.top && rect.top <= editorRect.bottom;
+
+        const centroY = rect.top + (rect.height / 2);
+
+        const margenIcono = 10;
+
+        const visible =
+            centroY >= (editorRect.top + margenIcono) &&
+            centroY <= (editorRect.bottom - margenIcono);
 
         contenedor.style.display = visible ? '' : 'none';
         contenedor.style.top = (rect.top - wrapperRect.top) + 'px';
@@ -616,7 +672,9 @@ function inicializarNotasOrganos() {
         const raiz = obtenerRaizEditor();
         if (!raiz) return false;
 
-        pintarAlertas(datosRevisionActual);
+        if (!cargarRevisionInicialDesdeHidden()) {
+            pintarAlertas(datosRevisionActual);
+        }
 
         if (observerNotasEditor) observerNotasEditor.disconnect();
 
@@ -645,7 +703,7 @@ function inicializarNotasOrganos() {
     });
 }
 
-function aplicar(datos) {
+function aplicar(datos, persistir = true) {
     limpiarHighlights();
     cerrarDetalleAlerta();
 
@@ -657,6 +715,8 @@ function aplicar(datos) {
     if (!datos || !Array.isArray(datos.organos)) return false;
 
     datosRevisionActual = datos;
+    sincronizarRevisionHidden(datos, persistir);
+
     activarReaplicacionEnEdicion();
 
     const porOrigen = {
@@ -695,6 +755,7 @@ function limpiar() {
     limpiarHighlights();
     cerrarDetalleAlerta();
     datosRevisionActual = null;
+    sincronizarRevisionHidden(null, true); 
 
     clearTimeout(timerReaplicarRevision);
 

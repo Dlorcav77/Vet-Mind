@@ -3,10 +3,21 @@
 $isModificar = isset($action) && $action === 'modificar';
 $initialMode = $modo_ingreso_contenido_inicial ?? ($isModificar ? 'manual' : 'audio');
 $isManualInitial = $initialMode === 'manual';
+
+$revisionVisualInicial = '';
+
+if (
+    isset($borrador_payload['revision_visual']) &&
+    is_array($borrador_payload['revision_visual'])
+) {
+    $revisionVisualInicial = json_encode(
+        $borrador_payload['revision_visual'],
+        JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES
+    );
+}
 ?>
 
-
-<link rel="stylesheet" href="certificado/metodo_ingreso/css/metodo_ingreso.css?v=<?php echo time(); ?>">
+<link rel="stylesheet" href="certificado/metodo_ingreso/css/metodo_ingreso.css?v=<?= vetmind_asset_version() ?>">
 <div class="vm-ingreso-topbar mb-2">
     <div id="audio_manual_segmented" class="btn-group vm-ingreso-modo" role="group" aria-label="Modo de ingreso">
         <button type="button" class="btn btn-outline-info <?= $isManualInitial ? '' : 'active' ?>" id="audio_manual_audioBtn">🎤 Audio</button>
@@ -14,6 +25,13 @@ $isManualInitial = $initialMode === 'manual';
     </div>
 
     <input type="checkbox" id="toggle_audio_manual" class="d-none" <?= $isManualInitial ? 'checked' : '' ?> />
+   
+    <input
+        type="hidden"
+        name="revision_visual"
+        id="revision_visual"
+        value="<?= htmlspecialchars($revisionVisualInicial, ENT_QUOTES, 'UTF-8') ?>"
+    >
 
     <div id="revision_audio_barra" class="vm-review-audio" role="group" aria-label="Reproductor del dictado">
         <audio id="revision_audio" preload="metadata"></audio>
@@ -71,7 +89,7 @@ $isManualInitial = $initialMode === 'manual';
 <?php include __DIR__ . '/audio.php'; ?>
 <?php include __DIR__ . '/manual.php'; ?>
 
-<script type="module" src="certificado/common/js/tiptap-editor.bundle.js?v=<?php echo time(); ?>"></script>
-<script type="module" src="certificado/common/js/revision-visual.js?v=<?php echo time(); ?>"></script>
-<script src="certificado/metodo_ingreso/js/audio.js?v=2"></script>
-<script src="certificado/metodo_ingreso/js/metodo_ingreso.js?v=<?php echo time(); ?>"></script>
+<script type="module" src="certificado/common/js/tiptap-editor.bundle.js?v=<?= vetmind_asset_version() ?>"></script>
+<script type="module" src="certificado/common/js/revision-visual.js?v=<?= vetmind_asset_version() ?>"></script>
+<script src="certificado/metodo_ingreso/js/audio.js?v=<?= vetmind_asset_version() ?>"></script>
+<script src="certificado/metodo_ingreso/js/metodo_ingreso.js?v=<?= vetmind_asset_version() ?>"></script>

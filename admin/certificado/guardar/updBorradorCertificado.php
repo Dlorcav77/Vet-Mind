@@ -121,8 +121,41 @@ if ($actionFormulario === 'modificar') {
 
 $manual = [];
 
+foreach ($_POST as $key => $value) {
+    if (strpos($key, 'manual_') !== 0) {
+        continue;
+    }
+
+    $campo = substr($key, 7);
+
+    if ($campo === '') {
+        continue;
+    }
+
+    if (is_array($value)) {
+        $manual[$campo] = $value;
+    } else {
+        $manual[$campo] = trim((string)$value);
+    }
+}
+
 $notasOrganos = [];
 $notasOrganosRaw = trim((string)($_POST['notas_organos'] ?? ''));
+
+$revisionVisual = [];
+$revisionVisualRaw = trim((string)($_POST['revision_visual'] ?? ''));
+
+if ($revisionVisualRaw !== '') {
+    $revisionVisualTmp = json_decode($revisionVisualRaw, true);
+
+    if (
+        is_array($revisionVisualTmp) &&
+        isset($revisionVisualTmp['organos']) &&
+        is_array($revisionVisualTmp['organos'])
+    ) {
+        $revisionVisual = $revisionVisualTmp;
+    }
+}
 
 if ($notasOrganosRaw !== '') {
     $notasOrganosTmp = json_decode($notasOrganosRaw, true);
@@ -147,6 +180,7 @@ $payload = [
     'contenido_html' => trim((string)($_POST['contenido_html'] ?? '')),
     'manual_data' => $manual,
     'notas_organos' => $notasOrganos,
+    'revision_visual' => $revisionVisual,
     'plantillaBase' => trim((string)($_POST['plantillaBase'] ?? '')),
     'rid_ia' => trim((string)($_POST['rid_ia'] ?? '')),
     'rid_revision' => trim((string)($_POST['rid_revision'] ?? '')),

@@ -44,7 +44,7 @@ $stmt->close();
 $contenidoPlantilla = isset($fila['contenido']) ? (string)$fila['contenido'] : '';
 ?>
 
-<link rel="stylesheet" href="plantilla_informe/css/plantillaInforme.css?v=<?= time(); ?>">
+<link rel="stylesheet" href="plantilla_informe/css/plantillaInforme.css?v=<?= vetmind_asset_version() ?>">
 
 <div class="card" id="plantilla_informe" data-page-id="plantilla_informe">
     <div class="card-header">

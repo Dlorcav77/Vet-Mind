@@ -175,7 +175,7 @@ $clinica_config = array_merge(
 );
 
 ?>
-<link rel="stylesheet" href="configuracion_informe/css/configuracion_informe.css?v=<?= time() ?>">
+<link rel="stylesheet" href="configuracion_informe/css/configuracion_informe.css?v=<?= vetmind_asset_version() ?>">
 <div class="configuracion-informe-wrapper" id="configuracion_informe" data-page-id="configuracion_informe">
   <div class="config-toolbar">
     <div class="config-toolbar-title">
@@ -387,4 +387,4 @@ $clinica_config = array_merge(
     </div>
   </div>
 </div>
-<script src="configuracion_informe/js/configuracion_informe.js?v=<?= time() ?>"></script>
+<script src="configuracion_informe/js/configuracion_informe.js?v=<?= vetmind_asset_version() ?>"></script>

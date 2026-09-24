@@ -414,98 +414,428 @@ function prepararAudioRevision(audioFile) {
     window.__audioRevisionSrc = ($('#audioPlayback').attr('src') || '').trim();
 }
 
+function restaurarAudioRevisionDesdeBorrador() {
+    let audioTmp = ($('#audio_tmp').val() || '')
+        .trim()
+        .replace(/\\/g, '/')
+        .replace(/^\/+/, '');
+
+    if (!audioTmp) {
+        return false;
+    }
+
+    const prefix = 'uploads/tmp/audio/';
+
+    if (audioTmp.indexOf(prefix) !== 0) {
+        return false;
+    }
+
+    const filename = audioTmp.split('/').pop();
+
+    if (!filename) {
+        return false;
+    }
+
+    /*
+     * audio_tmp viene como:
+     *
+     * uploads/tmp/audio/archivo.wav
+     *
+     * Como estamos dentro de /admin, necesitamos convertirlo
+     * a una URL absoluta desde la raíz del sitio.
+     */
+    const src = '/' + audioTmp;
+
+    $('#bloque-audio')
+        .data('audioTmp', audioTmp)
+        .data('audioFilename', filename);
+
+    $('#audioPlayback')
+        .attr('src', src)
+        .show();
+
+    window.__audioRevisionSrc = src;
+
+    inicializarAudioRevision();
+
+    return true;
+}
+
 function inicializarAudioRevision() {
     const src = (window.__audioRevisionSrc || '').trim();
     const audio = document.getElementById('revision_audio');
+    const $barra = $('#revision_audio_barra');
+    const $play = $('#revision_audio_play');
+
     if (!audio || !src) {
-        $('#revision_audio_barra').removeClass('is-visible');
+        $barra.removeClass('is-visible');
         return;
     }
 
-    audio.src = src;
-    audio.load();
-    $('#revision_audio_barra').addClass('is-visible');
+    /*
+     * No confiamos exclusivamente en audio.paused para decidir
+     * qué quiso hacer el usuario.
+     *
+     * play() es asíncrono y puede existir una pequeña ventana
+     * donde audio.paused todavía no representa la intención
+     * del último clic.
+     */
+    let reproduccionDeseada = false;
+    let operacionReproduccion = 0;
 
     const formato = function (seg) {
         if (!isFinite(seg)) seg = 0;
+
         const m = Math.floor(seg / 60);
         const s = Math.floor(seg % 60);
+
         return String(m).padStart(2, '0') + ':' + String(s).padStart(2, '0');
     };
 
-    const iconoPlay = '<svg viewBox="0 0 24 24" aria-hidden="true"><polygon points="9,7 18,12 9,17"></polygon></svg>';
-    const iconoPause = '<svg viewBox="0 0 24 24" aria-hidden="true"><rect x="8" y="7" width="3" height="10" rx="1"></rect><rect x="13" y="7" width="3" height="10" rx="1"></rect></svg>';
+    const iconoPlay =
+        '<svg viewBox="0 0 24 24" aria-hidden="true">' +
+            '<polygon points="9,7 18,12 9,17"></polygon>' +
+        '</svg>';
+
+    const iconoPause =
+        '<svg viewBox="0 0 24 24" aria-hidden="true">' +
+            '<rect x="8" y="7" width="3" height="10" rx="1"></rect>' +
+            '<rect x="13" y="7" width="3" height="10" rx="1"></rect>' +
+        '</svg>';
+
+    let iconoMostrado = null;
 
     const actualizar = function () {
-        const dur = isFinite(audio.duration) ? audio.duration : 0;
-        const actual = isFinite(audio.currentTime) ? audio.currentTime : 0;
-        const $play = $('#revision_audio_play');
+        const dur = isFinite(audio.duration)
+            ? audio.duration
+            : 0;
 
-        $('#revision_audio_seek').val(dur > 0 ? (actual / dur) * 100 : 0);
-        $('#revision_audio_tiempo').text(formato(actual) + ' / ' + formato(dur));
+        const actual = isFinite(audio.currentTime)
+            ? audio.currentTime
+            : 0;
 
-        if (audio.paused) {
-            $play.removeClass('is-pause').html(iconoPlay).attr('title', 'Reproducir').attr('aria-label', 'Reproducir');
-        } else {
-            $play.addClass('is-pause').html(iconoPause).attr('title', 'Pausar').attr('aria-label', 'Pausar');
+        $('#revision_audio_seek').val(
+            dur > 0 ? (actual / dur) * 100 : 0
+        );
+
+        $('#revision_audio_tiempo').text(
+            formato(actual) + ' / ' + formato(dur)
+        );
+
+        const mostrarPause =
+            reproduccionDeseada && !audio.ended;
+
+        const nuevoIcono = mostrarPause
+            ? 'pause'
+            : 'play';
+
+        /*
+        * Solo reemplazamos el SVG cuando cambia
+        * realmente el estado del botón.
+        */
+        if (iconoMostrado !== nuevoIcono) {
+            $play.html(
+                mostrarPause ? iconoPause : iconoPlay
+            );
+
+            iconoMostrado = nuevoIcono;
         }
+
+        $play
+            .toggleClass('is-pause', mostrarPause)
+            .attr(
+                'title',
+                mostrarPause ? 'Pausar' : 'Reproducir'
+            )
+            .attr(
+                'aria-label',
+                mostrarPause ? 'Pausar' : 'Reproducir'
+            );
     };
 
-    $('#revision_audio_play').off('.revisionAudio').on('click.revisionAudio', function (e) {
-        e.preventDefault();
-        e.stopPropagation();
+    const marcarListo = function () {
+        $play
+            .prop('disabled', false)
+            .removeClass('is-loading');
 
-        if (!audio.paused) {
-            audio.pause();
-            actualizar();
-            return;
-        }
-
-        const promesa = audio.play();
         actualizar();
+    };
 
-        if (promesa && typeof promesa.catch === 'function') {
-            promesa.catch(function () {
+    const marcarCargando = function () {
+        $play
+            .prop('disabled', true)
+            .addClass('is-loading')
+            .attr('title', 'Cargando audio...')
+            .attr('aria-label', 'Cargando audio...');
+    };
+
+    $play
+        .off('.revisionAudio')
+        .on('click.revisionAudio', function (e) {
+            e.preventDefault();
+            e.stopPropagation();
+
+            reproduccionDeseada = !reproduccionDeseada;
+
+            const miOperacion = ++operacionReproduccion;
+
+            actualizar();
+
+            if (!reproduccionDeseada) {
+                audio.pause();
                 actualizar();
-            });
-        }
-    });
+                return;
+            }
 
-    $('#revision_audio_back').off('.revisionAudio').on('click.revisionAudio', function () {
-        audio.currentTime = Math.max(0, audio.currentTime - 5);
-    });
+            if (
+                audio.ended ||
+                (
+                    isFinite(audio.duration) &&
+                    audio.duration > 0 &&
+                    audio.currentTime >= audio.duration
+                )
+            ) {
+                audio.currentTime = 0;
+            }
 
-    $('#revision_audio_forward').off('.revisionAudio').on('click.revisionAudio', function () {
-        audio.currentTime = Math.min(audio.duration || 0, audio.currentTime + 5);
-    });
+            let promesaPlay;
 
-    $('#revision_audio_seek').off('.revisionAudio').on('input.revisionAudio', function () {
-        if (isFinite(audio.duration) && audio.duration > 0) audio.currentTime = audio.duration * (parseFloat(this.value) / 100);
-    });
+            try {
+                promesaPlay = audio.play();
+            } catch (error) {
+                reproduccionDeseada = false;
+                console.error('No se pudo reproducir revision_audio:', error);
+                actualizar();
+                return;
+            }
 
-    $('#revision_audio_speed').off('.revisionAudio').on('change.revisionAudio', function () {
-        audio.playbackRate = parseFloat(this.value) || 1;
-    });
+            Promise.resolve(promesaPlay)
+                .then(function () {
+                    if (
+                        miOperacion !== operacionReproduccion ||
+                        !reproduccionDeseada
+                    ) {
+                        audio.pause();
+                        actualizar();
+                        return;
+                    }
 
-    $('#revision_audio_volume').off('.revisionAudio').on('input.revisionAudio', function () {
-        audio.volume = Math.max(0, Math.min(1, parseFloat(this.value) / 100));
-        audio.muted = false;
-        $('#revision_audio_mute').removeClass('is-muted');
-    });
+                    actualizar();
+                })
+                .catch(function (error) {
+                    if (miOperacion === operacionReproduccion) {
+                        reproduccionDeseada = false;
+                    }
 
-    $('#revision_audio_mute').off('.revisionAudio').on('click.revisionAudio', function () {
-        audio.muted = !audio.muted;
-        $(this)
-            .toggleClass('is-muted', audio.muted)
-            .attr('title', audio.muted ? 'Activar sonido' : 'Silenciar')
-            .attr('aria-label', audio.muted ? 'Activar sonido' : 'Silenciar');
-    });
+                    console.error('No se pudo reproducir revision_audio:', error);
+                    actualizar();
+                });
+        });
 
-    $(audio).off('.revisionAudio')
-        .on('loadedmetadata.revisionAudio timeupdate.revisionAudio play.revisionAudio pause.revisionAudio ended.revisionAudio', actualizar);
+    $('#revision_audio_back')
+        .off('.revisionAudio')
+        .on('click.revisionAudio', function () {
+            audio.currentTime =
+                Math.max(
+                    0,
+                    audio.currentTime - 5
+                );
 
-    actualizar();
+            actualizar();
+        });
+
+    $('#revision_audio_forward')
+        .off('.revisionAudio')
+        .on('click.revisionAudio', function () {
+            if (!isFinite(audio.duration)) {
+                return;
+            }
+
+            audio.currentTime =
+                Math.min(
+                    audio.duration,
+                    audio.currentTime + 5
+                );
+
+            actualizar();
+        });
+
+    $('#revision_audio_seek')
+        .off('.revisionAudio')
+        .on('input.revisionAudio', function () {
+            if (
+                !isFinite(audio.duration) ||
+                audio.duration <= 0
+            ) {
+                return;
+            }
+
+            audio.currentTime =
+                audio.duration *
+                (
+                    parseFloat(this.value) /
+                    100
+                );
+
+            actualizar();
+        });
+
+    $('#revision_audio_speed')
+        .off('.revisionAudio')
+        .on('change.revisionAudio', function () {
+            audio.playbackRate =
+                parseFloat(this.value) || 1;
+        });
+
+    $('#revision_audio_volume')
+        .off('.revisionAudio')
+        .on('input.revisionAudio', function () {
+            audio.volume =
+                Math.max(
+                    0,
+                    Math.min(
+                        1,
+                        parseFloat(this.value) / 100
+                    )
+                );
+
+            audio.muted = false;
+
+            $('#revision_audio_mute')
+                .removeClass('is-muted')
+                .attr('title', 'Silenciar')
+                .attr('aria-label', 'Silenciar');
+        });
+
+    $('#revision_audio_mute')
+        .off('.revisionAudio')
+        .on('click.revisionAudio', function () {
+            audio.muted = !audio.muted;
+
+            $(this)
+                .toggleClass(
+                    'is-muted',
+                    audio.muted
+                )
+                .attr(
+                    'title',
+                    audio.muted
+                        ? 'Activar sonido'
+                        : 'Silenciar'
+                )
+                .attr(
+                    'aria-label',
+                    audio.muted
+                        ? 'Activar sonido'
+                        : 'Silenciar'
+                );
+        });
+
+    /*
+     * Eventos propios del audio.
+     *
+     * No cambiamos reproduccionDeseada en pause,
+     * porque un pause antiguo podría llegar después
+     * de que el usuario ya haya solicitado otro play.
+     */
+    $(audio)
+        .off('.revisionAudio')
+
+        .on(
+            'loadedmetadata.revisionAudio ' +
+            'durationchange.revisionAudio ' +
+            'timeupdate.revisionAudio ' +
+            'ratechange.revisionAudio ' +
+            'volumechange.revisionAudio',
+            actualizar
+        )
+
+        .on(
+            'loadeddata.revisionAudio ' +
+            'canplay.revisionAudio',
+            marcarListo
+        )
+
+        .on(
+            'play.revisionAudio',
+            function () {
+                /*
+                 * Si un play antiguo terminó después de que
+                 * el usuario pidió pausa, lo detenemos.
+                 */
+                if (!reproduccionDeseada) {
+                    audio.pause();
+                    actualizar();
+                    return;
+                }
+
+                actualizar();
+            }
+        )
+
+        .on(
+            'pause.revisionAudio',
+            function () {
+                actualizar();
+            }
+        )
+
+        .on(
+            'ended.revisionAudio',
+            function () {
+                reproduccionDeseada = false;
+                operacionReproduccion++;
+
+                actualizar();
+            }
+        )
+
+        .on(
+            'error.revisionAudio',
+            function () {
+                reproduccionDeseada = false;
+                operacionReproduccion++;
+
+                $play.prop('disabled', true);
+
+                console.error(
+                    'Error cargando revision_audio:',
+                    audio.error
+                );
+
+                actualizar();
+            }
+        );
+
+    /*
+     * Estado inicial.
+     */
+    reproduccionDeseada = false;
+    operacionReproduccion++;
+
+    audio.pause();
+    audio.preload = 'auto';
+
+    marcarCargando();
+
+    audio.src = src;
+    audio.load();
+
+    $barra.addClass('is-visible');
+
+    if (
+        audio.readyState >=
+        HTMLMediaElement.HAVE_CURRENT_DATA
+    ) {
+        marcarListo();
+    } else {
+        actualizar();
+    }
 }
+
+$(function () {
+    restaurarAudioRevisionDesdeBorrador();
+});
 
 function aplicarZoomInforme(valor) {
     const zoom = parseFloat(valor) || 1;

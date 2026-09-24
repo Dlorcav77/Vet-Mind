@@ -656,7 +656,8 @@
             .attr('href', '#');
 
         $('#btnVerInformeEditar')
-            .attr('href', '#');
+            .attr('href', '#')
+            .hide();
 
         $('#btnVerInformeAnterior')
             .prop('disabled', true)
@@ -786,7 +787,21 @@
             $('#verInformeContenido')
                 .html(contenido);
 
+            if (
+                window.VetmindVerNotas &&
+                typeof window.VetmindVerNotas.cargar === 'function'
+            ) {
+                window.VetmindVerNotas.cargar(informe.id);
+            }
+
         } else {
+
+            if (
+                window.VetmindVerNotas &&
+                typeof window.VetmindVerNotas.limpiar === 'function'
+            ) {
+                window.VetmindVerNotas.limpiar();
+            }
 
             $('#verInformeContenido')
                 .html(
@@ -842,8 +857,12 @@
                 );
         }
 
+        const puedeEditar =
+            parseInt(informe.puede_editar, 10) === 1;
+
         $('#btnVerInformeEditar')
-            .attr('href', editarUrl);
+            .attr('href', puedeEditar ? editarUrl : '#')
+            .toggle(puedeEditar);
 
         actualizarNavegacionInforme();
     }

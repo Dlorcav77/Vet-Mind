@@ -1,4 +1,5 @@
 <?php
+require_once dirname(__DIR__) . '/funciones/vetmind_env.php';
 require ("../funciones/session/ini_session.php");
 
 $csrfToken = tokenCsrf();

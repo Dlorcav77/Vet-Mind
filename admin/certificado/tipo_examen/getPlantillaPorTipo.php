@@ -18,8 +18,10 @@ validarTokenCsrf();
 credenciales('certificado', 'listar');
 
 $mysqli = conn();
-$veterinario_id = (int)($_SESSION['usuario_id'] ?? 0);
+$usuario_id = (int)($_SESSION['usuario_id'] ?? 0);
 $plantilla_id = (int)($_POST['plantilla_informe_id'] ?? 0);
+$certificado_id = (int)($_POST['certificado_id'] ?? 0);
+$veterinario_contexto = $usuario_id;
 
 if (!$mysqli) {
     echo json_encode([
@@ -29,7 +31,7 @@ if (!$mysqli) {
     exit;
 }
 
-if ($veterinario_id <= 0) {
+if ($usuario_id <= 0) {
     http_response_code(401);
     echo json_encode([
         'status' => 'error',
@@ -44,6 +46,58 @@ if ($plantilla_id <= 0) {
         'message' => 'Plantilla no proporcionada.'
     ], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
     exit;
+}
+
+if ($certificado_id > 0) {
+    $stmtContexto = $mysqli->prepare("
+        SELECT c.veterinario_id
+        FROM certificados c
+        LEFT JOIN certificado_compartidos cc
+            ON cc.certificado_id = c.id
+            AND cc.usuario_id = ?
+            AND cc.estado = 'activo'
+        WHERE c.id = ?
+          AND (
+              c.veterinario_id = ?
+              OR (
+                  cc.id IS NOT NULL
+                  AND cc.puede_ver = 1
+                  AND cc.puede_editar = 1
+              )
+          )
+        LIMIT 1
+    ");
+
+    if (!$stmtContexto) {
+        echo json_encode([
+            'status' => 'error',
+            'message' => 'No se pudo validar el acceso al informe.'
+        ], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+        exit;
+    }
+
+    $stmtContexto->bind_param(
+        'iii',
+        $usuario_id,
+        $certificado_id,
+        $usuario_id
+    );
+
+    $stmtContexto->execute();
+    $rowContexto = $stmtContexto->get_result()->fetch_assoc();
+    $stmtContexto->close();
+
+    if (!$rowContexto) {
+        http_response_code(403);
+
+        echo json_encode([
+            'status' => 'error',
+            'message' => 'No tienes permiso para modificar este informe.'
+        ], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+        exit;
+    }
+
+    $veterinario_contexto = (int)$rowContexto['veterinario_id'];
 }
 
 $stmt = $mysqli->prepare(
@@ -66,7 +120,7 @@ if (!$stmt) {
     exit;
 }
 
-$stmt->bind_param('ii', $plantilla_id, $veterinario_id);
+$stmt->bind_param('ii', $plantilla_id, $veterinario_contexto);
 
 if (!$stmt->execute()) {
     error_log('[getPlantillaPorTipo][execute] ' . $stmt->error);

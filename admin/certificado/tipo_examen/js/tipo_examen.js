@@ -17,7 +17,10 @@ function cargarCamposVisiblesPorConfiguracion(configuracionInformeId) {
         url: 'certificado/configuracion/get_campos_visibles.php',
         type: 'POST',
         dataType: 'json',
-        data: { configuracion_informe_id: configuracionInformeId },
+        data: {
+            configuracion_informe_id: configuracionInformeId,
+            certificado_id: parseInt($('input[name="id"]').val(), 10) || 0
+        },
         success: function (res) {
             // console.log('get_campos_visibles response:', res);
 
@@ -287,7 +290,10 @@ $(function () {
                 url: 'certificado/tipo_examen/getPlantillaPorTipo.php',
                 type: 'POST',
                 dataType: 'json',
-                data: { plantilla_informe_id: tipo },
+                data: {
+                    plantilla_informe_id: tipo,
+                    certificado_id: parseInt($('input[name="id"]').val(), 10) || 0
+                },
                 success: function (res) {
                     // console.log('getPlantillaPorTipo response:', res);
 

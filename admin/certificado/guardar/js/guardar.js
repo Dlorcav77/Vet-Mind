@@ -674,8 +674,6 @@ function updateDraftStatus(text, cls) {
 
                         Swal.fire('Listo', 'Borrador descartado.', 'success');
 
-                        const href = 'certificado/certificados.php';
-
                         if (window.VetmindTiptap && typeof window.VetmindTiptap.destroyMainEditor === 'function') {
                             window.VetmindTiptap.destroyMainEditor();
                         }
@@ -684,7 +682,9 @@ function updateDraftStatus(text, cls) {
                             destroyTiptapEditors();
                         }
 
-                        $('#content').empty().load(href);
+                        $('#content')
+                            .empty()
+                            .load('certificado/lisCertificados.php');
                     } else {
                         Swal.fire('Error', response.message || 'No se pudo descartar el borrador.', 'error');
                     }
@@ -915,33 +915,6 @@ $('#btnGuardarCertificado')
                     response &&
                     response.status === 'success'
                 ) {
-                    let certId =
-                        response.id || 0;
-
-                    if (certId) {
-                        window.open(
-                            'certificado/pdf/descargar.php?id=' +
-                            encodeURIComponent(certId),
-                            '_blank'
-                        );
-
-                    } else {
-                        let rutaPdf =
-                            response.rutaPdf || null;
-
-                        if (rutaPdf) {
-                            let urlPdf =
-                                rutaPdf.startsWith('/')
-                                    ? rutaPdf
-                                    : '/' + rutaPdf;
-
-                            window.open(
-                                urlPdf,
-                                '_blank'
-                            );
-                        }
-                    }
-
                     /*
                      * No reactivamos el autosave:
                      * el informe ya quedó finalizado
@@ -964,10 +937,42 @@ $('#btnGuardarCertificado')
                         destroyTiptapEditors();
                     }
 
+                    const certId =
+                        parseInt(response.id, 10) || 0;
+
+                    const abrirPdf =
+                        parseInt(response.abrir_pdf, 10) === 1;
+
                     $('#content')
                         .empty()
                         .load(
-                            'certificado/lisCertificados.php'
+                            'certificado/lisCertificados.php',
+                            function () {
+                                if (
+                                    !abrirPdf ||
+                                    certId <= 0
+                                ) {
+                                    return;
+                                }
+
+                                setTimeout(function () {
+                                    const $btnPdf =
+                                        $('.btn-ver-pdf-informe')
+                                            .filter(function () {
+                                                return (
+                                                    parseInt(
+                                                        $(this).data('id'),
+                                                        10
+                                                    ) === certId
+                                                );
+                                            })
+                                            .first();
+
+                                    if ($btnPdf.length) {
+                                        $btnPdf.trigger('click');
+                                    }
+                                }, 150);
+                            }
                         );
 
                     return;

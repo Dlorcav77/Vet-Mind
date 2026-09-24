@@ -9,37 +9,63 @@ credenciales('certificado', 'listar');
 $mysqli = conn();
 global $usuario_id, $acceso_aplicaciones;
 
-// Traer certificados del veterinario actual
-$sel = "SELECT 
-        c.id, 
-        p.nombre AS paciente, 
+// Traer certificados propios y compartidos con el usuario actual
+$sel = "SELECT
+        c.id,
+        c.veterinario_id AS propietario_veterinario_id,
+        p.nombre AS paciente,
         p.codigo_paciente,
-        t.nombre_completo AS propietario, 
-        t.email AS email,  
-        c.fecha_examen, 
-        c.created_at, 
-        c.medico_solicitante, 
-        c.recinto, 
+        t.nombre_completo AS propietario,
+        t.email AS email,
+        c.fecha_examen,
+        c.created_at,
+        c.medico_solicitante,
+        c.recinto,
         pi.nombre AS tipo_examen,
         c.archivo_pdf,
         c.manual_data,
         c.tipo_ingreso,
         c.es_destacado,
-        c.destacado_titulo
-      FROM certificados c
-      LEFT JOIN pacientes p ON c.paciente_id = p.id
-      LEFT JOIN tutores t ON p.tutor_id = t.id
-      LEFT JOIN plantilla_informe pi ON c.tipo_estudio = pi.id
-      WHERE c.veterinario_id = ?
-      ORDER BY c.fecha_examen DESC, c.id DESC
-      ";
+        c.destacado_titulo,
+        CASE
+            WHEN c.veterinario_id = ? THEN 0
+            ELSE 1
+        END AS es_compartido,
+        CASE
+            WHEN c.veterinario_id = ? THEN 1
+            ELSE COALESCE(cc.puede_editar, 0)
+        END AS puede_editar_compartido,
+        u.nombres AS propietario_nombres,
+        u.apellidos AS propietario_apellidos
+    FROM certificados c
+    LEFT JOIN pacientes p ON c.paciente_id = p.id
+    LEFT JOIN tutores t ON p.tutor_id = t.id
+    LEFT JOIN plantilla_informe pi ON c.tipo_estudio = pi.id
+    LEFT JOIN usuarios u ON u.id = c.veterinario_id
+    LEFT JOIN certificado_compartidos cc
+        ON cc.certificado_id = c.id
+        AND cc.usuario_id = ?
+        AND cc.estado = 'activo'
+        AND cc.puede_ver = 1
+    WHERE
+        c.veterinario_id = ?
+        OR cc.id IS NOT NULL
+    ORDER BY c.fecha_examen DESC, c.id DESC
+";
 
 $stmt = $mysqli->prepare($sel);
-$stmt->bind_param('i', $usuario_id);
+$stmt->bind_param(
+    'iiii',
+    $usuario_id,
+    $usuario_id,
+    $usuario_id,
+    $usuario_id
+);
 $stmt->execute();
 $res = $stmt->get_result();
 ?>
-<link rel="stylesheet" href="certificado/ver/css/ver.css?v=2">
+<link rel="stylesheet" href="certificado/ver/css/ver.css?v=<?= vetmind_asset_version() ?>">
+<link rel="stylesheet" href="certificado/ver/css/notas.css?v=<?= vetmind_asset_version() ?>">
 <style>
 
     .cert-numero-wrap {
@@ -233,60 +259,75 @@ $res = $stmt->get_result();
                 <?php $i = 1; ?>
                 <?php while ($fila = $res->fetch_assoc()): ?>
                 <?php
-                  $paciente = $fila['paciente'] ?? '';
-                  $propietario = $fila['propietario'] ?? '';
-                  $tipo_ingreso = $fila['tipo_ingreso'] ?? 'sistema';
+                    $paciente = $fila['paciente'] ?? '';
+                    $propietario = $fila['propietario'] ?? '';
+                    $tipo_ingreso = $fila['tipo_ingreso'] ?? 'sistema';
 
-                  $manual = [];
+                    $manual = [];
 
-                  if (!empty($fila['manual_data'])) {
-                      $manualTmp = json_decode($fila['manual_data'], true);
+                    if (!empty($fila['manual_data'])) {
+                        $manualTmp = json_decode($fila['manual_data'], true);
 
-                      if (is_array($manualTmp)) {
-                          $manual = $manualTmp;
-                      }
-                  }
+                        if (is_array($manualTmp)) {
+                            $manual = $manualTmp;
+                        }
+                    }
 
-                  if (empty($paciente)) {
-                      $paciente = $manual['paciente'] ?? 'Sin nombre';
-                  }
+                    if (empty($paciente)) {
+                        $paciente = $manual['paciente'] ?? 'Sin nombre';
+                    }
 
-                  if (empty($propietario)) {
-                      $propietario = $manual['propietario'] ?? '-';
-                  }
+                    if (empty($propietario)) {
+                        $propietario = $manual['propietario'] ?? '-';
+                    }
 
-                  $medicoListado = trim((string)($fila['medico_solicitante'] ?? ''));
+                    $medicoListado = trim((string)($fila['medico_solicitante'] ?? ''));
 
-                  if ($medicoListado === '') {
-                      $medicoListado = trim((string)($manual['m_tratante'] ?? ''));
-                  }
+                    if ($medicoListado === '') {
+                        $medicoListado = trim((string)($manual['m_tratante'] ?? ''));
+                    }
 
-                  if ($medicoListado === '') {
-                      $medicoListado = '-';
-                  }
+                    if ($medicoListado === '') {
+                        $medicoListado = '-';
+                    }
 
-                  $esDestacado = (
-                      isset($fila['es_destacado']) &&
-                      (int)$fila['es_destacado'] === 1
-                  );
+                    $esCompartido = (
+                        isset($fila['es_compartido']) &&
+                        (int)$fila['es_compartido'] === 1
+                        );
 
-                  $destacadoTitulo = trim(
-                      (string)($fila['destacado_titulo'] ?? '')
-                  );
+                    $puedeEditarCompartido = (
+                        !$esCompartido ||
+                        (int)($fila['puede_editar_compartido'] ?? 0) === 1
+                    );
 
-                  $numeroListado = $i++;
+                    $nombrePropietarioInforme = trim(
+                        (string)($fila['propietario_nombres'] ?? '') . ' ' .
+                        (string)($fila['propietario_apellidos'] ?? '')
+                    );
 
-                  $textoBusquedaNumero = (string)$numeroListado;
+                    $esDestacado = (
+                        isset($fila['es_destacado']) &&
+                        (int)$fila['es_destacado'] === 1
+                    );
 
-                  if ($esDestacado) {
-                      $textoBusquedaNumero .= ' destacado';
+                    $destacadoTitulo = trim(
+                        (string)($fila['destacado_titulo'] ?? '')
+                    );
 
-                      if ($destacadoTitulo !== '') {
-                          $textoBusquedaNumero .= ' ' . $destacadoTitulo;
-                      }
-                  }
+                    $numeroListado = $i++;
+
+                    $textoBusquedaNumero = (string)$numeroListado;
+
+                    if ($esDestacado) {
+                        $textoBusquedaNumero .= ' destacado';
+
+                        if ($destacadoTitulo !== '') {
+                            $textoBusquedaNumero .= ' ' . $destacadoTitulo;
+                        }
+                    }
                 ?>
-                  <tr data-destacado="<?= $esDestacado ? '1' : '0' ?>">
+                <tr data-destacado="<?= $esDestacado ? '1' : '0' ?>">
 
                     <td
                         data-search="<?= htmlspecialchars($textoBusquedaNumero, ENT_QUOTES) ?>"
@@ -326,7 +367,24 @@ $res = $stmt->get_result();
                     </td>
                     <td>
                       <div class="d-flex justify-content-between">
-                        <span><?= htmlspecialchars($paciente) ?></span>
+                        <span>
+                            <?= htmlspecialchars($paciente) ?>
+
+                            <?php if ($esCompartido): ?>
+                                <span
+                                    class="badge bg-light text-info border ms-1"
+                                    title="<?= htmlspecialchars(
+                                        $nombrePropietarioInforme !== ''
+                                            ? 'Compartido por ' . $nombrePropietarioInforme
+                                            : 'Informe compartido',
+                                        ENT_QUOTES,
+                                        'UTF-8'
+                                    ) ?>"
+                                >
+                                    Compartido
+                                </span>
+                            <?php endif; ?>
+                        </span>
                         <?php if (!empty($fila['codigo_paciente'])): ?>
                           <small class="text-muted"><?= htmlspecialchars($fila['codigo_paciente']) ?></small>
                         <?php endif; ?>
@@ -352,15 +410,40 @@ $res = $stmt->get_result();
                               <i class="fas fa-eye me-2 text-info"></i>
                               Ver
                           </a>
-                          <?php if ($tipo_ingreso === 'manual'): ?>
-                            <a class="dropdown-item ajax-link" href="certificado/subir_informe/subir_informe.php?action=modificar&id=<?= (int)$fila['id'] ?>">
-                              <i class="fas fa-edit me-2 text-primary"></i>Editar
-                            </a>
-                          <?php else: ?>
-                            <a class="dropdown-item ajax-link" href="certificado/certificados.php?action=modificar&id=<?= (int)$fila['id'] ?>">
-                              <i class="fas fa-edit me-2 text-primary"></i>Editar
-                            </a>
-                          <?php endif; ?>
+                            <?php if ($puedeEditarCompartido): ?>
+
+                                <?php if ($tipo_ingreso === 'manual'): ?>
+                                    <a
+                                        class="dropdown-item ajax-link"
+                                        href="certificado/subir_informe/subir_informe.php?action=modificar&id=<?= (int)$fila['id'] ?>"
+                                    >
+                                        <i class="fas fa-edit me-2"></i>
+                                        Editar
+                                    </a>
+                                <?php else: ?>
+                                    <a
+                                        class="dropdown-item ajax-link"
+                                        href="certificado/certificados.php?action=modificar&id=<?= (int)$fila['id'] ?>"
+                                    >
+                                        <i class="fas fa-edit me-2 text-primary"></i>
+                                        Editar
+                                    </a>
+                                <?php endif; ?>
+
+                            <?php endif; ?>
+
+                            <?php if (!$esCompartido): ?>
+
+                                <button
+                                    type="button"
+                                    class="dropdown-item btn-compartir-informe"
+                                    data-id="<?= (int)$fila['id'] ?>"
+                                >
+                                    <i class="fas fa-user-friends me-2 text-success"></i>
+                                    Compartir
+                                </button>
+
+                            <?php endif; ?>
                           <div class="dropdown-divider"></div>
                           <a
                               class="dropdown-item btn-ver-pdf-informe"
@@ -459,8 +542,12 @@ $res = $stmt->get_result();
 <?php include 'envio_email/envio_email.php'; ?>
 <?php include 'envio_email/envio_masivo.php'; ?>
 <?php include 'envio_email/historial_envios.php'; ?>
+<?php require __DIR__ . '/compartir/modal_compartir.php'; ?>
+<?php require __DIR__ . '/partials/modal_ver_informe.php'; ?>
 
-<script src="certificado/ver/js/ver.js?v=3"></script>
+<script src="certificado/ver/js/ver.js?v=<?= vetmind_asset_version() ?>"></script>
+<script src="certificado/ver/js/notas.js?v=<?= vetmind_asset_version() ?>"></script>
+<script src="certificado/compartir/js/compartir.js?v=<?= vetmind_asset_version() ?>"></script>
 <script>
 
 (function () {

@@ -1,4 +1,5 @@
 <?php
+require_once __DIR__ . '/funciones/vetmind_env.php';
 
 require_once __DIR__ . '/funciones/session/funcionesSesion.php';
 require_once __DIR__ . '/funciones/session/csrf.php';
@@ -47,7 +48,7 @@ $csrf = tokenCsrf();
     >
 
     <link
-        href="assets/css/branding.css?v=4"
+        href="assets/css/branding.css?v=<?= vetmind_asset_version() ?>"
         rel="stylesheet"
     >
 

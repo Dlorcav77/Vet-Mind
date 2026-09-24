@@ -9,7 +9,7 @@ global $acceso_aplicaciones;
 
 $puedeEliminar = in_array('eliminar', $acceso_aplicaciones['control_ia'] ?? []);
 ?>
-<link rel="stylesheet" href="control_ia/css/control_ia.css?v=5">
+<link rel="stylesheet" href="control_ia/css/control_ia.css?v=<?= vetmind_asset_version() ?>">
 <div id="control_ia" data-page-id="control_ia">
   <div class="control-ia-topbar mb-3">
     <h1 class="h3 control-ia-title"><strong>Control IA</strong></h1>
@@ -143,4 +143,4 @@ $puedeEliminar = in_array('eliminar', $acceso_aplicaciones['control_ia'] ?? []);
     eliminar: <?= $puedeEliminar ? 'true' : 'false' ?>
   };
 </script>
-<script src="control_ia/js/control_ia.js?v=14"></script>
+<script src="control_ia/js/control_ia.js?v=<?= vetmind_asset_version() ?>"></script>

@@ -8,6 +8,15 @@ if (!function_exists('certificado_get_form_data')) {
         $accion = 'Ingresar';
         $scopeKey = ($action === 'modificar' && $id > 0) ? 'modificar:' . $id : 'nuevo';
 
+        /*
+        * Usuario dueño de los datos clínicos del informe.
+        *
+        * En ingreso normal corresponde al usuario actual.
+        * En un informe compartido se reemplaza por el propietario
+        * original del certificado.
+        */
+        $veterinario_contexto = $usuario_id;
+
         $fila = [
             'paciente_id'               => '',
             'paciente_label'            => '',
@@ -35,23 +44,85 @@ if (!function_exists('certificado_get_form_data')) {
         if ($action === 'modificar') {
             $accion = 'Modificar';
 
+            if ($id <= 0) {
+                http_response_code(400);
+                echo '<div class="alert alert-danger mb-0">Informe inválido.</div>';
+                exit;
+            }
+
             $stmt = $mysqli->prepare("
-                SELECT 
-                    c.*, 
-                    p.nombre AS paciente, 
-                    p.especie, 
-                    p.raza, 
+                SELECT
+                    c.*,
+                    p.nombre AS paciente,
+                    p.especie,
+                    p.raza,
                     p.sexo,
-                    t.nombre_completo AS propietario
+                    t.nombre_completo AS propietario,
+
+                    CASE
+                        WHEN c.veterinario_id = ? THEN 1
+                        ELSE 0
+                    END AS es_propietario_informe,
+
+                    CASE
+                        WHEN c.veterinario_id = ? THEN 1
+                        ELSE COALESCE(cc.puede_editar, 0)
+                    END AS puede_editar_informe
+
                 FROM certificados c
-                LEFT JOIN pacientes p ON c.paciente_id = p.id
-                LEFT JOIN tutores t ON p.tutor_id = t.id
-                WHERE c.id = ?
+
+                LEFT JOIN pacientes p
+                    ON c.paciente_id = p.id
+
+                LEFT JOIN tutores t
+                    ON p.tutor_id = t.id
+
+                LEFT JOIN certificado_compartidos cc
+                    ON cc.certificado_id = c.id
+                    AND cc.usuario_id = ?
+                    AND cc.estado = 'activo'
+                    AND cc.puede_ver = 1
+
+                WHERE
+                    c.id = ?
+                    AND (
+                        c.veterinario_id = ?
+                        OR (
+                            cc.id IS NOT NULL
+                            AND cc.puede_editar = 1
+                        )
+                    )
+
+                LIMIT 1
             ");
-            $stmt->bind_param("i", $id);
+
+            if (!$stmt) {
+                http_response_code(500);
+                echo '<div class="alert alert-danger mb-0">No se pudo validar el acceso al informe.</div>';
+                exit;
+            }
+
+            $stmt->bind_param(
+                "iiiii",
+                $usuario_id,
+                $usuario_id,
+                $usuario_id,
+                $id,
+                $usuario_id
+            );
+
             $stmt->execute();
             $res = $stmt->get_result();
             $row = $res->fetch_assoc();
+            $stmt->close();
+
+            if (!$row) {
+                http_response_code(403);
+                echo '<div class="alert alert-warning mb-0">No tienes permiso para modificar este informe.</div>';
+                exit;
+            }
+
+            $veterinario_contexto = (int)$row['veterinario_id'];
 
             if ($id > 0) {
                 $stmtNotas = $mysqli->prepare("
@@ -114,7 +185,7 @@ if (!function_exists('certificado_get_form_data')) {
             WHERE veterinario_id = ?
             ORDER BY es_predeterminada DESC, nombre_plantilla ASC, id ASC
         ");
-        $stmtPlantillas->bind_param("i", $usuario_id);
+        $stmtPlantillas->bind_param("i", $veterinario_contexto);
         $stmtPlantillas->execute();
         $resPlantillas = $stmtPlantillas->get_result();
 
@@ -231,7 +302,7 @@ if (!function_exists('certificado_get_form_data')) {
                                 $stmtTutorDraft->bind_param(
                                     "ii",
                                     $tutorExistenteIdDraft,
-                                    $usuario_id
+                                    $veterinario_contexto
                                 );
 
                                 if ($stmtTutorDraft->execute()) {
@@ -322,7 +393,7 @@ if (!function_exists('certificado_get_form_data')) {
             ");
 
             if ($stmtRecintoDefault) {
-                $stmtRecintoDefault->bind_param("ii", $configuracion_informe_id_actual, $usuario_id);
+                $stmtRecintoDefault->bind_param("ii", $configuracion_informe_id_actual, $veterinario_contexto);
                 $stmtRecintoDefault->execute();
                 $rowRecintoDefault = $stmtRecintoDefault->get_result()->fetch_assoc();
 
@@ -348,7 +419,7 @@ if (!function_exists('certificado_get_form_data')) {
         ");
 
         if ($stmtClinicas) {
-            $stmtClinicas->bind_param("i", $usuario_id);
+            $stmtClinicas->bind_param("i", $veterinario_contexto);
             $stmtClinicas->execute();
             $resClinicas = $stmtClinicas->get_result();
             while ($rowClinica = $resClinicas->fetch_assoc()) {
@@ -358,17 +429,21 @@ if (!function_exists('certificado_get_form_data')) {
 
         $toggle_manual_inicial = false;
 
-        if (!empty($fila['manual_data'])) {
+        if (
+            $action !== 'modificar' &&
+            is_array($borrador_payload) &&
+            array_key_exists('toggle_manual', $borrador_payload)
+        ) {
+            $toggle_manual_inicial = (int)$borrador_payload['toggle_manual'] === 1;
+        } elseif (!empty($fila['manual_data'])) {
             $manualDataArr = json_decode((string)$fila['manual_data'], true);
 
             if (is_array($manualDataArr)) {
                 foreach ($manualDataArr as $valorManual) {
-                    if (is_string($valorManual) && trim($valorManual) !== '') {
-                        $toggle_manual_inicial = true;
-                        break;
-                    }
-
-                    if (is_numeric($valorManual) && (string)$valorManual !== '') {
+                    if (
+                        (is_string($valorManual) && trim($valorManual) !== '') ||
+                        (is_numeric($valorManual) && (string)$valorManual !== '')
+                    ) {
                         $toggle_manual_inicial = true;
                         break;
                     }
@@ -379,7 +454,6 @@ if (!function_exists('certificado_get_form_data')) {
         if (!empty($fila['paciente_id'])) {
             $toggle_manual_inicial = false;
         }
-
         return [
             'id'                              => $id,
             'accion'                          => $accion,
@@ -388,6 +462,7 @@ if (!function_exists('certificado_get_form_data')) {
             'mostrarImagenesAntiguas'         => $mostrarImagenesAntiguas,
             'plantillas_diseno'               => $plantillas_diseno,
             'configuracion_informe_id_actual' => $configuracion_informe_id_actual,
+            'veterinario_contexto'            => $veterinario_contexto,
             'campos_permitidos_catalogo'      => $campos_permitidos_catalogo,
             'campos_visibles_actuales'        => $campos_visibles_actuales,
             'hay_borrador'                    => $hay_borrador,

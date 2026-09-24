@@ -28,6 +28,7 @@ $imagenesGuardadas               = $formData['imagenesGuardadas'];
 $mostrarImagenesAntiguas         = $formData['mostrarImagenesAntiguas'];
 $plantillas_diseno               = $formData['plantillas_diseno'];
 $configuracion_informe_id_actual = $formData['configuracion_informe_id_actual'];
+$veterinario_contexto            = (int)$formData['veterinario_contexto'];
 $campos_permitidos_catalogo      = $formData['campos_permitidos_catalogo'];
 $campos_visibles_actuales        = $formData['campos_visibles_actuales'];
 $toggle_manual_inicial           = $formData['toggle_manual_inicial'];
@@ -48,7 +49,7 @@ $destacado_titulo_inicial = trim(
     (string)($fila['destacado_titulo'] ?? '')
 );
 ?>
-<link rel="stylesheet" href="certificado/common/css/certificado.css?v=3">
+<link rel="stylesheet" href="certificado/common/css/certificado.css?v=<?= vetmind_asset_version() ?>">
 <div class="card" id="certificado" data-page-id="certificado">
     <div class="card-header pb-1">
         <div class="cert-header-top">
@@ -124,8 +125,8 @@ $destacado_titulo_inicial = trim(
 })();
 </script>
 
-<script src="certificado/common/js/editor.js?v=4"></script>
-<script src="certificado/metodo_ingreso/js/ia.js?v=<?php echo time(); ?>"></script>
-<script src="certificado/preview/js/preview.js?v=4"></script>
-<script src="certificado/common/js/destacado.js?v=1"></script>
-<script src="certificado/guardar/js/guardar.js?v=23"></script>
+<script src="certificado/common/js/editor.js?v=<?= vetmind_asset_version() ?>"></script>
+<script src="certificado/metodo_ingreso/js/ia.js?v=<?= vetmind_asset_version() ?>"></script>
+<script src="certificado/preview/js/preview.js?v=<?= vetmind_asset_version() ?>"></script>
+<script src="certificado/common/js/destacado.js?v=<?= vetmind_asset_version() ?>"></script>
+<script src="certificado/guardar/js/guardar.js?v=<?= vetmind_asset_version() ?>"></script>

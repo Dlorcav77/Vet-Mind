@@ -56,6 +56,7 @@ if ($certificado_id <= 0) {
 $stmt = $mysqli->prepare("
     SELECT
         c.id,
+        c.veterinario_id,
         c.paciente_id,
         c.configuracion_informe_id,
         c.fecha_examen,
@@ -82,7 +83,17 @@ $stmt = $mysqli->prepare("
 
         pi.nombre AS tipo_examen,
 
-        te.nombre AS estudio
+        te.nombre AS estudio,
+
+        CASE
+            WHEN c.veterinario_id = ? THEN 1
+            ELSE 0
+        END AS es_propietario,
+
+        CASE
+            WHEN c.veterinario_id = ? THEN 1
+            ELSE COALESCE(cc.puede_editar, 0)
+        END AS puede_editar
 
     FROM certificados c
 
@@ -99,9 +110,18 @@ $stmt = $mysqli->prepare("
         ON te.id = pi.tipo_examen_id
         AND te.veterinario_id = c.veterinario_id
 
+    LEFT JOIN certificado_compartidos cc
+        ON cc.certificado_id = c.id
+        AND cc.usuario_id = ?
+        AND cc.estado = 'activo'
+        AND cc.puede_ver = 1
+
     WHERE
         c.id = ?
-        AND c.veterinario_id = ?
+        AND (
+            c.veterinario_id = ?
+            OR cc.id IS NOT NULL
+        )
 
     LIMIT 1
 ");
@@ -119,7 +139,10 @@ if (!$stmt) {
 }
 
 $stmt->bind_param(
-    "ii",
+    "iiiii",
+    $usuario_id,
+    $usuario_id,
+    $usuario_id,
     $certificado_id,
     $usuario_id
 );
@@ -742,6 +765,8 @@ echo json_encode([
         'tipo_ingreso' => (string)(
             $fila['tipo_ingreso'] ?? 'sistema'
         ),
+
+        'puede_editar' => (int)($fila['puede_editar'] ?? 0),
 
         'es_destacado' => (int)(
             $fila['es_destacado'] ?? 0

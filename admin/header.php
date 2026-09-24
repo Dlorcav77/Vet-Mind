@@ -45,9 +45,9 @@ $csrfPanel = tokenCsrf();
 
   <!-- App CSS personalizado -->
   <link href="../assets/css/app.css" rel="stylesheet">
-  <link href="../assets/css/global.css?v=9" rel="stylesheet">
+  <link href="../assets/css/global.css?v=<?= vetmind_asset_version() ?>" rel="stylesheet">
   <link
-    href="../assets/css/branding.css?v=11"
+    href="../assets/css/branding.css?v=<?= vetmind_asset_version() ?>"
     rel="stylesheet"
   >
 
