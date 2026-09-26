@@ -756,6 +756,8 @@ function aplicar(datos, persistir = true) {
         desconocido: []
     };
 
+    const rangosDudaSTT = [];
+
     datos.organos.forEach(organo => {
         const bloque = buscarBloqueOrgano(organo.organo);
         if (!bloque) return;
@@ -768,6 +770,13 @@ function aplicar(datos, persistir = true) {
             const rango = buscarRangoDom(bloque.el, atributo.texto);
             if (rango) porOrigen[origen].push(rango);
         });
+        (organo.dudasTranscripcion || []).forEach(frase => {
+            const rango = buscarRangoDom(bloque.el, frase);
+
+            if (rango) {
+                rangosDudaSTT.push(rango);
+            }
+        });
     });
 
     Object.entries(porOrigen).forEach(([origen, rangos]) => {
@@ -777,6 +786,17 @@ function aplicar(datos, persistir = true) {
         CSS.highlights.set(nombre, new Highlight(...rangos));
         nombresHighlights.push(nombre);
     });
+
+    if (rangosDudaSTT.length) {
+        const nombre = 'vm-revision-discrepancia';
+
+        CSS.highlights.set(
+            nombre,
+            new Highlight(...rangosDudaSTT)
+        );
+
+        nombresHighlights.push(nombre);
+    }
 
     pintarAlertas(datos);
     return true;
