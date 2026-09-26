@@ -113,6 +113,177 @@ METODO OBLIGATORIO:
    verifica que el INFORME haya elegido una version coherente con el resto del contexto clinico.
    Presta atencion EXTREMA a diferencias donde aparece o desaparece un "no" (negaciones): son las
    mas peligrosas porque invierten el hallazgo.
+COMPROBACIONES ADICIONALES OBLIGATORIAS:
+
+A. NEGACIÓN POSIBLEMENTE FUSIONADA
+
+Busca el bloque "ALERTA STT: POSIBLE NEGACIÓN FUSIONADA".
+
+Si existe, identifica el órgano afectado y cualquier otro
+que herede la incertidumbre por "mismas características".
+
+El informe debe CONSERVAR la frase del uréter que aparece
+en la PLANTILLA BASE de cada órgano afectado.
+
+Esa frase debe llevar inmediatamente después un flag
+termino_confuso. Su observación debe indicar expresamente
+que es un valor de plantilla NO confirmado por el audio.
+
+No debe sustituirse la frase por "visibilidad por confirmar",
+eliminarse el atributo ni copiarse una expresión deformada.
+
+Si el informe afirma un estado distinto al de la plantilla
+basándose únicamente en la expresión ambigua, devuelve
+discrepancia_negacion con severidad alta.
+
+Si conserva la frase pero no señala su incertidumbre,
+o si elimina por completo el atributo, devuelve
+discrepancia_negacion con severidad media.
+
+Si conserva la frase original de la plantilla,
+su flag y su observación, no marques ningún error
+por esa incertidumbre.
+
+B. COPIA INDEBIDA DE HALLAZGOS FOCALES
+
+Cuando un órgano se describe mediante "mismas características",
+comprueba qué atributos se copiaron desde el órgano de referencia.
+
+Los atributos generales pueden compartirse, pero las lesiones
+focales, quistes, nódulos, masas, estructuras individualizadas,
+medidas y ubicaciones específicas requieren confirmación explícita
+para el órgano de destino.
+
+Si una lesión aparece en el órgano de destino únicamente porque
+fue copiada desde el órgano de referencia, devuelve un item
+de tipo inventado y severidad alta. Identifica ambos órganos.
+
+No reportes este error cuando el dictado confirme expresamente
+la lesión en ambos órganos o la describa posteriormente en el
+órgano de destino.
+
+C. CALIFICADORES PERDIDOS
+
+Comprueba si las diferencias entre motores contienen calificadores
+como "levemente", "moderadamente", "marcadamente" o "severamente".
+
+Si una transcripción está claramente deformada y la otra ofrece
+un descriptor clínico completo y coherente para el mismo atributo,
+comprueba que el INFORME conserve ese calificador.
+
+Ejemplo:
+Motor A: "ecogenicidad en aumento aumentada".
+Motor B: "ecogenicidad levemente aumentada".
+Informe incorrecto: "ecogenicidad aumentada".
+
+En ese caso devuelve un item de tipo omitido e indica que se perdió
+el calificador "levemente".
+
+Si ambas alternativas son clínicamente válidas y contradictorias,
+comprueba que el informe haya señalado la incertidumbre.
+No presupongas que el segundo motor siempre tiene razón.
+
+D. HALLAZGOS TRASLADADOS ENTRE ÓRGANOS
+
+Compara cada hallazgo específico del INFORME con el mismo
+órgano del DICTADO y de la PLANTILLA BASE.
+
+Un hallazgo que aparece en el DICTADO de otro órgano no
+justifica incorporarlo en el órgano que estás revisando.
+
+Ejemplo obligatorio:
+DICTADO de vejiga: contenido anecoico.
+DICTADO de vesícula biliar: contenido ecogénico en suspensión.
+INFORME de vejiga: contenido ecogénico en suspensión.
+
+En ese caso devuelve un item de tipo inventado y severidad alta
+para la vejiga. Identifica el órgano de procedencia incorrecta.
+
+Aplica esta comprobación a lesiones, sedimento, contenido,
+medidas y otros hallazgos específicos.
+
+No marques atributos normales que procedan de la PLANTILLA
+del mismo órgano.
+
+E. ASOCIACIÓN DE MEDIDAS ANATÓMICAS
+
+Comprueba que cada medida esté asociada a la pared, polo,
+lóbulo o región anatómica que corresponde.
+
+Revisa las dos transcripciones cuando el Motor A presente
+una frase fragmentada y el Motor B aclare su asociación.
+
+Ejemplo:
+Motor A: "0.32 centímetros. En pared ventral,
+pared dorsal en 0.23 centímetros".
+Motor B: "0.32 centímetros en pared ventral,
+pared dorsal en 0.23 centímetros".
+
+La asociación respaldada es:
+0.32 cm: pared ventral.
+0.23 cm: pared dorsal.
+
+Si el INFORME intercambia las ubicaciones o atribuye
+una medida a ambas paredes sin respaldo, devuelve un item
+de tipo cambio_medida y severidad alta.
+
+Si la redacción solamente resulta ambigua y no permite
+determinar la asociación, devuelve un item de tipo
+cambio_medida y severidad media.
+
+No inventes asociaciones cuando las dos transcripciones
+sean contradictorias y el contexto no permita resolverlas.
+
+
+F. DISCREPANCIAS NUMÉRICAS
+
+Para cada diferencia numérica entre motores, comprueba
+si el INFORME la resolvió de forma justificada o si
+conservó explícitamente la incertidumbre.
+
+Si el Motor A indica 1 cm y el Motor B indica 0.1 cm,
+y el INFORME elige una cifra sin suficiente respaldo
+ni advertencia, devuelve cambio_medida, severidad alta.
+
+Si el INFORME utiliza XX con medida_ilegible y una
+observación que explica ambas alternativas, considera
+que la incertidumbre fue señalada correctamente.
+
+No reportes como error una cifra confirmada explícitamente
+por una autocorrección posterior del ecografista.
+
+G. UBICACIONES ANATÓMICAS OMITIDAS
+
+Comprueba que los hallazgos localizados mantengan
+su ubicación en el INFORME.
+
+Ejemplo: el DICTADO especifica aumento de tamaño
+del lóbulo lateral izquierdo del hígado, pero el
+INFORME solo describe aumento general del hígado.
+
+En ese caso devuelve un item de tipo omitido,
+severidad media, indicando la ubicación perdida.
+Utiliza severidad alta si la pérdida cambia
+sustancialmente la interpretación clínica.
+
+H. NORMALIZACIONES SILENCIOSAS
+
+Cuando ambos motores produzcan términos deformados
+y ninguno aporte inequívocamente el descriptor clínico,
+comprueba que el INFORME conserve una advertencia.
+
+Si se mantuvo el texto normal de la PLANTILLA para
+ese atributo, debe existir un flag termino_confuso
+y una observación que explique la incertidumbre.
+
+Si el INFORME convirtió silenciosamente las dos
+transcripciones deformadas en un descriptor clínico
+confirmado, devuelve un item de tipo omitido,
+severidad media, solicitando comprobar el audio.
+
+No generes este aviso cuando uno de los motores
+contenga claramente el término correcto y el otro
+solamente presente ruido de transcripción.
 
 Casos a reportar:
 1. hallazgo_bajado (EL MAS GRAVE, NUNCA lo omitas): el DICTADO marca un organo o atributo como ALTERADO
@@ -140,8 +311,19 @@ Casos a reportar:
    "1 por 1,3 cm") y el INFORME deja solo una ("0,85 cm"), es cambio_medida. Compara dimension por
    dimension; si el informe perdio alguna dimension que el dictado dio, marcalo. Alta.
 4. omitido: hallazgo ALTERADO del dictado que el informe no refleja en ningun organo. Media.
-5. inventado: SOLO si el informe afirma un dato clinico ALTERADO o especifico que NO esta en el
-   DICTADO NI en la PLANTILLA BASE. Si el dato aparece en la PLANTILLA (aunque no en el dictado), NO es inventado.
+5. inventado: si el INFORME afirma un hallazgo clínico alterado
+   o específico que no está respaldado por el DICTADO ni por
+   la PLANTILLA BASE para ese MISMO órgano y lateralidad.
+
+   Un hallazgo descrito en el riñón izquierdo NO justifica
+   incluirlo automáticamente en el riñón derecho.
+
+   Si se copió una lesión focal debido a "mismas características"
+   sin confirmación explícita para el órgano de destino,
+   márcala como inventado, severidad alta.
+
+   No marques como inventados los atributos normales que
+   proceden de la PLANTILLA BASE del mismo órgano.
 6. discrepancia_negacion: revisa el bloque "DIFERENCIAS ENTRE 2 TRANSCRIPCIONES". Si en una
    discrepancia una version contiene una negacion ("no") y la otra no (por ejemplo "ureter no" vs
    "uretano"/"ureter", "no visible" vs "visible", "no se observa" vs "se observa"), y el informe
@@ -156,7 +338,10 @@ Casos a reportar:
    (o "mismas caracteristicas que el izquierdo/derecho/anterior") en vez de copiar de forma explicita
    los atributos del organo de referencia, MARCALO. El DICTADO puede decir "mismas caracteristicas",
    pero el INFORME debe expandirlas: escribir uno por uno los atributos del organo de referencia
-   (bordes, ecogenicidad, forma, lesiones, etc.) aplicando la medida propia de este organo. Si el
+   (bordes, ecogenicidad, forma y otros atributos generales;
+    excluye lesiones focales y datos dudosos salvo confirmación
+    explícita para el órgano de destino)
+    aplicando la medida propia de este organo. Si el
    informe la dejo literal, se pierden los atributos y el hallazgo queda incompleto. Severidad media.
    En "informe" cita la frase literal encontrada; en "detalle" pide expandir los atributos del organo
    de referencia. NO lo marques si el informe SI expandio los atributos (aunque el dictado dijera la frase).

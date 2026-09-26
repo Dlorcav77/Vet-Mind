@@ -128,6 +128,7 @@ function construir_bloque_resueltas(array $resueltas): string {
     return "\n\n=== CORRECCIONES YA RESUELTAS (diferencias entre las 2 transcripciones del mismo audio, ya decididas porque un motor transcribio mal; usa SIEMPRE el termino correcto indicado; no incluyas esta nota en el informe) ===\n"
          . implode("\n", $lineas);
 }
+
 function construir_bloque_discrepancias(array $disc): string {
     if (empty($disc)) return '';
     $lineas = [];
@@ -138,4 +139,30 @@ function construir_bloque_discrepancias(array $disc): string {
     }
     return "\n\n=== NOTA: DIFERENCIAS ENTRE 2 TRANSCRIPCIONES DEL MISMO AUDIO (usa el contexto solo si una alternativa es claramente un error de transcripción. Si ambas alternativas son términos clínicamente válidos y cambian el significado del hallazgo, NO elijas silenciosamente: conserva la duda y marca el dato con flag termino_confuso para revisión. No incluyas esta nota en el informe) ===\n"
          . implode("\n", $lineas);
+}
+
+function construir_bloque_alerta_ureter(string $textoA, string $textoB): string
+{
+    $patron = '/\buretern[ao]\s+visibles?\b/iu';
+    $coincidencias = [];
+
+    if (preg_match($patron, $textoA, $m)) {
+        $coincidencias[] = 'Motor A: "' . $m[0] . '"';
+    }
+
+    if (preg_match($patron, $textoB, $m)) {
+        $coincidencias[] = 'Motor B: "' . $m[0] . '"';
+    }
+
+    if (!$coincidencias) return '';
+
+    return "\n\n=== ALERTA STT: POSIBLE NEGACIÓN FUSIONADA ===\n"
+        . '- ' . implode('; ', $coincidencias) . "\n"
+        . '- Estas expresiones podrían corresponder a "uréter no visible" o "uréter visible". '
+        . 'La información de ambos motores no confirma por sí sola lo pronunciado; revisa también sus discrepancias y verifica el audio. '
+        . 'No interpretes estas expresiones como confirmación del estado del uréter. '
+        . 'El generador debe conservar el texto del uréter de la plantilla, '
+        . 'marcarlo con termino_confuso y solicitar revisión del audio. '
+        . 'El revisor debe comprobar que la frase de plantilla y su advertencia estén presentes. '
+        . 'Esta alerta es información de control y no debe copiarse literalmente al informe.';
 }

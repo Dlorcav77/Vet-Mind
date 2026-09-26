@@ -108,6 +108,7 @@ function gpt_build_prompt(mysqli $mysqli, array $input): array
 
       === REGLAS DE ORO (las más importantes; ninguna excepción) ===
       1. NO INVENTES. Si falta un dato, no lo completes. Si un término es dudoso, consérvalo tal cual y márcalo con flag. Nunca adivines la palabra correcta.
+          EXCEPCIÓN PRIORITARIA: ante una alerta STT de posible negación fusionada del uréter, conserva el texto exacto del uréter que aparece en la PLANTILLA BASE para el órgano afectado. Coloca inmediatamente después un flag termino_confuso. No interpretes ese texto de plantilla como confirmación del audio; explica la incertidumbre en Observaciones del Asistente.
       2. EL HALLAZGO ANORMAL SIEMPRE GANA. Si el DICTADO describe un órgano o atributo como alterado/anormal (aumentado, engrosado, levemente aumentado, disminuido, distendido, dilatado, severamente distendido, irregular, bordes redondeados, ecogenicidad alterada, masa, etc.), ese estado REEMPLAZA SIEMPRE el estado normal de la PLANTILLA para ese atributo. JAMÁS dejes "conservado/normal" en un atributo que el DICTADO marcó como alterado. Este es el error más grave posible: revísalo órgano por órgano antes de responder.
         - SINÓNIMOS DE ALTERADO: "engrosado/engrosada" = grosor/pared aumentada. "distendido/distendida" y "severamente distendido" son estados alterados: NUNCA los reduzcas a "semi distendida" ni a "conservado". Si el DICTADO dice "estómago severamente distendido", el informe DEBE decir "severamente distendido", no "semi distendido" ni "conservado". Si dice "vejiga distendida", va "distendida", no "semi distendida" de la plantilla.
         - Esto aplica AUNQUE el órgano venga mal transcrito (ej. "Vaso" por "Bazo"): traslada el hallazgo al órgano correcto.
@@ -119,8 +120,40 @@ function gpt_build_prompt(mysqli $mysqli, array $input): array
           - Riñón, PLANTILLA "límite corticomedular definido" + DICTADO "límite definido" → conserva "límite corticomedular definido"; no lo reduzcas a "límite definido".
           - Si el DICTADO dice "límite difuso" → "límite corticomedular difuso".
           Esta regla aplica solo cuando la correspondencia entre el atributo abreviado del DICTADO y el atributo de la PLANTILLA es inequívoca dentro de ese órgano. Si hay más de un atributo posible, no adivines y marca la duda.
-        - URÉTER Y ESTRUCTURAS CON HALLAZGO: si el DICTADO describe el uréter como distendido, dilatado, visible, o le da una medida, el informe DEBE reflejar ese hallazgo en el lado que corresponda. NUNCA dejes "No se visualiza uréter" de la plantilla cuando el DICTADO dice que el uréter SÍ se ve o está alterado. Respeta el lado (izquierdo/derecho) que indique el DICTADO.
-        - GROSOR = PARED (tubo digestivo y vejiga). "grosor" del DICTADO y "pared" de la PLANTILLA son EL MISMO atributo. Si el DICTADO dice "grosor aumentado" (o engrosado/disminuido), ese estado MANDA: el informe DEBE decir "pared aumentada" / "pared engrosada", NUNCA "pared conservada". La medida numérica que acompaña NO normaliza el hallazgo: "grosor aumentado en 0,42 cm" → "pared aumentada de 0,42 cm", JAMÁS "pared conservada de 0,42 cm". Revisa esto órgano por órgano en Estómago, Duodeno, Yeyuno, Íleon, Colon y Vejiga: si el DICTADO marcó el grosor alterado, la pared NO puede quedar conservada.
+
+          - URÉTER Y ESTRUCTURAS CON HALLAZGO:
+
+            Si el DICTADO indica inequívocamente que el uréter es visible,
+            no visible, dilatado o presenta una medida, conserva exactamente
+            ese hallazgo y su lateralidad.
+
+            EXCEPCIÓN: si existe una
+            "ALERTA STT: POSIBLE NEGACIÓN FUSIONADA", no decidas
+            automáticamente si el uréter es visible o no visible.
+
+            CONSERVA literalmente el texto que ya tiene la PLANTILLA BASE
+            para el uréter del órgano afectado. No lo elimines, no lo
+            reescribas como "visibilidad por confirmar" y no lo sustituyas
+            por ninguna de las expresiones deformadas de los motores.
+
+            Coloca un flag termino_confuso inmediatamente después de
+            la frase del uréter conservada de la PLANTILLA.
+
+            En Observaciones del Asistente, explica que:
+            - El estado visible en el informe procede de la PLANTILLA.
+            - La transcripción del audio es ambigua.
+            - Ese estado todavía NO está confirmado por el dictado.
+            - Debe verificarse el audio antes de emitir el informe final.
+
+            Si otro órgano tiene "mismas características" que el afectado,
+            conserva también el texto de su propia PLANTILLA para el uréter
+            y marca por separado la incertidumbre si se heredó del órgano
+            de referencia.
+
+            No copies un estado incierto como si fuera un hallazgo confirmado.
+            No dupliques la misma advertencia dentro de un mismo órgano.
+
+          - GROSOR = PARED (tubo digestivo y vejiga). "grosor" del DICTADO y "pared" de la PLANTILLA son EL MISMO atributo. Si el DICTADO dice "grosor aumentado" (o engrosado/disminuido), ese estado MANDA: el informe DEBE decir "pared aumentada" / "pared engrosada", NUNCA "pared conservada". La medida numérica que acompaña NO normaliza el hallazgo: "grosor aumentado en 0,42 cm" → "pared aumentada de 0,42 cm", JAMÁS "pared conservada de 0,42 cm". Revisa esto órgano por órgano en Estómago, Duodeno, Yeyuno, Íleon, Colon y Vejiga: si el DICTADO marcó el grosor alterado, la pared NO puede quedar conservada.
       3. PARTE DE LA PLANTILLA, NO REESCRIBAS NI PIERDAS ÓRGANOS. Para cada órgano arranca de la frase completa de la PLANTILLA y cambia SOLO el atributo que el DICTADO contradiga. No acortes ni reescribas el órgano desde cero. Lo que el DICTADO no menciona, queda como en la PLANTILLA (estado normal). NUNCA elimines ni omitas un órgano que está en la PLANTILLA: el informe final debe contener TODOS los órganos/secciones de la PLANTILLA, más los que el DICTADO agregue. Si un órgano de la PLANTILLA no se dictó, va igual en estado normal.
         - HÍGADO Y BORDES: en la PLANTILLA, los bordes del hígado se describen en el "lóbulo lateral izquierdo" (ej. "lóbulo lateral izquierdo aguzado"). Cuando el DICTADO dice "hígado bordes redondeados" (o cualquier estado de bordes), ese valor REEMPLAZA el del lóbulo lateral izquierdo: escribe "lóbulo lateral izquierdo redondeado", NO dejes "aguzado". NUNCA pongas los dos estados de bordes a la vez (no escribas "lóbulo lateral izquierdo aguzado ... bordes redondeados"): es contradictorio. El estado de bordes del hígado debe quedar UNO solo, el del DICTADO.
         - "SIN LESIONES FOCALES" Y LESIONES DICTADAS: si la PLANTILLA trae "Sin lesiones focales" en un órgano (hígado, bazo, riñón, etc.) y el DICTADO describe en ESE órgano una lesión, estructura, nódulo, masa o imagen focal (con o sin medida), ELIMINA la frase "Sin lesiones focales": es contradictoria con lo dictado. Deja solo la descripción de la(s) lesión(es) dictada(s). NUNCA dejes "Sin lesiones focales" junto a una lesión descrita en el mismo órgano.
@@ -168,6 +201,13 @@ function gpt_build_prompt(mysqli $mysqli, array $input): array
         - ILEGIBLE: no se puede determinar el número (balbuceo, números pegados, frase cortada). Pon "XX" en su lugar y márcalo medida_ilegible. Conserva el resto de la descripción.
         - El criterio para XX es "¿se entiende qué número es?", NO "¿es normal?".
       - TÉRMINO CONFUSO (importante): si una palabra NO numérica no tiene sentido clínico o parece error de dictado (ej. "dispuso" donde correspondería "difuso", "anécdotas", etc.), CONSÉRVALA tal cual y márcala con flag termino_confuso, explicando la duda en Observaciones. NUNCA la reemplaces por la que tú creas correcta ni la dejes pasar sin flag.
+        EXCEPCIÓN: ante una ALERTA STT de posible negación fusionada
+        del uréter, conserva literalmente la frase de la PLANTILLA
+        correspondiente a ese atributo, con flag termino_confuso
+        pegado inmediatamente después de la frase.
+
+        La observación debe indicar expresamente que se trata
+        de texto de plantilla pendiente de confirmar mediante audio.
       - DISCREPANCIA ENTRE TÉRMINO CLÍNICO Y RUIDO: cuando las dos transcripciones difieren y una alternativa es un término clínico válido y coherente con la frase, mientras la otra es claramente ruido, una conjunción, palabra incompleta o término sin significado clínico en ese contexto, usa el término clínico. No lo omitas.
         Ejemplo: "bordes regulares y homogéneo" / "bordes regulares hipoecoico homogéneo" → usa "bordes regulares, hipoecoico, homogéneo". La alternativa "y" no reemplaza ni elimina el descriptor clínico "hipoecoico".
         Esta regla NO aplica cuando ambas alternativas son términos clínicos válidos con significados diferentes; en ese caso conserva la duda y usa flag termino_confuso.
@@ -178,10 +218,178 @@ function gpt_build_prompt(mysqli $mysqli, array $input): array
         - Si dice "ecogenicidad disminuida", escribe "ecogenicidad disminuida"; NO la conviertas en "hipoecoica".
         - Si dice "isoecoico", conserva "isoecoico".
         Ejemplo obligatorio: PLANTILLA "ecogenicidad hipoecoica respecto al bazo" + DICTADO "ecogenicidad disminuida respecto al bazo" → "ecogenicidad disminuida respecto al bazo".
+      - CALIFICADORES CLÍNICOS ENTRE MOTORES:
+        Antes de redactar un atributo, revisa si existe una diferencia
+        entre las dos transcripciones relativa a su intensidad:
+        "levemente", "moderadamente", "marcadamente", "severamente"
+        u otros calificadores clínicos.
+
+        Si el Motor A presenta una frase evidentemente deformada o
+        redundante y el Motor B contiene una expresión clínica clara
+        y coherente para ese mismo órgano y atributo, utiliza la
+        expresión clara completa. No pierdas el calificador.
+
+        Ejemplo:
+        Motor A: "ecogenicidad en aumento aumentada"
+        Motor B: "ecogenicidad levemente aumentada"
+        Informe: "ecogenicidad levemente aumentada".
+
+        Si ambas alternativas son clínicamente válidas pero expresan
+        intensidades diferentes, no elijas silenciosamente. Conserva
+        la duda mediante termino_confuso y solicita verificar el audio.
+
+      No traslades calificadores entre órganos ni atributos distintos.
       - Si el DICTADO se autocorrige sobre un mismo dato ("0.79... no, era 0.57", "perdón, mejor dicho..."), usa SIEMPRE el último valor.
       - No muevas hallazgos, medidas ni descripciones entre órganos, zonas o lateralidades.
+      - AISLAMIENTO ESTRICTO POR ÓRGANO:
+        Antes de incorporar un hallazgo, identifica a qué órgano
+        pertenece en el DICTADO y comprueba que se encuentre dentro
+        de la sección correspondiente del INFORME.
+
+        Nunca traslades sedimento, barro biliar, contenido ecogénico,
+        lesiones, estructuras focales ni medidas de un órgano a otro,
+        aunque sus descripciones sean similares.
+
+        Ejemplo obligatorio:
+        DICTADO de vejiga: "contenido anecoico".
+        DICTADO de vesícula biliar: "contenido ecogénico en suspensión
+        en moderada cantidad".
+
+        La vejiga NO puede recibir el contenido ecogénico de la
+        vesícula biliar. Ese hallazgo pertenece exclusivamente
+        a la vesícula.
+
+        Los atributos normales no mencionados en el DICTADO pueden
+        conservarse desde la PLANTILLA, pero siempre desde la
+        sección del mismo órgano.
+
+      - ASOCIACIÓN DE MEDIDAS A UBICACIONES ANATÓMICAS:
+        Cada medida debe permanecer asociada a su órgano, pared,
+        polo, lóbulo o región anatómica específica.
+
+        Si una transcripción está fragmentada y la segunda ofrece
+        una asociación clara y coherente, aprovecha esa información
+        para reconstruir la frase sin modificar los valores.
+
+        Ejemplo:
+        Motor A: "grosor aumentado en 0.32 centímetros. En pared
+        ventral, pared dorsal en 0.23 centímetros".
+        Motor B: "grosor aumentado en 0.32 centímetros en pared
+        ventral, pared dorsal en 0.23 centímetros".
+
+        Informe: "pared ventral aumentada de 0.32 cm y pared dorsal
+        de 0.23 cm".
+
+        No escribas una medida aislada seguida de dos ubicaciones
+        cuando ambas asociaciones puedan establecerse claramente.
+
+        Si las transcripciones contienen asociaciones clínicamente
+        distintas y ninguna puede resolverse con seguridad,
+        conserva la incertidumbre mediante termino_confuso.
+        Nunca intercambies medidas entre ubicaciones.
+
+      - DISCREPANCIAS NUMÉRICAS ENTRE MOTORES:
+        Revisa cada discrepancia que afecte a un número clínico,
+        especialmente cuando pueda existir confusión entre
+        1 y 0.1, 2 y 0.2, o diferencias de orden de magnitud.
+
+        Ejemplo del bazo:
+        Motor A: "ser un centímetro por un centímetro".
+        Motor B: "0,1 centímetro por 1 centímetro".
+
+        Si ambas interpretaciones son posibles y ninguna está
+        confirmada, NO selecciones una silenciosamente.
+        Conserva las dimensiones que sí estén claras y utiliza
+        XX para la dimensión incierta, con flag medida_ilegible
+        y una observación que cite ambas alternativas.
+
+        Si el contexto permite resolver inequívocamente la
+        diferencia, utiliza el dato respaldado por el contexto.
+        Nunca elijas una cifra únicamente porque parece normal.
+
+      - CONSERVACIÓN DE UBICACIONES ANATÓMICAS:
+        No reduzcas un hallazgo localizado a una afirmación
+        general sobre todo el órgano.
+
+        Ejemplo:
+        DICTADO: "hígado aumentado de tamaño en el
+        lóbulo lateral izquierdo".
+        INFORME correcto: "lóbulo lateral izquierdo
+        aumentado de tamaño".
+        INFORME incorrecto: "hígado aumentado de tamaño"
+        sin conservar la ubicación del hallazgo.
+
+        Conserva las ubicaciones de lesiones, medidas,
+        alteraciones de tamaño y demás hallazgos:
+        lóbulo, polo, pared, segmento, región y lateralidad.
+
+        Cuando varios atributos pertenecen a la misma
+        ubicación, redáctalos juntos cuando resulte natural.
+        Evita repeticiones como "lóbulo lateral izquierdo
+        aumentado, lóbulo lateral izquierdo redondeado".
+
+      - TÉRMINOS NORMALIZADOS CON TRANSCRIPCIÓN INCIERTA:
+        Si ambos motores presentan expresiones deformadas
+        y ninguno entrega inequívocamente el término clínico,
+        no conviertas silenciosamente una interpretación
+        probable en un hallazgo confirmado.
+
+        Ejemplo:
+        Motor A: "por otro moncoso".
+        Motor B: "patromoncosa".
+
+        Aunque ambas frases parezcan aproximaciones
+        a "patrón mucoso", esa interpretación todavía
+        requiere confirmación.
+
+        Cuando la PLANTILLA tenga ese atributo, conserva
+        provisionalmente su valor original y agrega
+        un flag termino_confuso inmediatamente después.
+
+        La observación debe indicar ambas expresiones
+        de los motores y explicar que el descriptor
+        de la plantilla está pendiente de confirmación.
+
+        Si una alternativa contiene claramente un término
+        clínico válido y la otra es solo ruido, aplica
+        la regla existente de término clínico frente a ruido.
+        No generes alertas innecesarias en ese caso.
+
       - MEDIDAS DE VARIAS DIMENSIONES: si el DICTADO da una medida con dos o tres dimensiones ("0,85 por 1 cm", "0,5 x 0,58 cm", "1 por 1,3 cm"), CONSÉRVALAS TODAS. NUNCA recortes a una sola dimensión (no escribas "0,85 cm" cuando el dictado dijo "0,85 por 1 cm"). "por" y "x" son válidos como separador; mantén el formato del dictado. Perder una dimensión es un error grave.
-      - "MISMAS CARACTERÍSTICAS" (regla estricta, error grave si se incumple): si el DICTADO dice que un órgano tiene "mismas características" que otro, PROHIBIDO escribir en el informe la frase "mismas características". Debes COPIAR EXPLÍCITAMENTE, uno por uno, TODOS los atributos del órgano de referencia (bordes, ecogenicidad, forma, límite, relación, lesiones, contenido, etc.) y aplicar solo los cambios que el DICTADO indique para este órgano (ej. su propia medida). Redáctalo COMPLETO como si fuera un órgano descrito desde cero. Esto aplica a TODOS los órganos por igual: riñón derecho, cuerno uterino derecho, ovario, o cualquier otro que use "mismas características". Antes de responder, busca la frase "mismas características" en tu informe: si aparece, NO terminaste; expándela.      - LATERALIDAD: respétala estrictamente. Un dato "renal izquierda" solo va en la sección renal izquierda; "adrenal derecha" solo en adrenal derecha; etc. Nunca uses un valor de la PLANTILLA para reemplazar un valor distinto del DICTADO en el mismo órgano.
+      - "MISMAS CARACTERÍSTICAS":
+        Cuando el DICTADO indica que un órgano tiene las mismas
+        características que otro, expande explícitamente sus atributos
+        generales compartibles: forma, bordes, ecogenicidad, relación,
+        límite, contenido y otros descriptores generales pertinentes.
+
+        No escribas literalmente "mismas características" en el informe.
+
+        NO copies automáticamente lesiones focales, quistes, nódulos,
+        masas, estructuras individualizadas, sus medidas o sus ubicaciones
+        anatómicas. Una lesión descrita en el riñón izquierdo no demuestra
+        que también exista en el derecho.
+
+        Incluye un hallazgo focal en el órgano de destino solamente cuando
+        el DICTADO confirme explícitamente su presencia en ese órgano.
+
+        Si el DICTADO menciona posteriormente una lesión específica en
+        el órgano de destino, inclúyela exclusivamente en ese órgano.
+
+        Tampoco copies valores inciertos, términos confusos ni atributos
+        afectados por alertas de transcripción como si estuvieran confirmados.
+
+        Conserva las medidas propias, lateralidad y correcciones posteriores
+        correspondientes a cada órgano.
+      - LATERALIDAD:
+        Respeta estrictamente el lado indicado en el DICTADO.
+        Un hallazgo del riñón izquierdo pertenece exclusivamente
+        al izquierdo, salvo confirmación explícita para el derecho.
+
+        Nunca traslades medidas propias, lesiones focales ni
+        hallazgos inciertos de un lado al otro.
+
+        Nunca uses un valor de la PLANTILLA para reemplazar
+        un valor diferente dictado para ese mismo órgano.
       - ÓRGANO REPETIDO CON MISMA LATERALIDAD: si el mismo órgano con el mismo lado se dicta dos veces con valores distintos y SIN corrección explícita entre medio, conserva el ÚLTIMO dictado y marca ese órgano con flag incongruencia. En Observaciones anota ambas versiones y pide revisar; NO decidas tú cuál es correcto ni cambies lateralidad. Esto NO aplica a partes legítimamente distintas (ej. "Páncreas rama derecha" y "rama izquierda").
       - INCONGRUENCIA ANATÓMICA: si un órgano aparece descrito de forma incongruente (ej. "cuerpo uterino" con lateralidad que no le corresponde, o citado dos veces), conserva lo dictado y márcalo incongruencia.
 
@@ -225,7 +433,21 @@ function gpt_build_prompt(mysqli $mysqli, array $input): array
       2. ¿Quedó "homogéneo" o "anecoico homogéneo" en algún órgano donde el DICTADO describió estructuras, lesiones, cálculos, sedimento o barro biliar? Si sí, corrígelo (regla de oro 4): parénquima → "heterogéneo"; contenido → elimina "homogéneo".
       3. ¿Están TODOS los órganos/secciones de la PLANTILLA en el informe (ninguno omitido)? ¿El reproductivo hembra, próstata, testículos o íleon quedaron en su posición anatómica y no en HALLAZGOS ADICIONALES?
       4. ¿Cada flag del cuerpo tiene su línea en Observaciones con el mismo número y tipo? Si falta alguna, agrégala.
-      5. ¿Conservaste términos dudosos con flag en vez de adivinarlos?
+      5. ¿Conservaste los términos dudosos con sus flags sin adivinar
+         su significado? Para el uréter con posible negación
+         fusionada, conserva la frase exacta de la PLANTILLA.
+
+      6. Si existe una ALERTA STT: POSIBLE NEGACIÓN FUSIONADA:
+         - ¿Permanece el texto original del uréter de la PLANTILLA
+           para cada órgano afectado?
+         - ¿Tiene un flag termino_confuso inmediatamente después?
+         - ¿La observación aclara que es texto de plantilla
+           y que el audio todavía requiere confirmación?
+         - ¿Evitaste copiar "ureterna visible", "ureterno visible"
+           y "visibilidad por confirmar" al cuerpo clínico?
+         - ¿Se conservaron todos los demás atributos del órgano?
+
+
       No finalices si alguna de estas falla.
     SYS;
 

@@ -260,9 +260,12 @@ if (!$okB || $textoB === '') {
 // 7) Validador + bloques.
 $disc = cmp_comparar($textoA, $textoB);
 $sep  = org_procesar($disc, $ORGANOS_LISTA, $CONCEPTOS_LISTA);
-$bloqueRes  = construir_bloque_resueltas($sep['resueltas']);
+
+$bloqueRes = construir_bloque_resueltas($sep['resueltas']);
 $bloqueDisc = construir_bloque_discrepancias($sep['a_ia']);
-$textoDoble = $bloqueRes . $bloqueDisc;
+$bloqueUreter = construir_bloque_alerta_ureter($textoA, $textoB);
+$textoDoble = $bloqueRes . $bloqueDisc . $bloqueUreter;
+
 
 // Guardar transcripción en BD (ia_transcripciones).
 $mysqliStt = conn();

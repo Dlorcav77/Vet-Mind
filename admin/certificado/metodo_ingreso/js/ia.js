@@ -207,7 +207,8 @@ function ejecutarRevisor(dictado, informeHtml, plantillaBase, observacionesGener
             return {
                 organo: organo.organo,
                 atributos: Array.isArray(organo.atributos) ? organo.atributos : [],
-                alertas: []
+                alertas: [],
+                dudasTranscripcion: []
             };
         });
 
@@ -266,6 +267,33 @@ function ejecutarRevisor(dictado, informeHtml, plantillaBase, observacionesGener
 
         observaciones.forEach(function (obs) {
             const indice = buscarOrgano(obs.contexto);
+
+            if (indice !== -1 && obs.tipo === 'termino_confuso') {
+                const detalle = norm(obs.texto || '');
+
+                const esDudaUreter =
+                    detalle.includes('ureter') &&
+                    (
+                        detalle.includes('negacion') ||
+                        detalle.includes('fusionada') ||
+                        detalle.includes('transcripcion') ||
+                        detalle.includes('visibilidad')
+                    );
+
+                if (esDudaUreter) {
+                    const contexto = String(obs.contexto || '');
+
+                    const fraseUreter = contexto.match(
+                        /(?:no\s+se\s+(?:visualiza|observa|identifica)\s+(?:el\s+)?ur[eé]ter|ur[eé]ter\s+(?:no\s+)?visible)/iu
+                    );
+
+                    if (fraseUreter) {
+                        organosVisuales[indice].dudasTranscripcion.push(
+                            fraseUreter[0]
+                        );
+                    }
+                }
+            }
 
             const item = {
                 severidad: 'media',
