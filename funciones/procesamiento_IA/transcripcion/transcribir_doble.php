@@ -234,12 +234,14 @@ if (!$okB || $textoB === '') {
     $mysqliStt = conn();
     stt_guardar_transcripcion($mysqliStt, [
         'flujo_id'       => $flujoId,
+        'usuario_id'     => $userId,
         'audio_tmp'      => $audioTmp,
         'motor_a'        => MOTOR_A,
         'motor_b'        => MOTOR_B,
         'texto_a'        => $textoA,
         'texto_b'        => '',
         'texto_doble'    => '',
+        'resueltas'      => [],
         'discrepancias'  => [],
         'duracion_seg_a' => $durA,
         'duracion_seg_b' => 0,
@@ -271,12 +273,14 @@ $textoDoble = $bloqueRes . $bloqueDisc;
 $mysqliStt = conn();
 stt_guardar_transcripcion($mysqliStt, [
     'flujo_id'        => $flujoId,
+    'usuario_id'      => $userId,
     'audio_tmp'       => $audioTmp,
     'motor_a'         => MOTOR_A,
     'motor_b'         => MOTOR_B,
     'texto_a'         => $textoA,
     'texto_b'         => $textoB,
     'texto_doble'     => $textoDoble,
+    'resueltas'       => $sep['resueltas'],
     'discrepancias'   => $sep['a_ia'],
     'duracion_seg_a'  => $durA,
     'duracion_seg_b'  => $durB,

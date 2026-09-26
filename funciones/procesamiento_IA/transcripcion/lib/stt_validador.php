@@ -62,11 +62,9 @@ function cmp_comparar(string $textoA, string $textoB): array {
 }
 
 // ---- Diccionarios ----
-$ORGANOS_LISTA = [
-    'vejiga','riñon','riñones','bazo','higado','vesicula','estomago','pancreas',
-    'linfonodulos','adrenal','adrenales','yeyuno','ileon','duodeno','colon',
-    'prostata','ciego','peritoneo','ovario','utero','cuerno','cuerpo','testiculos',
-];
+$catalogoOrganos = require __DIR__ . '/../../config/organos.php';
+
+$ORGANOS_LISTA = $catalogoOrganos['stt'];
 $CONCEPTOS_LISTA = [
     'ecogenicidad','anecoico','anecoica','anecoicas',
     'hipoecoico','hipoecoica','hipoecoicas','hiperecoico','hiperecoica','hiperecoicas',

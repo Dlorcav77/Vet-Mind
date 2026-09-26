@@ -114,6 +114,31 @@ return [
         ],
     ],
 
+    'interpretacion' => [
+        'motor_activo' => 'openai',
+        'parametros' => [
+            'openai' => [
+                'archivo' => 'interpretacion/motores/openai.php',
+                'model' => 'gpt-5-mini',
+                'reasoning_effort' => 'low',
+                'max_output_tokens' => 6000,
+                'max_prompt_bytes_hard' => 307200,
+                'max_attempts' => 3,
+                'retry_delays' => [0, 2, 5],
+                'timeouts' => [
+                    'connect' => 10,
+                    'total' => 60,
+                ],
+                'pricing' => [
+                    'input_1m' => 0.25,
+                    'cached_input_1m' => 0.025,
+                    'output_1m' => 2.00,
+                ],
+                'version_prompt' => '1',
+            ],
+        ],
+    ],
+
     'revision' => [
         'motor_activo' => 'grok',
         'parametros' => [

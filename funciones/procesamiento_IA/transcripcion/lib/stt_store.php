@@ -42,17 +42,23 @@ function stt_costo_por_motor(mysqli $mysqli, string $motor, float $duracion_seg)
 function stt_guardar_transcripcion(mysqli $mysqli, array $d): int
 {
     $audio_tmp = (string)($d['audio_tmp'] ?? '');
-    if ($audio_tmp === '') {
+    $usuario_id = (int)($d['usuario_id'] ?? 0);
+
+    if ($audio_tmp === '' || $usuario_id <= 0) {
         return 0;
     }
 
     $flujo_id = trim((string)($d['flujo_id'] ?? ''));
-
     $motor_a = (string)($d['motor_a'] ?? '');
     $motor_b = (string)($d['motor_b'] ?? '');
     $texto_a = (string)($d['texto_a'] ?? '');
     $texto_b = (string)($d['texto_b'] ?? '');
     $texto_doble = (string)($d['texto_doble'] ?? '');
+
+    $resueltas_json = json_encode(
+        $d['resueltas'] ?? [],
+        JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES
+    );
 
     $disc_json = isset($d['discrepancias'])
         ? json_encode($d['discrepancias'], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES)
@@ -66,13 +72,13 @@ function stt_guardar_transcripcion(mysqli $mysqli, array $d): int
     $cost_total = round($cost_a + $cost_b, 6);
 
     $created = date('Y-m-d H:i:s');
-
     $flujo_bind = $flujo_id !== '' ? $flujo_id : null;
 
     $sql = 'INSERT INTO ia_transcripciones
-        (audio_tmp, certificado_id, flujo_id, motor_a, motor_b, texto_a, texto_b, texto_doble,
-         discrepancias_json, duracion_seg_a, duracion_seg_b, cost_a, cost_b, cost_total, created_at)
-        VALUES (?, NULL, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)';
+        (audio_tmp, certificado_id, usuario_id, flujo_id, motor_a, motor_b,
+        texto_a, texto_b, texto_doble, resueltas_json, discrepancias_json,
+        duracion_seg_a, duracion_seg_b, cost_a, cost_b, cost_total, created_at)
+        VALUES (?, NULL, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)';
 
     $stmt = $mysqli->prepare($sql);
     if (!$stmt) {
@@ -80,14 +86,16 @@ function stt_guardar_transcripcion(mysqli $mysqli, array $d): int
     }
 
     $stmt->bind_param(
-        'ssssssssddddds',
+        'sissssssssddddds',
         $audio_tmp,
+        $usuario_id,
         $flujo_bind,
         $motor_a,
         $motor_b,
         $texto_a,
         $texto_b,
         $texto_doble,
+        $resueltas_json,
         $disc_json,
         $dur_a,
         $dur_b,

@@ -5,4 +5,6 @@ return [
     'transcripcion' => 'nuevo',
     'generacion' => 'nuevo',
     'revision' => 'nuevo',
+    'interpretacion' => 'php',
+    'banco_pruebas_habilitado' => true,
 ];

@@ -45,6 +45,93 @@ function control_ia_where_created_at(string $rango): string
     }
 }
 
+
+/**
+ * Busca la interpretación PHP correspondiente a un informe.
+ * Nunca selecciona arbitrariamente entre varias coincidencias.
+ */
+function control_ia_interpretacion_informe(mysqli $mysqli, ?array $informe): array
+{
+    if (!$informe) {
+        return ['dato' => null, 'aviso' => 'No hay informe asociado.'];
+    }
+
+    $flujoId = trim((string)($informe['flujo_id'] ?? ''));
+    $entrada = json_decode((string)($informe['input_json'] ?? '{}'), true);
+
+    $texto = trim((string)(
+        $entrada['texto']
+        ?? $entrada['dictado']
+        ?? ''
+    ));
+
+    $fechaInforme = (string)($informe['created_at'] ?? '');
+
+    if ($flujoId === '' || $texto === '' || $fechaInforme === '') {
+        return [
+            'dato' => null,
+            'aviso' => 'El informe no tiene datos suficientes para vincular su interpretación.'
+        ];
+    }
+
+    $stmt = $mysqli->prepare("
+        SELECT
+            id,
+            transcripcion_id,
+            flujo_id,
+            motor,
+            modelo,
+            version_esquema,
+            estado,
+            texto_entrada,
+            resultado_json,
+            prompt_tokens,
+            completion_tokens,
+            cost_usd,
+            duracion_ms,
+            created_at
+        FROM ia_interpretaciones
+        WHERE flujo_id = ?
+          AND motor = 'php'
+          AND TRIM(texto_entrada) = ?
+          AND created_at <= ?
+        ORDER BY created_at DESC, id DESC
+        LIMIT 2
+    ");
+
+    $stmt->bind_param('sss', $flujoId, $texto, $fechaInforme);
+    $stmt->execute();
+
+    $res = $stmt->get_result();
+    $coincidencias = [];
+
+    while ($row = $res->fetch_assoc()) {
+        $coincidencias[] = $row;
+    }
+
+    $stmt->close();
+
+    if (count($coincidencias) === 0) {
+        return [
+            'dato' => null,
+            'aviso' => 'No se encontró una interpretación PHP vinculable a este informe.'
+        ];
+    }
+
+    if (count($coincidencias) > 1) {
+        return [
+            'dato' => null,
+            'aviso' => 'Hay varias interpretaciones posibles para este informe. Se requiere una vinculación explícita.'
+        ];
+    }
+
+    return [
+        'dato' => $coincidencias[0],
+        'aviso' => null
+    ];
+}
+
+
 // ───────────────────────────────────────────
 // VER DETALLE (grupo por certificado o flujo)
 // ───────────────────────────────────────────
@@ -63,6 +150,8 @@ if ($action === 'detalle_grupo') {
         'informe' => null,
         'revision' => null,
         'transcripcion' => null,
+        'interpretacion' => null,
+        'interpretacion_aviso' => null,
     ];
 
     if ($certificado_id > 0) {
@@ -93,11 +182,31 @@ if ($action === 'detalle_grupo') {
     $res = $stmt->get_result();
 
     while ($row = $res->fetch_assoc()) {
-        if (($row['tipo'] === 'informe' || $row['tipo'] === 'revision') && $data[$row['tipo']] === null) {
+        if (
+            ($row['tipo'] === 'informe' || $row['tipo'] === 'revision')
+            && $data[$row['tipo']] === null
+        ) {
             $data[$row['tipo']] = $row;
         }
     }
+
     $stmt->close();
+
+    // ===============================================
+    // INTERPRETACIÓN PHP ASOCIADA AL INFORME
+    // ===============================================
+
+    $vinculo = control_ia_interpretacion_informe(
+        $mysqli,
+        $data['informe']
+    );
+
+    $data['interpretacion'] = $vinculo['dato'];
+    $data['interpretacion_aviso'] = $vinculo['aviso'];
+
+    // ===============================================
+    // TRANSCRIPCIÓN
+    // ===============================================
 
     if ($certificado_id > 0) {
         $stmt = $mysqli->prepare("

@@ -356,13 +356,81 @@
         $('#tablaControlIaBody').html(filas);
     }
 
-    // ─────────────── DETALLE ───────────────
+    function pintarDetalleInterpretacion(d) {
+        $('#detalleVacio').hide();
+        $('#detalleContenido').show();
+
+        let json = d.resultado_json || '';
+
+        try {
+            const objeto = typeof json === 'string'
+                ? JSON.parse(json)
+                : json;
+
+            json = JSON.stringify(objeto, null, 2);
+        } catch (e) {
+            json = String(json);
+        }
+
+        $('#d_provider').text('PHP');
+        $('#d_model').text(d.modelo || 'Determinista');
+        $('#d_plantilla').text('-');
+        $('#d_tokens').text(d.prompt_tokens || '0');
+        $('#d_cost').text(fmtUsd(d.cost_usd));
+        $('#d_rid').text('INT-' + d.id);
+        $('#d_datetime').text(d.created_at || '-');
+        $('#d_created').text(d.created_at || '-');
+
+        $('#d_det_transcripcion').text(d.texto_entrada || '');
+
+        const html = '<pre style="white-space:pre-wrap;'
+            + 'overflow-wrap:anywhere;font-size:12px;'
+            + 'background:#f8fafc;padding:12px;border-radius:6px">'
+            + esc(json)
+            + '</pre>';
+
+        $('#d_det_resultado').html(html);
+        $('#d_final_render').html(html);
+        $('#d_final_raw').text(json);
+
+        $('#d_input').text(JSON.stringify({
+            id: d.id,
+            transcripcion_id: d.transcripcion_id,
+            flujo_id: d.flujo_id,
+            motor: d.motor,
+            estado: d.estado,
+            version_esquema: d.version_esquema,
+            duracion_ms: d.duracion_ms
+        }, null, 2));
+
+        $('#d_prompt').text('No aplica: interpretación determinista PHP.');
+        $('#d_system').text('No aplica: interpretación determinista PHP.');
+    }
+
+
     function pintarDetalle(tipo) {
         const d = detalleData[tipo];
         const $cont = $('#detalleContenido');
         const $vacio = $('#detalleVacio');
 
+        if (tipo === 'interpretacion') {
+            if (!d) {
+                $cont.hide();
+
+                $vacio.text(
+                    detalleData.interpretacion_aviso ||
+                    'Este informe todavía no tiene una interpretación PHP.'
+                ).show();
+
+                return;
+            }
+
+            pintarDetalleInterpretacion(d);
+            return;
+        }
+
         if (!d) {
+
             $cont.hide();
             $vacio.show();
             return;
@@ -483,6 +551,7 @@
         $('#d_det_resultado').html(html);
     }
 
+
     function actualizarSelector() {
         const $sel = $('#detalleSelector');
         $sel.empty();
@@ -499,16 +568,32 @@
             $sel.append('<option value="transcripcion">Transcripción</option>');
         }
 
+        // Disponible también cuando falla la vinculación,
+        // para mostrar el motivo del problema.
+        if (
+            detalleData.informe ||
+            detalleData.interpretacion ||
+            detalleData.interpretacion_aviso
+        ) {
+            $sel.append(
+                '<option value="interpretacion">Interpretación PHP</option>'
+            );
+        }
+
         const primero = detalleData.informe
             ? 'informe'
-            : (detalleData.revision ? 'revision' : (detalleData.transcripcion ? 'transcripcion' : ''));
+            : (
+                detalleData.revision
+                    ? 'revision'
+                    : (
+                        detalleData.transcripcion
+                            ? 'transcripcion'
+                            : 'interpretacion'
+                    )
+            );
 
-        if (primero) {
-            $sel.val(primero);
-            pintarDetalle(primero);
-        } else {
-            pintarDetalle('informe');
-        }
+        $sel.val(primero);
+        pintarDetalle(primero);
     }
 
     function abrirDetalle(payload) {
@@ -560,17 +645,134 @@
         pintarDetalle($(this).val());
     });
 
-    // Copiar transcripción + resultado.
+    // Copiar los datos de la operación seleccionada.
     $(document).on('click', '#btnCopiarDetalles', function () {
-        const trans = $('#d_det_transcripcion').text() || '';
-        const res = $('#d_det_resultado').text() || '';
-        const texto = '===== TRANSCRIPCIÓN (DICTADO) =====\n' + trans +
-            '\n\n===== RESULTADO (INFORME) =====\n' + res + '\n';
-        navigator.clipboard.writeText(texto).then(function () {
-            Swal.fire({ icon: 'success', title: 'Copiado', timer: 1200, showConfirmButton: false });
-        }).catch(function () {
-            Swal.fire('Error', 'No se pudo copiar.', 'error');
-        });
+        const tipo = $('#detalleSelector').val();
+
+        const formatearJson = function (valor) {
+            if (!valor) return '';
+
+            try {
+                return JSON.stringify(
+                    typeof valor === 'string'
+                        ? JSON.parse(valor)
+                        : valor,
+                    null,
+                    2
+                );
+            } catch (e) {
+                return String(valor);
+            }
+        };
+
+        let bloques = [];
+
+        if (tipo === 'informe') {
+            const informe = detalleData.informe || {};
+            const stt = detalleData.transcripcion;
+            const php = detalleData.interpretacion;
+
+            bloques.push(
+                '===== IDENTIFICADORES =====\n'
+                + 'RID: ' + (informe.rid || '-') + '\n'
+                + 'Flujo: ' + (informe.flujo_id || '-')
+            );
+
+            if (stt) {
+                bloques.push(
+                    '===== MOTOR A: ' + (stt.motor_a || '-') + ' =====\n'
+                    + (stt.texto_a || '')
+                );
+
+                bloques.push(
+                    '===== MOTOR B: ' + (stt.motor_b || '-') + ' =====\n'
+                    + (stt.texto_b || '')
+                );
+
+                bloques.push(
+                    '===== CORRECCIONES Y NOTAS STT =====\n'
+                    + (stt.texto_doble || '')
+                );
+
+                bloques.push(
+                    '===== DISCREPANCIAS ORIGINALES =====\n'
+                    + formatearJson(stt.discrepancias_json)
+                );
+            } else {
+                bloques.push(
+                    '===== DICTADO ENVIADO =====\n'
+                    + ($('#d_det_transcripcion').text() || '')
+                );
+            }
+
+            if (php) {
+                bloques.push(
+                    '===== INTERPRETACIÓN PHP =====\n'
+                    + 'ID: ' + php.id + '\n'
+                    + 'Transcripción ID: '
+                    + (php.transcripcion_id || '-') + '\n'
+                    + formatearJson(php.resultado_json)
+                );
+            } else {
+                bloques.push(
+                    '===== INTERPRETACIÓN PHP =====\n'
+                    + (
+                        detalleData.interpretacion_aviso ||
+                        'No disponible.'
+                    )
+                );
+            }
+
+            bloques.push(
+                '===== INFORME GENERADO (HTML) =====\n'
+                + (informe.content_final || '')
+            );
+
+        } else if (tipo === 'interpretacion') {
+            const php = detalleData.interpretacion;
+
+            if (php) {
+                bloques.push(
+                    '===== INTERPRETACIÓN PHP =====\n'
+                    + 'ID: ' + php.id + '\n'
+                    + 'Transcripción ID: '
+                    + (php.transcripcion_id || '-') + '\n'
+                    + formatearJson(php.resultado_json)
+                );
+            }
+
+        } else {
+            // Mantener el comportamiento anterior
+            // para Revisión y Transcripción.
+            bloques.push(
+                '===== TRANSCRIPCIÓN =====\n'
+                + ($('#d_det_transcripcion').text() || '')
+            );
+
+            bloques.push(
+                '===== RESULTADO =====\n'
+                + ($('#d_det_resultado').text() || '')
+            );
+        }
+
+        const texto = bloques.join('\n\n') + '\n';
+
+        navigator.clipboard.writeText(texto)
+            .then(function () {
+                Swal.fire({
+                    icon: 'success',
+                    title: 'Copiado',
+                    timer: 1200,
+                    showConfirmButton: false
+                });
+            })
+            .catch(function () {
+                Swal.fire(
+                    'Error',
+                    'No se pudo copiar.',
+                    'error'
+                );
+            });
     });
 
     // ─────────────── ELIMINAR ───────────────

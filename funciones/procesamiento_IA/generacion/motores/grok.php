@@ -75,7 +75,12 @@ $input = [
 ];
 
 // 3. armar prompt y system usando el helper
-$promptData = gpt_build_prompt($mysqli, $input);
+$promptData = gpt_build_prompt(
+    $mysqli,
+    $input,
+    $interpretacionData ?? null
+);
+
 $system             = $promptData['system'];
 $prompt             = $promptData['prompt'];
 $incluir_conclusion = $promptData['incluir_conclusion'];
