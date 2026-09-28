@@ -185,6 +185,11 @@
             + ' data-flujo="' + esc(flujo) + '">'
             + '<i class="fas fa-eye"></i></button> ';
 
+        btns += '<button class="btn btn-sm btn-outline-primary btn-copiar-caso" title="Copiar caso completo"'
+            + ' data-certificado="' + esc(cert) + '"'
+            + ' data-flujo="' + esc(flujo) + '">'
+            + '<i class="fas fa-copy"></i></button> ';
+
         if (PERMS.eliminar) {
             btns += '<button class="btn btn-sm btn-outline-danger btn-eliminar-grupo" title="Eliminar"'
                 + ' data-certificado="' + esc(cert) + '"'
@@ -645,133 +650,327 @@
         pintarDetalle($(this).val());
     });
 
-    // Copiar los datos de la operación seleccionada.
-    $(document).on('click', '#btnCopiarDetalles', function () {
-        const tipo = $('#detalleSelector').val();
+    function controlIaJson(valor) {
+        if (valor === null || valor === undefined || valor === '') return '';
 
-        const formatearJson = function (valor) {
-            if (!valor) return '';
+        try {
+            return JSON.stringify(
+                typeof valor === 'string' ? JSON.parse(valor) : valor,
+                null,
+                2
+            );
+        } catch (e) {
+            return String(valor);
+        }
+    }
 
-            try {
-                return JSON.stringify(
-                    typeof valor === 'string'
-                        ? JSON.parse(valor)
-                        : valor,
-                    null,
-                    2
-                );
-            } catch (e) {
-                return String(valor);
-            }
-        };
+    function controlIaValor(valor) {
+        return valor === null || valor === undefined || valor === ''
+            ? '-'
+            : String(valor);
+    }
 
-        let bloques = [];
+    function construirCasoCompleto(data) {
+        const informe = data.informe;
+        const stt = data.transcripcion;
+        const php = data.interpretacion;
+        const revision = data.revision;
+        const bloques = [];
 
-        if (tipo === 'informe') {
-            const informe = detalleData.informe || {};
-            const stt = detalleData.transcripcion;
-            const php = detalleData.interpretacion;
+        if (informe) {
+            bloques.push([
+                '===== IDENTIFICADORES Y GENERACIÓN =====',
+                'RID: ' + controlIaValor(informe.rid),
+                'Informe ID: ' + controlIaValor(informe.id),
+                'Certificado: ' + controlIaValor(informe.certificado_id),
+                'Flujo: ' + controlIaValor(informe.flujo_id),
+                'Fecha: ' + controlIaValor(informe.created_at),
+                'Plantilla ID: ' + controlIaValor(informe.plantilla_id),
+                'Proveedor: ' + controlIaValor(informe.provider),
+                'Modelo: ' + controlIaValor(informe.model),
+                'Tokens entrada: ' + controlIaValor(informe.prompt_tokens),
+                'Tokens salida: ' + controlIaValor(informe.completion_tokens),
+                'Tokens totales: ' + controlIaValor(informe.total_tokens),
+                'Costo USD: ' + controlIaValor(informe.cost_usd)
+            ].join('\n'));
+        }
+
+        if (stt) {
+            bloques.push([
+                '===== TRANSCRIPCIÓN: MÉTRICAS =====',
+                'Transcripción ID: ' + controlIaValor(stt.id),
+                'Flujo: ' + controlIaValor(stt.flujo_id),
+                'Motor A: ' + controlIaValor(stt.motor_a),
+                'Duración A: ' + controlIaValor(stt.duracion_seg_a) + ' s',
+                'Costo A: ' + controlIaValor(stt.cost_a) + ' USD',
+                'Motor B: ' + controlIaValor(stt.motor_b),
+                'Duración B: ' + controlIaValor(stt.duracion_seg_b) + ' s',
+                'Costo B: ' + controlIaValor(stt.cost_b) + ' USD',
+                'Costo STT total: ' + controlIaValor(stt.cost_total) + ' USD'
+            ].join('\n'));
 
             bloques.push(
-                '===== IDENTIFICADORES =====\n'
-                + 'RID: ' + (informe.rid || '-') + '\n'
-                + 'Flujo: ' + (informe.flujo_id || '-')
+                '===== MOTOR A: ' + controlIaValor(stt.motor_a) + ' =====\n'
+                + (stt.texto_a || '')
             );
-
-            if (stt) {
-                bloques.push(
-                    '===== MOTOR A: ' + (stt.motor_a || '-') + ' =====\n'
-                    + (stt.texto_a || '')
-                );
-
-                bloques.push(
-                    '===== MOTOR B: ' + (stt.motor_b || '-') + ' =====\n'
-                    + (stt.texto_b || '')
-                );
-
-                bloques.push(
-                    '===== CORRECCIONES Y NOTAS STT =====\n'
-                    + (stt.texto_doble || '')
-                );
-
-                bloques.push(
-                    '===== DISCREPANCIAS ORIGINALES =====\n'
-                    + formatearJson(stt.discrepancias_json)
-                );
-            } else {
-                bloques.push(
-                    '===== DICTADO ENVIADO =====\n'
-                    + ($('#d_det_transcripcion').text() || '')
-                );
-            }
-
-            if (php) {
-                bloques.push(
-                    '===== INTERPRETACIÓN PHP =====\n'
-                    + 'ID: ' + php.id + '\n'
-                    + 'Transcripción ID: '
-                    + (php.transcripcion_id || '-') + '\n'
-                    + formatearJson(php.resultado_json)
-                );
-            } else {
-                bloques.push(
-                    '===== INTERPRETACIÓN PHP =====\n'
-                    + (
-                        detalleData.interpretacion_aviso ||
-                        'No disponible.'
-                    )
-                );
-            }
 
             bloques.push(
-                '===== INFORME GENERADO (HTML) =====\n'
-                + (informe.content_final || '')
+                '===== MOTOR B: ' + controlIaValor(stt.motor_b) + ' =====\n'
+                + (stt.texto_b || '')
             );
 
-        } else if (tipo === 'interpretacion') {
-            const php = detalleData.interpretacion;
+            const notas = String(stt.texto_doble || '');
+            const corte = notas.indexOf(
+                '=== NOTA: DIFERENCIAS ENTRE 2 TRANSCRIPCIONES'
+            );
 
-            if (php) {
+            const correcciones = corte >= 0
+                ? notas.substring(0, corte).trim()
+                : notas.trim();
+
+            if (correcciones) {
                 bloques.push(
-                    '===== INTERPRETACIÓN PHP =====\n'
-                    + 'ID: ' + php.id + '\n'
-                    + 'Transcripción ID: '
-                    + (php.transcripcion_id || '-') + '\n'
-                    + formatearJson(php.resultado_json)
+                    '===== CORRECCIONES STT =====\n' + correcciones
                 );
             }
 
+            const discrepancias = controlIaJson(stt.discrepancias_json);
+
+            if (discrepancias) {
+                bloques.push(
+                    '===== DISCREPANCIAS ORIGINALES =====\n' + discrepancias
+                );
+            } else if (corte >= 0) {
+                bloques.push(
+                    '===== NOTAS DE DISCREPANCIAS STT =====\n'
+                    + notas.substring(corte).trim()
+                );
+            }
         } else {
-            // Mantener el comportamiento anterior
-            // para Revisión y Transcripción.
             bloques.push(
                 '===== TRANSCRIPCIÓN =====\n'
-                + ($('#d_det_transcripcion').text() || '')
+                + (data.transcripcion_aviso || 'No disponible.')
             );
 
+            if (informe && informe.input_json) {
+                bloques.push(
+                    '===== ENTRADA GUARDADA DEL INFORME =====\n'
+                    + controlIaJson(informe.input_json)
+                );
+            }
+        }
+
+        if (php) {
+            bloques.push([
+                '===== INTERPRETACIÓN PHP =====',
+                'ID: ' + controlIaValor(php.id),
+                'Transcripción ID: ' + controlIaValor(php.transcripcion_id),
+                'Flujo: ' + controlIaValor(php.flujo_id),
+                'Motor: ' + controlIaValor(php.motor),
+                'Versión del esquema: ' + controlIaValor(php.version_esquema),
+                'Estado: ' + controlIaValor(php.estado),
+                'Duración: ' + controlIaValor(php.duracion_ms) + ' ms',
+                'Costo USD: ' + controlIaValor(php.cost_usd),
+                'Fecha: ' + controlIaValor(php.created_at),
+                '',
+                controlIaJson(php.resultado_json)
+            ].join('\n'));
+        } else if (informe) {
             bloques.push(
-                '===== RESULTADO =====\n'
-                + ($('#d_det_resultado').text() || '')
+                '===== INTERPRETACIÓN PHP =====\n'
+                + (data.interpretacion_aviso || 'No disponible.')
             );
         }
 
-        const texto = bloques.join('\n\n') + '\n';
+        if (informe) {
+            bloques.push(
+                '===== ENTRADA REGISTRADA (INPUT JSON) =====\n'
+                + (
+                    informe.input_json
+                        ? controlIaJson(informe.input_json)
+                        : 'No registrada.'
+                )
+            );
 
-        navigator.clipboard.writeText(texto)
-            .then(function () {
-                Swal.fire({
-                    icon: 'success',
-                    title: 'Copiado',
-                    timer: 1200,
-                    showConfirmButton: false
-                });
-            })
-            .catch(function () {
-                Swal.fire(
-                    'Error',
-                    'No se pudo copiar.',
-                    'error'
+            bloques.push(
+                '===== INSTRUCCIONES DEL SISTEMA (SYSTEM TEXT) =====\n'
+                + (informe.system_text || 'No registradas.')
+            );
+
+            bloques.push(
+                '===== PROMPT DE GENERACIÓN (PROMPT TEXT) =====\n'
+                + (informe.prompt_text || 'No registrado.')
+            );
+
+            bloques.push(
+                '===== RESPUESTA GPT - INFORME GENERADO (HTML) =====\n'
+                + (informe.content_final || 'No disponible.')
+            );
+        }
+
+        // Versión actual del informe guardada en certificados.
+        const certificadoFinal = data.certificado_final;
+
+        if (certificadoFinal && certificadoFinal.contenido_html) {
+            const htmlOriginal = String(
+                informe && informe.content_final || ''
+            ).trim();
+
+            const htmlFinal = String(
+                certificadoFinal.contenido_html
+            ).trim();
+
+            bloques.push([
+                '===== INFORME GUARDADO POR EL VETERINARIO =====',
+                'Certificado ID: ' + controlIaValor(certificadoFinal.id),
+                'Fecha de creación: ' + controlIaValor(certificadoFinal.created_at),
+                'Última modificación: ' + controlIaValor(certificadoFinal.updated_at),
+                'Coincide con el HTML original: '
+                    + (htmlOriginal === htmlFinal ? 'Sí' : 'No'),
+                '',
+                htmlFinal
+            ].join('\n'));
+        } else {
+            bloques.push(
+                '===== INFORME GUARDADO POR EL VETERINARIO =====\n'
+                + 'No disponible.'
+            );
+        }
+
+        if (revision) {
+            const mismoFlujo = informe
+                && informe.flujo_id
+                && revision.flujo_id
+                && informe.flujo_id === revision.flujo_id;
+
+            if (mismoFlujo) {
+                bloques.push([
+                    '===== REVISIÓN REGISTRADA EN EL MISMO FLUJO =====',
+                    'Aviso: coincide el flujo, pero no existe una vinculación directa verificada con este RID.',
+                    'RID revisión: ' + controlIaValor(revision.rid),
+                    'Fecha: ' + controlIaValor(revision.created_at),
+                    'Proveedor: ' + controlIaValor(revision.provider),
+                    'Modelo: ' + controlIaValor(revision.model),
+                    'Costo USD: ' + controlIaValor(revision.cost_usd),
+                    '',
+                    revision.content_final || ''
+                ].join('\n'));
+            } else {
+                bloques.push(
+                    '===== REVISIÓN =====\n'
+                    + 'Existe una revisión en el grupo, pero no está vinculada '
+                    + 'de forma verificable a este informe. No se incluye su contenido.'
                 );
+            }
+        }
+
+        return bloques.join('\n\n') + '\n';
+    }
+
+    function copiarTextoControlIa(texto) {
+        function copiarAlternativo() {
+            const area = document.createElement('textarea');
+            area.value = texto;
+            area.style.position = 'fixed';
+            area.style.opacity = '0';
+            document.body.appendChild(area);
+            area.select();
+
+            try {
+                if (!document.execCommand('copy')) {
+                    throw new Error('No se pudo copiar.');
+                }
+            } finally {
+                document.body.removeChild(area);
+            }
+        }
+
+        const promesa = navigator.clipboard && navigator.clipboard.writeText
+            ? navigator.clipboard.writeText(texto).catch(copiarAlternativo)
+            : Promise.resolve().then(copiarAlternativo);
+
+        promesa.then(function () {
+            Swal.fire({
+                icon: 'success',
+                title: 'Copiado',
+                timer: 1200,
+                showConfirmButton: false
+            });
+        }).catch(function () {
+            Swal.fire('Error', 'No se pudo copiar el contenido.', 'error');
+        });
+    }
+
+    // Copiar el contenido seleccionado dentro del modal.
+    $(document).on('click', '#btnCopiarDetalles', function () {
+        const tipo = $('#detalleSelector').val();
+
+        if (tipo === 'informe') {
+            copiarTextoControlIa(construirCasoCompleto(detalleData));
+            return;
+        }
+
+        if (tipo === 'interpretacion') {
+            const php = detalleData.interpretacion;
+            if (!php) return;
+
+            copiarTextoControlIa(
+                '===== INTERPRETACIÓN PHP =====\n'
+                + 'ID: ' + php.id + '\n'
+                + 'Transcripción ID: ' + controlIaValor(php.transcripcion_id)
+                + '\n\n' + controlIaJson(php.resultado_json)
+            );
+            return;
+        }
+
+        copiarTextoControlIa(
+            '===== TRANSCRIPCIÓN =====\n'
+            + ($('#d_det_transcripcion').text() || '')
+            + '\n\n===== RESULTADO =====\n'
+            + ($('#d_det_resultado').text() || '')
+            + '\n'
+        );
+    });
+
+    // Copiar el caso completo directamente desde el listado.
+    $(document).on('click', '.btn-copiar-caso', function (e) {
+        e.preventDefault();
+
+        const boton = $(this);
+        if (boton.prop('disabled')) return;
+
+        boton.prop('disabled', true);
+
+        $.post(URL, {
+            action: 'detalle_grupo',
+            certificado_id: boton.data('certificado') || '',
+            flujo_id: boton.data('flujo') || ''
+        }, null, 'json')
+            .done(function (resp) {
+                if (!resp || resp.status !== 'success') {
+                    Swal.fire(
+                        'Error',
+                        resp && resp.message ? resp.message : 'No se pudo obtener el caso.',
+                        'error'
+                    );
+                    return;
+                }
+
+                const data = resp.data || {};
+
+                if (!data.informe && !data.transcripcion
+                    && !data.interpretacion && !data.revision) {
+                    Swal.fire('Error', 'El grupo no contiene datos disponibles.', 'error');
+                    return;
+                }
+
+                copiarTextoControlIa(construirCasoCompleto(data));
+            })
+            .fail(function () {
+                Swal.fire('Error', 'No se pudo conectar con Control IA.', 'error');
+            })
+            .always(function () {
+                boton.prop('disabled', false);
             });
     });
 

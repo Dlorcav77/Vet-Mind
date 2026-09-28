@@ -65,9 +65,7 @@ function control_ia_interpretacion_informe(mysqli $mysqli, ?array $informe): arr
         ?? ''
     ));
 
-    $fechaInforme = (string)($informe['created_at'] ?? '');
-
-    if ($flujoId === '' || $texto === '' || $fechaInforme === '') {
+    if ($flujoId === '' || $texto === '') {
         return [
             'dato' => null,
             'aviso' => 'El informe no tiene datos suficientes para vincular su interpretación.'
@@ -94,12 +92,11 @@ function control_ia_interpretacion_informe(mysqli $mysqli, ?array $informe): arr
         WHERE flujo_id = ?
           AND motor = 'php'
           AND TRIM(texto_entrada) = ?
-          AND created_at <= ?
         ORDER BY created_at DESC, id DESC
         LIMIT 2
     ");
 
-    $stmt->bind_param('sss', $flujoId, $texto, $fechaInforme);
+    $stmt->bind_param('ss', $flujoId, $texto);
     $stmt->execute();
 
     $res = $stmt->get_result();
@@ -205,41 +202,90 @@ if ($action === 'detalle_grupo') {
     $data['interpretacion_aviso'] = $vinculo['aviso'];
 
     // ===============================================
-    // TRANSCRIPCIÓN
+    // TRANSCRIPCIÓN ASOCIADA AL INFORME
     // ===============================================
 
-    if ($certificado_id > 0) {
-        $stmt = $mysqli->prepare("
-            SELECT id, audio_tmp, certificado_id, flujo_id, motor_a, motor_b,
-                   texto_a, texto_b, texto_doble, discrepancias_json,
-                   duracion_seg_a, duracion_seg_b,
-                   cost_a, cost_b, cost_total,
-                   created_at, updated_at
-            FROM ia_transcripciones
-            WHERE certificado_id = ?
-            ORDER BY created_at DESC
-            LIMIT 1
-        ");
-        $stmt->bind_param('i', $certificado_id);
+    $transcripcionId = (int)($data['interpretacion']['transcripcion_id'] ?? 0);
+    $flujoInforme = trim((string)($data['informe']['flujo_id'] ?? ''));
+
+    if ($transcripcionId > 0) {
+        $filtro = 'id = ?';
+        $tipo = 'i';
+        $valor = $transcripcionId;
+    } elseif ($flujoInforme !== '') {
+        $filtro = 'flujo_id = ?';
+        $tipo = 's';
+        $valor = $flujoInforme;
+    } elseif ($certificado_id > 0) {
+        $filtro = 'certificado_id = ?';
+        $tipo = 'i';
+        $valor = $certificado_id;
     } else {
-        $stmt = $mysqli->prepare("
-            SELECT id, audio_tmp, certificado_id, flujo_id, motor_a, motor_b,
-                   texto_a, texto_b, texto_doble, discrepancias_json,
-                   duracion_seg_a, duracion_seg_b,
-                   cost_a, cost_b, cost_total,
-                   created_at, updated_at
-            FROM ia_transcripciones
-            WHERE flujo_id = ?
-            ORDER BY created_at DESC
-            LIMIT 1
-        ");
-        $stmt->bind_param('s', $flujo_id);
+        $filtro = 'flujo_id = ?';
+        $tipo = 's';
+        $valor = $flujo_id;
     }
 
+    $stmt = $mysqli->prepare("
+        SELECT id, audio_tmp, certificado_id, flujo_id,
+            motor_a, motor_b, texto_a, texto_b, texto_doble,
+            discrepancias_json, duracion_seg_a, duracion_seg_b,
+            cost_a, cost_b, cost_total, created_at, updated_at
+        FROM ia_transcripciones
+        WHERE $filtro
+        ORDER BY created_at DESC, id DESC
+        LIMIT 2
+    ");
+
+    $stmt->bind_param($tipo, $valor);
     $stmt->execute();
+
     $res = $stmt->get_result();
-    $data['transcripcion'] = $res->fetch_assoc() ?: null;
+    $coincidencias = [];
+
+    while ($row = $res->fetch_assoc()) {
+        $coincidencias[] = $row;
+    }
+
     $stmt->close();
+
+    $data['transcripcion'] = $coincidencias[0] ?? null;
+    $data['transcripcion_aviso'] = null;
+
+    if ($transcripcionId === 0 && $flujoInforme !== '' && count($coincidencias) > 1) {
+        $data['transcripcion'] = null;
+        $data['transcripcion_aviso'] =
+            'Hay varias transcripciones posibles para este informe.';
+    }
+
+    if ($transcripcionId > 0 && !$data['transcripcion']) {
+        $data['transcripcion_aviso'] =
+            'No se encontró la transcripción asociada a la interpretación PHP.';
+    }
+
+    // ===============================================
+    // INFORME DEFINITIVO GUARDADO EN CERTIFICADOS
+    // ===============================================
+
+    $data['certificado_final'] = null;
+
+    $certificadoInforme = (int)($data['informe']['certificado_id'] ?? 0);
+
+    if ($certificadoInforme > 0) {
+        $stmt = $mysqli->prepare("
+            SELECT id, contenido_html, created_at, updated_at
+            FROM certificados
+            WHERE id = ?
+            LIMIT 1
+        ");
+
+        $stmt->bind_param('i', $certificadoInforme);
+        $stmt->execute();
+
+        $data['certificado_final'] = $stmt->get_result()->fetch_assoc() ?: null;
+
+        $stmt->close();
+    }
 
     echo json_encode(['status'=>'success','data'=>$data], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
     exit;

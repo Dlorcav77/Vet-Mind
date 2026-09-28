@@ -151,15 +151,46 @@ function gpt_build_prompt(
         - URÉTER Y ESTRUCTURAS CON HALLAZGO: si el DICTADO describe el uréter como distendido, dilatado, visible, o le da una medida, el informe DEBE reflejar ese hallazgo en el lado que corresponda. NUNCA dejes "No se visualiza uréter" de la plantilla cuando el DICTADO dice que el uréter SÍ se ve o está alterado. Respeta el lado (izquierdo/derecho) que indique el DICTADO.
         - GROSOR = PARED (tubo digestivo y vejiga). "grosor" del DICTADO y "pared" de la PLANTILLA son EL MISMO atributo. Si el DICTADO dice "grosor aumentado" (o engrosado/disminuido), ese estado MANDA: el informe DEBE decir "pared aumentada" / "pared engrosada", NUNCA "pared conservada". La medida numérica que acompaña NO normaliza el hallazgo: "grosor aumentado en 0,42 cm" → "pared aumentada de 0,42 cm", JAMÁS "pared conservada de 0,42 cm". Revisa esto órgano por órgano en Estómago, Duodeno, Yeyuno, Íleon, Colon y Vejiga: si el DICTADO marcó el grosor alterado, la pared NO puede quedar conservada.
       3. PARTE DE LA PLANTILLA, NO REESCRIBAS NI PIERDAS ÓRGANOS. Para cada órgano arranca de la frase completa de la PLANTILLA y cambia SOLO el atributo que el DICTADO contradiga. No acortes ni reescribas el órgano desde cero. Lo que el DICTADO no menciona, queda como en la PLANTILLA (estado normal). NUNCA elimines ni omitas un órgano que está en la PLANTILLA: el informe final debe contener TODOS los órganos/secciones de la PLANTILLA, más los que el DICTADO agregue. Si un órgano de la PLANTILLA no se dictó, va igual en estado normal.
-        - HÍGADO Y BORDES: en la PLANTILLA, los bordes del hígado se describen en el "lóbulo lateral izquierdo" (ej. "lóbulo lateral izquierdo aguzado"). Cuando el DICTADO dice "hígado bordes redondeados" (o cualquier estado de bordes), ese valor REEMPLAZA el del lóbulo lateral izquierdo: escribe "lóbulo lateral izquierdo redondeado", NO dejes "aguzado". NUNCA pongas los dos estados de bordes a la vez (no escribas "lóbulo lateral izquierdo aguzado ... bordes redondeados"): es contradictorio. El estado de bordes del hígado debe quedar UNO solo, el del DICTADO.
+        - HÍGADO Y BORDES: en la PLANTILLA, los bordes del hígado se expresan mediante el "lóbulo lateral izquierdo" (ej. "lóbulo lateral izquierdo aguzado").
+          SOLO modifica ese atributo cuando el DICTADO describa EXPLÍCITAMENTE los bordes del hígado (ej. "bordes redondeados", "bordes levemente redondeados", "bordes irregulares", "bordes aguzados").
+          Ejemplo: DICTADO "hígado bordes redondeados" → escribe "lóbulo lateral izquierdo redondeado".
+          Si el DICTADO NO menciona explícitamente los bordes, conserva el estado de bordes de la PLANTILLA.
+          Una expresión de localización como "focalizado en el lóbulo lateral izquierdo", "lesión en el lóbulo lateral izquierdo", "estructura ubicada en..." o equivalente NO describe automáticamente los bordes y NO debe reemplazar "aguzado/redondeado/irregular".
+          Si una expresión localizada es dudosa o no queda claro qué atributo describe, consérvala como información aparte y usa flag termino_confuso cuando corresponda; NO sacrifiques otro atributo de la PLANTILLA para acomodarla.
+
+        - ALCANCE DE ATRIBUTOS LOCALES VS GLOBALES: un descriptor perteneciente a una lesión, estructura, nódulo, masa o zona localizada NO modifica automáticamente un atributo global del órgano.
+          Antes de reemplazar un atributo de la PLANTILLA, confirma que el DICTADO se refiere explícitamente a ese atributo DEL ÓRGANO y no al hallazgo localizado.
+          Ejemplo obligatorio: "se observa una estructura en cabeza esplénica que deforma el borde seroso" NO significa "bordes del bazo deformados". Conserva el estado general de los bordes del bazo según la PLANTILLA o según un dictado explícito de los bordes, y describe aparte que la estructura deforma el borde seroso.
+          Otro ejemplo: "lesión focalizada en lóbulo lateral izquierdo" NO significa que "focalizado" sea la forma o el borde del hígado.
+          Si el alcance es ambiguo, conserva el texto clínico sin reasignarlo a otro atributo y marca la duda.
+
         - "SIN LESIONES FOCALES" Y LESIONES DICTADAS: si la PLANTILLA trae "Sin lesiones focales" en un órgano (hígado, bazo, riñón, etc.) y el DICTADO describe en ESE órgano una lesión, estructura, nódulo, masa o imagen focal (con o sin medida), ELIMINA la frase "Sin lesiones focales": es contradictoria con lo dictado. Deja solo la descripción de la(s) lesión(es) dictada(s). NUNCA dejes "Sin lesiones focales" junto a una lesión descrita en el mismo órgano.
-      4. COHERENCIA HOMOGÉNEO/HETEROGÉNEO (error frecuente; revísalo siempre). "Homogéneo" y "anecoico homogéneo" de la PLANTILLA describen un órgano/contenido SIN hallazgos. Si el DICTADO describe en ese mismo órgano cualquier estructura, lesión, nódulo, masa, cálculo, urolito, sedimento, barro biliar, contenido particulado o imagen focal, ese descriptor de la PLANTILLA es CONTRADICTORIO y DEBE cambiar:
-        - PARÉNQUIMA (bazo, hígado, riñón, páncreas, próstata, etc.): si el DICTADO describe una o más estructuras/lesiones/nódulos/masas en ese órgano, el parénquima pasa a "heterogéneo". NUNCA dejes "parénquima homogéneo" junto a una estructura descrita en el mismo órgano.
-        - CONTENIDO (vesícula biliar, vejiga urinaria, estómago, etc.): si el DICTADO describe barro biliar, sedimento, cálculos, estructuras hiperecoicas, sombra acústica o cualquier material dentro del lumen, ELIMINA "homogéneo" del contenido. Escribe "contenido anecoico" (sin "homogéneo") más la descripción del hallazgo. NUNCA dejes "contenido anecoico homogéneo" junto a barro biliar, sedimento o cálculos en el mismo órgano.
-        - Esto NO requiere que el DICTADO diga la palabra "heterogéneo": la sola presencia del hallazgo obliga el cambio.
-        - Si el DICTADO SÍ dice explícitamente "homogéneo" para ese órgano y a la vez describe un hallazgo focal, conserva ambos y marca flag incongruencia.
-        - No apliques esta regla a órganos donde el DICTADO no describió ningún hallazgo: ahí "homogéneo" de la PLANTILLA se conserva.
-        - NO AGREGUES el atributo si no existe. Esta regla solo CORRIGE un "homogéneo" que ya está en la PLANTILLA o en el DICTADO. Si el órgano no trae ese atributo en ninguno de los dos (ej. próstata, uréter, órganos extra), NO inventes "parénquima heterogéneo": describe solo lo que el DICTADO dio, más el hallazgo.
+
+      4. COHERENCIA HOMOGÉNEO/HETEROGÉNEO (error frecuente; revísalo siempre).
+
+        PRIMERO determina de dónde proviene "homogéneo":
+
+        A) "HOMOGÉNEO" PROVIENE SOLO DE LA PLANTILLA:
+        Si la PLANTILLA dice "homogéneo" o "anecoico homogéneo", pero el DICTADO describe en ese mismo órgano una estructura, lesión, nódulo, masa, cálculo, urolito, sedimento, barro biliar, contenido particulado o imagen focal, NO conserves silenciosamente ese estado normal de la PLANTILLA.
+
+        - PARÉNQUIMA (bazo, hígado, riñón, páncreas, etc.): si "homogéneo" existe SOLO en la PLANTILLA y el DICTADO describe una lesión/estructura focal en ese parénquima, cambia el descriptor incompatible según las reglas del informe. Si corresponde expresar heterogeneidad por la presencia del hallazgo, puede quedar "heterogéneo".
+        - CONTENIDO (vesícula biliar, vejiga urinaria, etc.): si "homogéneo" existe SOLO en la PLANTILLA y el DICTADO describe sedimento, cálculos, estructuras hiperecoicas, barro u otro material luminal, elimina "homogéneo". Conserva "contenido anecoico" solo si sigue siendo compatible con lo dictado.
+
+        B) "HOMOGÉNEO" FUE DICTADO EXPLÍCITAMENTE POR EL VETERINARIO:
+        Si el DICTADO dice explícitamente "homogéneo" / "anecoico homogéneo" y EN EL MISMO DICTADO también describe una lesión, estructura, cálculo, sedimento u otro hallazgo que parece incompatible, PROHIBIDO borrar, sustituir o convertir silenciosamente "homogéneo".
+        Conserva AMBAS afirmaciones tal como fueron dictadas y coloca flag incongruencia sobre el dato conflictivo.
+        En Observaciones del Asistente explica que el DICTADO contiene ambos datos y que requieren revisión.
+        NO conviertas automáticamente "homogéneo" en "heterogéneo".
+        NO elimines automáticamente "homogéneo".
+        El DICTADO explícito tiene prioridad sobre una normalización clínica automática.
+
+        Ejemplo obligatorio:
+        DICTADO: "vejiga con contenido anecoico homogéneo... se observan múltiples estructuras hiperecoicas con sombra acústica y sedimento".
+        RESULTADO: conserva "contenido anecoico homogéneo" Y conserva las estructuras/sedimento; marca incongruencia para revisión. NO elimines "homogéneo" por decisión propia.
+
+        - No agregues el atributo "homogéneo/heterogéneo" si no existe ni en la PLANTILLA ni en el DICTADO.
+        - La presencia de un hallazgo NO autoriza a inventar un nuevo atributo que ninguna fuente proporcionó.
+        - Antes de finalizar, verifica específicamente si eliminaste alguna palabra dictada explícitamente solo porque parecía clínicamente contradictoria. Si ocurrió, restáurala y usa un flag.
       5. FIDELIDAD SOBRE LIMPIEZA. Mejor un término feo pero visible y marcado, que un dato bonito pero silenciosamente equivocado.
 
       === SALIDA HTML ===

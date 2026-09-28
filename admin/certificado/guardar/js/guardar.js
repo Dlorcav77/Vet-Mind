@@ -327,13 +327,23 @@ function updateDraftStatus(text, cls) {
                         );
                     }
 
-                    const syncedData =
-                        collectDraftData();
+                    // Registrar los datos realmente enviados al servidor,
+                    // incorporando el ID del borrador recibido.
+                    const savedData = Object.assign({}, data, {
+                        borrador_id: $('#borrador_id').val() || '0'
+                    });
 
-                    lastDraftHash =
-                        JSON.stringify(syncedData);
+                    lastDraftHash = JSON.stringify(savedData);
 
-                    draftDirty = false;
+                    // Comprobar si el formulario cambió mientras
+                    // la petición de guardado estaba en curso.
+                    const currentHash = JSON.stringify(collectDraftData());
+
+                    draftDirty = currentHash !== lastDraftHash;
+
+                    if (draftDirty) {
+                        pendingDraftSave = true;
+                    }
 
                     updateDraftStatus(
                         'Guardado en borrador',

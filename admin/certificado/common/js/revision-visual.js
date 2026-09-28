@@ -71,8 +71,41 @@ function obtenerBloquesTexto() {
 }
 
 function buscarBloqueOrgano(nombre) {
-    const buscado = normalizar(nombre);
-    return obtenerBloquesTexto().find(b => normalizar(b.texto).includes(buscado)) || null;
+    const buscado = normalizarComparacion(nombre);
+    if (!buscado) return null;
+
+    const bloques = obtenerBloquesTexto();
+
+    /*
+     * Primero buscar por el nombre real detectado para la card.
+     * Esto evita falsos positivos con órganos cortos como AI / AD.
+     */
+    const exacto = bloques.find(b => {
+        const nombreCard = obtenerNombreCard(b.el);
+
+        return nombreCard
+            && normalizarComparacion(nombreCard) === buscado;
+    });
+
+    if (exacto) return exacto;
+
+    /*
+     * Fallback conservador:
+     * el nombre debe estar al comienzo del párrafo y terminar
+     * en un límite razonable, no simplemente aparecer dentro
+     * de cualquier palabra.
+     */
+    return bloques.find(b => {
+        const texto = normalizarComparacion(b.texto);
+
+        if (!texto.startsWith(buscado)) {
+            return false;
+        }
+
+        const siguiente = texto.charAt(buscado.length);
+
+        return !siguiente || /[\s:.,;-]/.test(siguiente);
+    }) || null;
 }
 
 function normalizarComparacion(valor) {
@@ -160,33 +193,95 @@ function obtenerCardsInforme() {
         });
 }
 
-function buscarRangoDom(contenedor, textoBuscado) {
-    const objetivo = normalizar(textoBuscado);
-    if (!objetivo) return null;
+function buscarRangoDom(contenedor, textoBuscado, ocurrencia = 0) {
+    const buscado = String(textoBuscado || '').trim();
+    if (!buscado) return null;
 
-    const walker = document.createTreeWalker(contenedor, NodeFilter.SHOW_TEXT);
+    const objetivo = buscado.toLowerCase();
+
+    /*
+     * Ignorar el texto de los <sup class="flag">.
+     *
+     * Si el HTML contiene:
+     *   cotextura<sup class="flag">...</sup> granular fina
+     *
+     * para búsqueda debe comportarse como:
+     *   cotextura granular fina
+     */
+    const walker = document.createTreeWalker(
+        contenedor,
+        NodeFilter.SHOW_TEXT,
+        {
+            acceptNode(node) {
+                const padre = node.parentElement;
+
+                if (padre && padre.closest('sup.flag')) {
+                    return NodeFilter.FILTER_REJECT;
+                }
+
+                return NodeFilter.FILTER_ACCEPT;
+            }
+        }
+    );
+
     const nodos = [];
     let texto = '';
     let nodo;
 
     while ((nodo = walker.nextNode())) {
         const inicio = texto.length;
-        texto += nodo.nodeValue || '';
-        nodos.push({ nodo, inicio, fin: texto.length });
+        const valor = nodo.nodeValue || '';
+
+        texto += valor;
+
+        nodos.push({
+            nodo,
+            inicio,
+            fin: texto.length
+        });
     }
 
-    const inicio = texto.toLowerCase().indexOf(objetivo);
-    if (inicio === -1) return null;
+    const textoComparacion = texto.toLowerCase();
 
-    const fin = inicio + textoBuscado.length;
-    const nodoInicio = nodos.find(n => inicio >= n.inicio && inicio < n.fin);
-    const nodoFin = nodos.find(n => (fin - 1) >= n.inicio && (fin - 1) < n.fin);
+    let inicio = -1;
+    let desde = 0;
 
-    if (!nodoInicio || !nodoFin) return null;
+    for (let i = 0; i <= ocurrencia; i++) {
+        inicio = textoComparacion.indexOf(objetivo, desde);
+
+        if (inicio === -1) {
+            return null;
+        }
+
+        desde = inicio + objetivo.length;
+    }
+
+    const fin = inicio + buscado.length;
+
+    const nodoInicio = nodos.find(n =>
+        inicio >= n.inicio && inicio < n.fin
+    );
+
+    const nodoFin = nodos.find(n =>
+        (fin - 1) >= n.inicio && (fin - 1) < n.fin
+    );
+
+    if (!nodoInicio || !nodoFin) {
+        return null;
+    }
 
     const range = new Range();
-    range.setStart(nodoInicio.nodo, inicio - nodoInicio.inicio);
-    range.setEnd(nodoFin.nodo, fin - nodoFin.inicio);
+
+    range.setStart(
+        nodoInicio.nodo,
+        inicio - nodoInicio.inicio
+    );
+
+    range.setEnd(
+        nodoFin.nodo,
+        fin - nodoFin.inicio
+    );
+
     return range;
 }
 
@@ -758,6 +853,32 @@ function aplicar(datos, persistir = true) {
 
     const rangosDudaSTT = [];
 
+    const ocurrenciasUsadas = new WeakMap();
+
+    const buscarRangoSinRepetir = function (contenedor, texto) {
+        let mapa = ocurrenciasUsadas.get(contenedor);
+
+        if (!mapa) {
+            mapa = new Map();
+            ocurrenciasUsadas.set(contenedor, mapa);
+        }
+
+        const clave = normalizarComparacion(texto);
+        const ocurrencia = mapa.get(clave) || 0;
+
+        const rango = buscarRangoDom(
+            contenedor,
+            texto,
+            ocurrencia
+        );
+
+        if (rango) {
+            mapa.set(clave, ocurrencia + 1);
+        }
+
+        return rango;
+    };
+
     datos.organos.forEach(organo => {
         const bloque = buscarBloqueOrgano(organo.organo);
         if (!bloque) return;
@@ -767,7 +888,10 @@ function aplicar(datos, persistir = true) {
                 ? atributo.origen
                 : 'desconocido';
 
-            const rango = buscarRangoDom(bloque.el, atributo.texto);
+            const rango = buscarRangoSinRepetir(
+                bloque.el,
+                atributo.texto
+            );
             if (rango) porOrigen[origen].push(rango);
         });
         (organo.dudasTranscripcion || []).forEach(frase => {

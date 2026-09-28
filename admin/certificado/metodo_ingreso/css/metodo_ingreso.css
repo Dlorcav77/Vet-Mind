@@ -1740,3 +1740,11 @@ mark.xx-faltante {
         transform: translateY(-4px);
     }
 }
+
+/* Cursor compacto, verde y sin borde blanco */
+.vm-tiptap-editor .ProseMirror,
+.vm-tiptap-editor.ProseMirror {
+    caret-color: #0f766e;
+
+    cursor: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='20' height='24' viewBox='0 0 20 24'%3E%3Cpath d='M7 4H13M10 4V20M7 20H13' fill='none' stroke='%230f766e' stroke-width='1.8' stroke-linecap='round'/%3E%3C/svg%3E") 10 12, text;
+}

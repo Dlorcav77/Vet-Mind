@@ -126,7 +126,7 @@ function exigirAutenticacion(
     string $redirectUrl = '../index.php'
 ): void
 {
-    $inactivo = 2400; // 40 minutos
+    $inactivo = 28800; // 8 horas
 
     $usuarioId = $_SESSION['usuario_id'] ?? null;
     $perfilId  = $_SESSION['perfil_id'] ?? null;

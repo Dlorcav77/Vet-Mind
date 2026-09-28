@@ -188,7 +188,11 @@ function ejecutarRevisor(dictado, informeHtml, plantillaBase, observacionesGener
             return;
         }
 
-        if (resp.rid) $('#rid_revision').val(resp.rid);
+        if (resp.rid) {
+            $('#rid_revision')
+                .val(resp.rid)
+                .trigger('change');
+        }
 
         const itemsRevisor = Array.isArray(resp.items) ? resp.items : [];
         const organos = Array.isArray(organosOrigen) ? organosOrigen : [];
@@ -268,9 +272,57 @@ function ejecutarRevisor(dictado, informeHtml, plantillaBase, observacionesGener
         observaciones.forEach(function (obs) {
             const indice = buscarOrgano(obs.contexto);
 
-            if (indice !== -1 && obs.tipo === 'termino_confuso') {
-                const detalle = norm(obs.texto || '');
+            if (
+                indice !== -1
+                && (
+                    obs.tipo === 'termino_confuso'
+                    || obs.tipo === 'incongruencia'
+                    || obs.tipo === 'valor_sospechoso'
+                    || obs.tipo === 'falta_unidad'
+                    || obs.tipo === 'medida_ilegible'
+                )
+            ) {
+                const detalleOriginal = String(obs.texto || '');
+                const detalle = norm(detalleOriginal);
+                const contexto = String(obs.contexto || '');
+                const contextoNorm = norm(contexto);
 
+                /*
+                * Extraer términos o valores que el generador dejó entre comillas
+                * dentro de la observación.
+                *
+                * Ejemplos:
+                *   “cotextura”
+                *   "asami líquido"
+                *   “0.3 cm”
+                *   “0 a 13 cm”
+                */
+                const regexCitas = /[“"]([^”"]{1,120})[”"]/gu;
+                let matchCita;
+
+                while ((matchCita = regexCitas.exec(detalleOriginal)) !== null) {
+                    const frase = String(matchCita[1] || '').trim();
+
+                    if (!frase) continue;
+
+                    if (contextoNorm.includes(norm(frase))) {
+                        if (
+                            !organosVisuales[indice]
+                                .dudasTranscripcion
+                                .includes(frase)
+                        ) {
+                            organosVisuales[indice]
+                                .dudasTranscripcion
+                                .push(frase);
+                        }
+                    }
+                }
+
+                /*
+                * Mantener el tratamiento especial histórico del uréter,
+                * porque algunas observaciones no necesariamente lo dejan
+                * entre comillas.
+                */
                 const esDudaUreter =
                     detalle.includes('ureter') &&
                     (
@@ -281,16 +333,19 @@ function ejecutarRevisor(dictado, informeHtml, plantillaBase, observacionesGener
                     );
 
                 if (esDudaUreter) {
-                    const contexto = String(obs.contexto || '');
-
                     const fraseUreter = contexto.match(
                         /(?:no\s+se\s+(?:visualiza|observa|identifica)\s+(?:el\s+)?ur[eé]ter|ur[eé]ter\s+(?:no\s+)?visible)/iu
                     );
 
-                    if (fraseUreter) {
-                        organosVisuales[indice].dudasTranscripcion.push(
-                            fraseUreter[0]
-                        );
+                    if (
+                        fraseUreter
+                        && !organosVisuales[indice]
+                            .dudasTranscripcion
+                            .includes(fraseUreter[0])
+                    ) {
+                        organosVisuales[indice]
+                            .dudasTranscripcion
+                            .push(fraseUreter[0]);
                     }
                 }
             }
@@ -893,32 +948,123 @@ $(document).off('click.revisionIAModal', '#revision_ia_modal_cerrar, #revision_i
 // Resalta en el informe las palabras que vinieron de una discrepancia entre los 2 motores.
 // Solo color (no número, no observación). El vet ve dónde hubo duda y revisa.
 function resaltarDiscrepancias(html, discrepancias) {
-    if (!Array.isArray(discrepancias) || discrepancias.length === 0) return html;
+    if (!Array.isArray(discrepancias) || discrepancias.length === 0) {
+        return html;
+    }
 
-    // Junta los tokens candidatos de ambos lados (A y B), separa por palabras,
-    // limpia signos y descarta palabras muy cortas o vacías para no pintar ruido.
-    const stop = new Set(['nada','con','de','el','la','en','por','x','y','o','un','una','del']);
+    const stop = new Set([
+        'nada',
+        'con',
+        'de',
+        'el',
+        'la',
+        'en',
+        'por',
+        'x',
+        'y',
+        'o',
+        'un',
+        'una',
+        'del'
+    ]);
+
     const candidatos = new Set();
+
+    const limpiarFrase = function (valor) {
+        return String(valor || '')
+            .replace(/^[\s"'“”‘’();:]+|[\s"'“”‘’();:]+$/g, '')
+            .replace(/\s+/g, ' ')
+            .trim();
+    };
+
     discrepancias.forEach(function (d) {
         [d.a, d.b].forEach(function (lado) {
-            (lado || '').split(/\s+/).forEach(function (w) {
-                const limpia = w.replace(/[.,;:()"]/g, '').trim();
-                const norm = limpia.toLowerCase();
-                if (limpia.length >= 4 && !stop.has(norm)) candidatos.add(limpia);
+            const frase = limpiarFrase(lado);
+
+            if (!frase) return;
+
+            /*
+             * Conservar la alternativa completa cuando:
+             * - contiene números, aunque sea corta ("0,3")
+             * - o es texto clínico suficientemente largo.
+             */
+            if (/\d/.test(frase) || frase.length >= 4) {
+                candidatos.add(frase);
+            }
+
+            /*
+             * Mantener también palabras individuales útiles,
+             * como hacía la versión anterior.
+             */
+            frase.split(/\s+/).forEach(function (w) {
+                const limpia = w
+                    .replace(/[.,;:()"]/g, '')
+                    .trim();
+
+                const normW = limpia.toLowerCase();
+
+                if (
+                    limpia.length >= 4
+                    && !stop.has(normW)
+                ) {
+                    candidatos.add(limpia);
+                }
             });
         });
     });
-    if (candidatos.size === 0) return html;
 
-    // Reemplaza cada candidato por su versión resaltada, evitando tocar dentro de etiquetas.
-    let out = html;
-    candidatos.forEach(function (palabra) {
-        const esc = palabra.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-        // (?![^<]*>) evita reemplazar dentro de atributos/tags HTML.
-        const re = new RegExp('(' + esc + ')(?![^<]*>)', 'gi');
-        out = out.replace(re, '<span class="vm-discrepancia" style="background:#fff3cd;border-bottom:2px solid #f59e0b;padding:0 2px;border-radius:3px">$1</span>');
-    });
-    return out;
+    if (candidatos.size === 0) {
+        return html;
+    }
+
+    const crearPatron = function (texto) {
+        return Array.from(texto).map(function (char) {
+            if (/\s/.test(char)) {
+                return '\\s+';
+            }
+
+            /*
+             * GPT normaliza decimales a punto, pero STT puede
+             * haber entregado coma.
+             */
+            if (char === '.' || char === ',') {
+                return '[.,]';
+            }
+
+            return char.replace(
+                /[.*+?^${}()|[\]\\]/g,
+                '\\$&'
+            );
+        }).join('');
+    };
+
+    const patrones = Array.from(candidatos)
+        .sort(function (a, b) {
+            return b.length - a.length;
+        })
+        .map(crearPatron);
+
+    if (!patrones.length) {
+        return html;
+    }
+
+    /*
+     * Un solo replace evita envolver dos veces una frase:
+     * primero gana siempre el candidato más largo.
+     */
+    const re = new RegExp(
+        '(' + patrones.join('|') + ')(?![^<]*>)',
+        'gi'
+    );
+
+    return html.replace(
+        re,
+        '<span class="vm-discrepancia" ' +
+        'style="background:#fff3cd;' +
+        'border-bottom:2px solid #f59e0b;' +
+        'padding:0 2px;' +
+        'border-radius:3px">$1</span>'
+    );
 }
 
 function obtenerContenidoInformeActual() {

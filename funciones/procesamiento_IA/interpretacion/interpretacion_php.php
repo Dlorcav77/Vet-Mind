@@ -23,32 +23,56 @@ function interpretacion_procesar_php(string $textoRecibido, ?array $origen = nul
 
     $patronOrgano = $catalogoOrganos['patron'];
 
-    // Admitir "adrenalina" como órgano únicamente cuando
-    // el validador STT haya propuesto esa corrección.
+    /*
+    * Alias de órganos ya resueltos por el validador STT.
+    *
+    * Ejemplos reales:
+    *   vaso       -> Bazo
+    *   adrenalina -> Adrenal
+    *   Duoden     -> Duodeno
+    *   Yiyuno     -> Yeyuno
+    *
+    * No modificamos la transcripción original.
+    * Solo permitimos que el intérprete reconozca el término descartado
+    * como inicio de órgano y lo normalice al órgano elegido.
+    */
+    $aliasesOrgano = [];
+
     foreach (($origen['resueltas'] ?? []) as $correccion) {
         if (!is_array($correccion)) {
             continue;
         }
 
-        $elegido = mb_strtolower(
-            (string)($correccion['elegido'] ?? ''),
-            'UTF-8'
-        );
+        if (($correccion['origen'] ?? '') !== 'organo') {
+            continue;
+        }
 
-        $descartado = mb_strtolower(
-            (string)($correccion['descartado'] ?? ''),
-            'UTF-8'
-        );
+        $elegido = trim((string)($correccion['elegido'] ?? ''));
+        $descartado = trim((string)($correccion['descartado'] ?? ''));
 
-        if (
-            ($correccion['origen'] ?? '') === 'organo'
-            && $elegido === 'adrenal'
-            && $descartado === 'adrenalina'
-        ) {
-            $patronOrgano .= '|adrenalina';
-            break;
+        if ($elegido === '' || $descartado === '') {
+            continue;
+        }
+
+        $clave = mb_strtolower($descartado, 'UTF-8');
+
+        if (!isset($aliasesOrgano[$clave])) {
+            $aliasesOrgano[$clave] = $elegido;
+
+            $patronOrgano .= '|'
+                . preg_quote($descartado, '/');
         }
     }
+
+    $normalizarOrganoDetectado = static function (?string $organo) use ($aliasesOrgano): ?string {
+        if ($organo === null || $organo === '') {
+            return null;
+        }
+
+        $clave = mb_strtolower(trim($organo), 'UTF-8');
+
+        return $aliasesOrgano[$clave] ?? $organo;
+    };
 
     // Identificar comienzos de órgano después de una coma.
     // No dividir las comas de los números decimales.
@@ -90,16 +114,24 @@ function interpretacion_procesar_php(string $textoRecibido, ?array $origen = nul
             . '(?!\p{L})/iu';
 
         if (preg_match($patronInicio, $fragmento, $m)) {
-            $organo = $m[1];
+            $organoOriginal = $m[1];
+
+            $organo = $normalizarOrganoDetectado(
+                $organoOriginal
+            );
+
             $lateralidad = !empty($m[2])
                 ? mb_strtolower($m[2], 'UTF-8')
                 : null;
-            $estado = 'extraido_textualmente';
 
-            if (mb_strtolower($organo, 'UTF-8') === 'adrenalina') {
-                $organo = 'adrenal';
-                $estado = 'organo_corregido_stt';
-            }
+            $claveOriginal = mb_strtolower(
+                trim($organoOriginal),
+                'UTF-8'
+            );
+
+            $estado = isset($aliasesOrgano[$claveOriginal])
+                ? 'organo_corregido_stt'
+                : 'extraido_textualmente';
         }
 
         // Si aparecen varios órganos, no atribuir todo a uno solo.
@@ -161,11 +193,213 @@ function interpretacion_procesar_php(string $textoRecibido, ?array $origen = nul
         ];
     }
 
+        /*
+     * Detectar referencias explícitas entre órganos/lateralidades.
+     *
+     * Ejemplo:
+     *   "Riñón derecho, mismas características que el izquierdo"
+     *
+     * No copiamos atributos aquí.
+     * Solo dejamos estructurada la referencia para que el generador
+     * sepa que el órgano descrito hereda las características del citado.
+     */
+    $referenciasEntreOrganos = [];
+
+    foreach ($hallazgos as $hallazgo) {
+        $organoActual = $hallazgo['organo'] ?? null;
+        $lateralidadActual = $hallazgo['lateralidad'] ?? null;
+        $textoHallazgo = (string)($hallazgo['valor_texto'] ?? '');
+
+        if (
+            $organoActual === null
+            || $lateralidadActual === null
+            || $textoHallazgo === ''
+        ) {
+            continue;
+        }
+
+        if (!preg_match(
+            '/\bmismas?\s+caracter[ií]sticas\s+que\s+(?:el|la)\s+'
+            . '(izquierd[oa]|derech[oa])\b/iu',
+            $textoHallazgo,
+            $m
+        )) {
+            continue;
+        }
+
+        $referenciasEntreOrganos[] = [
+            'organo_destino' => $organoActual,
+            'lateralidad_destino' => $lateralidadActual,
+            'organo_referencia' => $organoActual,
+            'lateralidad_referencia' => mb_strtolower(
+                $m[1],
+                'UTF-8'
+            ),
+            'evidencia' => $m[0],
+            'estado' => 'referencia_explicita'
+        ];
+    }
+
+        /*
+     * Detectar autocorrecciones numéricas explícitas del veterinario.
+     *
+     * Casos soportados inicialmente:
+     *
+     *   "0.79... no, era 0.57"
+     *   "0.45, no en 0.51"
+     *
+     * No modificamos el dictado ni los hallazgos originales.
+     * Solo dejamos estructurada la corrección para el generador.
+     */
+    $autocorrecciones = [];
+
+    $resolverContextoAutocorreccion = static function (
+        string $textoFuente,
+        int $offset
+    ) use ($patronOrgano, $normalizarOrganoDetectado): array {
+        $textoAnteriorBytes = substr($textoFuente, 0, $offset);
+
+        $contextoAnterior = mb_substr(
+            $textoAnteriorBytes,
+            -350,
+            null,
+            'UTF-8'
+        );
+
+        preg_match_all(
+            '/(?<!\p{L})(' . $patronOrgano . ')'
+            . '(?:\s+(izquierd[oa]|derech[oa]))?'
+            . '(?!\p{L})/iu',
+            $contextoAnterior,
+            $organos,
+            PREG_SET_ORDER
+        );
+
+        $ultimoOrgano = !empty($organos)
+            ? end($organos)
+            : null;
+
+        $organo = $ultimoOrgano
+            ? $normalizarOrganoDetectado($ultimoOrgano[1])
+            : null;
+
+        $lateralidad = $ultimoOrgano && !empty($ultimoOrgano[2])
+            ? mb_strtolower($ultimoOrgano[2], 'UTF-8')
+            : null;
+
+        $ventanaAtributo = mb_substr(
+            $textoAnteriorBytes,
+            -140,
+            null,
+            'UTF-8'
+        );
+
+        $atributo = 'medida';
+
+        if (preg_match('/\bpolo\s+caudal\b/iu', $ventanaAtributo)) {
+            $atributo = 'polo_caudal';
+        } elseif (preg_match('/\bpolo\s+craneal\b/iu', $ventanaAtributo)) {
+            $atributo = 'polo_craneal';
+        } elseif (preg_match('/\bgrosor\b/iu', $ventanaAtributo)) {
+            $atributo = 'grosor';
+        } elseif (preg_match('/\bpared\b/iu', $ventanaAtributo)) {
+            $atributo = 'pared';
+        } elseif (preg_match('/\btamañ[oa]\b/iu', $ventanaAtributo)) {
+            $atributo = 'tamaño';
+        }
+
+        return [
+            'organo' => $organo,
+            'lateralidad' => $lateralidad,
+            'atributo' => $atributo
+        ];
+    };
+
+    $normalizarNumeroAutocorreccion = static function (string $valor): string {
+        return str_replace(',', '.', trim($valor));
+    };
+
+    /*
+     * Forma 1:
+     *   "0.79... no, era 0.57"
+     *
+     * El primer valor es descartado y el segundo es el corregido.
+     */
+    preg_match_all(
+        '/(?P<anterior>\d+(?:[.,]\d+)?)'
+        . '\s*(?:cm|mm|cent[ií]metros?|mil[ií]metros?)?'
+        . '[\s,.;:…-]{0,15}'
+        . '\bno\s*,?\s*(?:era|es)\s+'
+        . '(?P<corregido>\d+(?:[.,]\d+)?)'
+        . '\s*(?:cm|mm|cent[ií]metros?|mil[ií]metros?)?/iu',
+        $texto,
+        $coincidenciasAutocorreccion,
+        PREG_SET_ORDER | PREG_OFFSET_CAPTURE
+    );
+
+    foreach ($coincidenciasAutocorreccion as $m) {
+        $contexto = $resolverContextoAutocorreccion(
+            $texto,
+            $m[0][1]
+        );
+
+        $autocorrecciones[] = [
+            'organo' => $contexto['organo'],
+            'lateralidad' => $contexto['lateralidad'],
+            'atributo' => $contexto['atributo'],
+            'valor_anterior' => $normalizarNumeroAutocorreccion(
+                $m['anterior'][0]
+            ),
+            'valor_corregido' => $normalizarNumeroAutocorreccion(
+                $m['corregido'][0]
+            ),
+            'evidencia' => trim($m[0][0])
+        ];
+    }
+
+    /*
+     * Forma 2:
+     *   "estaba en 0.45, no en 0.51"
+     *
+     * Aquí el valor correcto aparece PRIMERO
+     * y después el veterinario niega el valor anterior.
+     */
+    preg_match_all(
+        '/(?P<corregido>\d+(?:[.,]\d+)?)'
+        . '\s*(?:cm|mm|cent[ií]metros?|mil[ií]metros?)?'
+        . '\s*,?\s*\bno\s+en\s+'
+        . '(?P<anterior>\d+(?:[.,]\d+)?)'
+        . '\s*(?:cm|mm|cent[ií]metros?|mil[ií]metros?)?/iu',
+        $texto,
+        $coincidenciasAutocorreccionInvertida,
+        PREG_SET_ORDER | PREG_OFFSET_CAPTURE
+    );
+
+    foreach ($coincidenciasAutocorreccionInvertida as $m) {
+        $contexto = $resolverContextoAutocorreccion(
+            $texto,
+            $m[0][1]
+        );
+
+        $autocorrecciones[] = [
+            'organo' => $contexto['organo'],
+            'lateralidad' => $contexto['lateralidad'],
+            'atributo' => $contexto['atributo'],
+            'valor_anterior' => $normalizarNumeroAutocorreccion(
+                $m['anterior'][0]
+            ),
+            'valor_corregido' => $normalizarNumeroAutocorreccion(
+                $m['corregido'][0]
+            ),
+            'evidencia' => trim($m[0][0])
+        ];
+    }
+
     // Localizar cada diferencia dentro de su transcripción original.
     $buscarContexto = static function (
         string $textoFuente,
         string $termino
-    ) use ($patronOrgano): array {
+    ) use ($patronOrgano, $normalizarOrganoDetectado): array {
         $termino = trim($termino, " \t\n\r\0\x0B.,;:");
 
         if ($textoFuente === '' || $termino === '') {
@@ -199,7 +433,9 @@ function interpretacion_procesar_php(string $textoRecibido, ?array $origen = nul
         $ultimo = !empty($organos) ? end($organos) : null;
 
         return [
-            'organo' => $ultimo ? $ultimo[1] : null,
+            'organo' => $ultimo
+                ? $normalizarOrganoDetectado($ultimo[1])
+                : null,
             'lateralidad' => $ultimo && !empty($ultimo[2])
                 ? mb_strtolower($ultimo[2], 'UTF-8')
                 : null,
@@ -347,8 +583,8 @@ function interpretacion_procesar_php(string $textoRecibido, ?array $origen = nul
         'metodo' => 'php',
         'hallazgos' => $hallazgos,
         'correcciones_stt' => $origen['resueltas'] ?? [],
-        'autocorrecciones' => [],
-        'referencias_entre_organos' => [],
+        'autocorrecciones' => $autocorrecciones,
+        'referencias_entre_organos' => $referenciasEntreOrganos,
         'discrepancias' => $discrepancias,
         'alertas' => $alertas
     ];
