@@ -142,6 +142,22 @@ function gpt_build_prompt(
         - Esto aplica AUNQUE el órgano venga mal transcrito (ej. "Vaso" por "Bazo"): traslada el hallazgo al órgano correcto.
         - ATRIBUTO POR ATRIBUTO: cuando el DICTADO da un atributo de un órgano (bordes, ecogenicidad, forma, tamaño, contenido), usa el valor del DICTADO para ESE atributo, NO el de la PLANTILLA. Ejemplo: dictado "hígado bordes redondeados" → el informe debe decir "bordes redondeados", NUNCA "aguzado" porque lo diga la plantilla.
         - REEMPLAZO COMPLETO DEL VALOR DE UN ATRIBUTO: si el DICTADO especifica el valor de un atributo, reemplaza el valor correspondiente de la PLANTILLA y NO conserves calificadores adicionales de la plantilla que el DICTADO no mencionó. Ejemplo: PLANTILLA "patrón mucoso y gaseoso" + DICTADO "patrón gaseoso" → "patrón gaseoso", NO "patrón mucoso y gaseoso". Esto aplica cuando el DICTADO está dando explícitamente el valor de ese mismo atributo; no mezcles automáticamente el valor dictado con descriptores normales de la PLANTILLA.
+        - SUBATRIBUTOS INDEPENDIENTES DE LA PLANTILLA:
+            no elimines un descriptor de la PLANTILLA únicamente porque el DICTADO haya especificado OTRO descriptor diferente del mismo órgano o contenido.
+
+            Antes de quitar un término de la PLANTILLA, confirma que el DICTADO realmente está reemplazando ESE MISMO subatributo.
+
+            Ejemplo:
+            PLANTILLA: "contenido anecoico, homogéneo"
+            DICTADO: "contenido anecoico"
+            → conserva "contenido anecoico, homogéneo", porque el DICTADO confirmó la ecogenicidad pero no contradijo la homogeneidad.
+
+            Si el DICTADO dijera "contenido anecoico heterogéneo", entonces sí reemplaza "homogéneo" por "heterogéneo".
+
+            Esta regla NO significa conservar calificadores alternativos del mismo atributo.
+            Ejemplo: PLANTILLA "patrón mucoso y gaseoso" + DICTADO "patrón gaseoso" sigue usando solo el valor explícitamente dictado según la regla de reemplazo completo.
+
+            Las reglas especiales de coherencia homogéneo/heterogéneo siguen teniendo prioridad cuando existan lesiones, sedimento, cálculos u otros hallazgos incompatibles.
         - ATRIBUTO ABREVIADO SEGÚN PLANTILLA: el DICTADO puede mencionar un atributo de forma abreviada omitiendo una parte del nombre que ya está definida en la PLANTILLA. Si dentro del mismo órgano existe una correspondencia única y clara, CONSERVA el nombre completo del atributo de la PLANTILLA y reemplaza solo su estado con lo dictado. NO elimines calificadores anatómicos que identifican el atributo.
           Ejemplos:
           - Riñón, PLANTILLA "ecogenicidad cortical conservada" + DICTADO "ecogenicidad aumentada" → "ecogenicidad cortical aumentada".
@@ -150,7 +166,32 @@ function gpt_build_prompt(
           Esta regla aplica solo cuando la correspondencia entre el atributo abreviado del DICTADO y el atributo de la PLANTILLA es inequívoca dentro de ese órgano. Si hay más de un atributo posible, no adivines y marca la duda.
         - URÉTER Y ESTRUCTURAS CON HALLAZGO: si el DICTADO describe el uréter como distendido, dilatado, visible, o le da una medida, el informe DEBE reflejar ese hallazgo en el lado que corresponda. NUNCA dejes "No se visualiza uréter" de la plantilla cuando el DICTADO dice que el uréter SÍ se ve o está alterado. Respeta el lado (izquierdo/derecho) que indique el DICTADO.
         - GROSOR = PARED (tubo digestivo y vejiga). "grosor" del DICTADO y "pared" de la PLANTILLA son EL MISMO atributo. Si el DICTADO dice "grosor aumentado" (o engrosado/disminuido), ese estado MANDA: el informe DEBE decir "pared aumentada" / "pared engrosada", NUNCA "pared conservada". La medida numérica que acompaña NO normaliza el hallazgo: "grosor aumentado en 0,42 cm" → "pared aumentada de 0,42 cm", JAMÁS "pared conservada de 0,42 cm". Revisa esto órgano por órgano en Estómago, Duodeno, Yeyuno, Íleon, Colon y Vejiga: si el DICTADO marcó el grosor alterado, la pared NO puede quedar conservada.
-      3. PARTE DE LA PLANTILLA, NO REESCRIBAS NI PIERDAS ÓRGANOS. Para cada órgano arranca de la frase completa de la PLANTILLA y cambia SOLO el atributo que el DICTADO contradiga. No acortes ni reescribas el órgano desde cero. Lo que el DICTADO no menciona, queda como en la PLANTILLA (estado normal). NUNCA elimines ni omitas un órgano que está en la PLANTILLA: el informe final debe contener TODOS los órganos/secciones de la PLANTILLA, más los que el DICTADO agregue. Si un órgano de la PLANTILLA no se dictó, va igual en estado normal.
+        - INTERPRETACIÓN DE "GROSOR" SEGÚN EL ÓRGANO:
+            NO asumas que "grosor" significa siempre "pared" ni siempre "tamaño" solo porque la PLANTILLA tenga uno de esos atributos.
+
+            A) ÓRGANOS HUECOS O TUBULARES:
+            En vejiga urinaria y tracto gastrointestinal, "grosor" describe la PARED salvo que el DICTADO indique explícitamente otra estructura.
+            Usa por tanto el atributo "pared" de la PLANTILLA.
+            Ejemplo: "vejiga grosor conservado 0.26 cm" → "pared conservada de 0.26 cm".
+            Ejemplo: "yeyuno grosor aumentado 0.35 cm" → "pared aumentada de 0.35 cm".
+
+            B) PÁNCREAS:
+            Si el DICTADO usa únicamente una valoración CUALITATIVA del grosor
+            ("grosor conservado", "grosor aumentado", "grosor disminuido")
+            y NO entrega una medida específica de grosor ni describe además el tamaño por separado,
+            puede interpretarse como estado general de tamaño para mantener la estructura de la PLANTILLA.
+            Ejemplo: PLANTILLA "Páncreas de tamaño conservado" + DICTADO "Páncreas, grosor conservado" → conserva "tamaño conservado"; no agregues además una segunda frase "grosor conservado".
+
+            Si el DICTADO entrega una MEDIDA de grosor pancreático, conserva "grosor" como atributo propio y NO lo conviertas automáticamente en tamaño.
+            Ejemplo: "Páncreas grosor 0.8 cm" → conserva "grosor 0.8 cm".
+
+            C) OTROS ÓRGANOS SÓLIDOS:
+            NO conviertas "grosor" automáticamente en "tamaño" únicamente porque la PLANTILLA contenga tamaño.
+            Conserva el atributo dictado o marca duda si no queda claro qué dimensión describe.
+
+            D) SI EL DICTADO MENCIONA TANTO TAMAÑO COMO GROSOR:
+            trátalos como atributos distintos; nunca fusiones uno dentro del otro automáticamente.
+        3. PARTE DE LA PLANTILLA, NO REESCRIBAS NI PIERDAS ÓRGANOS. Para cada órgano arranca de la frase completa de la PLANTILLA y cambia SOLO el atributo que el DICTADO contradiga. No acortes ni reescribas el órgano desde cero. Lo que el DICTADO no menciona, queda como en la PLANTILLA (estado normal). NUNCA elimines ni omitas un órgano que está en la PLANTILLA: el informe final debe contener TODOS los órganos/secciones de la PLANTILLA, más los que el DICTADO agregue. Si un órgano de la PLANTILLA no se dictó, va igual en estado normal.
         - HÍGADO Y BORDES: en la PLANTILLA, los bordes del hígado se expresan mediante el "lóbulo lateral izquierdo" (ej. "lóbulo lateral izquierdo aguzado").
           SOLO modifica ese atributo cuando el DICTADO describa EXPLÍCITAMENTE los bordes del hígado (ej. "bordes redondeados", "bordes levemente redondeados", "bordes irregulares", "bordes aguzados").
           Ejemplo: DICTADO "hígado bordes redondeados" → escribe "lóbulo lateral izquierdo redondeado".
@@ -231,7 +272,36 @@ function gpt_build_prompt(
       - DISCREPANCIA ENTRE TÉRMINO CLÍNICO Y RUIDO: cuando las dos transcripciones difieren y una alternativa es un término clínico válido y coherente con la frase, mientras la otra es claramente ruido, una conjunción, palabra incompleta o término sin significado clínico en ese contexto, usa el término clínico. No lo omitas.
         Ejemplo: "bordes regulares y homogéneo" / "bordes regulares hipoecoico homogéneo" → usa "bordes regulares, hipoecoico, homogéneo". La alternativa "y" no reemplaza ni elimina el descriptor clínico "hipoecoico".
         Esta regla NO aplica cuando ambas alternativas son términos clínicos válidos con significados diferentes; en ese caso conserva la duda y usa flag termino_confuso.
-      - FIDELIDAD DE DESCRIPTORES ECOGRÁFICOS: conserva EXACTAMENTE el descriptor clínico usado por el DICTADO. La PLANTILLA puede indicar qué atributo se está describiendo, pero NUNCA puede sustituir el valor o descriptor dado por el DICTADO aunque ambos parezcan clínicamente equivalentes.
+        - DISCREPANCIAS ENTRE LOS DOS MOTORES: si una diferencia entre Motor A y Motor B NO aparece en CORRECCIONES YA RESUELTAS, PROHIBIDO crear una tercera palabra o expresión que no exista literalmente en ninguna de las dos transcripciones.
+        - Nunca "corrijas por intuición" una alternativa hacia un término clínico parecido que ninguno de los motores entregó.
+        - Si una alternativa es claramente ruido y la otra es inequívocamente clínica, usa EXACTAMENTE la alternativa clínica existente; no la reformules.
+        - Si no puedes descartar una alternativa con seguridad, conserva la forma presente en el DICTADO principal y marca termino_confuso.
+
+        - NÚMERO Y UNIDAD COINCIDENTES ENTRE AMBOS MOTORES:
+        si ambos motores contienen el MISMO valor numérico y la misma unidad para una medida,
+        NO conviertas esa medida en XX únicamente porque exista una discrepancia en una palabra,
+        preposición o token inmediatamente anterior o posterior.
+
+        Conserva el número y la unidad compartidos.
+
+        Ejemplo:
+        Motor A: "grosor conservado, 1 0.2 centímetros"
+        Motor B: "grosor conservado en 0.2 centímetros"
+        → la medida confirmada entre ambos motores es 0.2 cm.
+        PROHIBIDO convertirla en XX por la discrepancia "1 / en".
+
+        - UNA DISCREPANCIA PENDIENTE NO PUEDE SER TAPADA POR LA PLANTILLA:
+            si una discrepancia no resuelta afecta una palabra, frase o atributo clínico del órgano, NO uses el valor normal de la PLANTILLA para reemplazar, completar o disimular esa parte dudosa.
+            Conserva en el informe la alternativa presente en el DICTADO principal que corresponda a esa zona y marca termino_confuso, salvo que exista una regla más específica para ese tipo de discrepancia.
+            La PLANTILLA puede conservar atributos independientes que el DICTADO no mencionó, pero NO puede decidir silenciosamente el atributo que justamente está en discusión entre los dos motores.
+
+        - Ejemplo obligatorio:
+            Motor A "4 mucosas ratificación" / Motor B "patromucosa, estratificación".
+            Si la diferencia sigue pendiente, PROHIBIDO resolverla escribiendo simplemente "patrón mucoso" o "estratificación conservada" usando la PLANTILLA como si no existiera discrepancia.
+            Conserva la parte dudosa del DICTADO principal que afecte ese atributo y márcala termino_confuso para revisión.
+        - Ejemplo obligatorio: Motor A "cotextura" / Motor B "con textura" → PROHIBIDO escribir "ecotextura" por deducción. Si la diferencia no fue resuelta previamente, conserva "cotextura" y márcala termino_confuso, explicando en Observaciones que el otro motor transcribió "con textura".
+        - Ejemplo: Motor A "doble" / Motor B "Doppler" puede resolverse a "Doppler" SOLO si el validador STT lo dejó como CORRECCIÓN YA RESUELTA; de lo contrario no inventes ni normalices silenciosamente.
+        - FIDELIDAD DE DESCRIPTORES ECOGRÁFICOS: conserva EXACTAMENTE el descriptor clínico usado por el DICTADO. La PLANTILLA puede indicar qué atributo se está describiendo, pero NUNCA puede sustituir el valor o descriptor dado por el DICTADO aunque ambos parezcan clínicamente equivalentes.
         - Si el DICTADO dice "hiperecoico", escribe "hiperecoico"; NO lo conviertas en "ecogenicidad aumentada".
         - Si dice "hipoecoico", escribe "hipoecoico"; NO lo conviertas en "ecogenicidad disminuida".
         - Si dice "ecogenicidad aumentada", escribe "ecogenicidad aumentada"; NO la conviertas en "hiperecoica".
@@ -282,7 +352,9 @@ function gpt_build_prompt(
 
       === VALIDACIÓN FINAL (antes de responder) ===
       1. Recorre órgano por órgano comparando con el DICTADO: (a) ¿algún atributo que el DICTADO marcó alterado quedó como normal/conservado de la plantilla? (b) ¿algún atributo (bordes, ecogenicidad, forma) quedó con el valor de la PLANTILLA en vez del que dio el DICTADO? (c) ¿el uréter quedó "no visible" cuando el DICTADO decía distendido/visible/con medida? Si encuentras cualquiera, corrígelo (regla de oro 2).      
-      2. ¿Quedó "homogéneo" o "anecoico homogéneo" en algún órgano donde el DICTADO describió estructuras, lesiones, cálculos, sedimento o barro biliar? Si sí, corrígelo (regla de oro 4): parénquima → "heterogéneo"; contenido → elimina "homogéneo".
+      2. ¿Quedó "homogéneo" o "anecoico homogéneo" en algún órgano donde el DICTADO describió estructuras, lesiones, cálculos, sedimento o barro biliar?
+        - Si "homogéneo" proviene SOLO de la PLANTILLA, aplica la regla de oro 4 y corrige/elimina el descriptor incompatible.
+        - Si "homogéneo" fue DICTADO EXPLÍCITAMENTE, NO lo elimines ni lo conviertas: conserva lo dictado y verifica que exista flag incongruencia con su observación correspondiente.
       3. ¿Están TODOS los órganos/secciones de la PLANTILLA en el informe (ninguno omitido)? ¿El reproductivo hembra, próstata, testículos o íleon quedaron en su posición anatómica y no en HALLAZGOS ADICIONALES?
       4. ¿Cada flag del cuerpo tiene su línea en Observaciones con el mismo número y tipo? Si falta alguna, agrégala.
       5. ¿Conservaste términos dudosos con flag en vez de adivinarlos?

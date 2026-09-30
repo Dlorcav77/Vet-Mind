@@ -1,5 +1,5 @@
 <?php
-// funciones/GPT/lib/stt_validador.php
+// funciones/procesamiento_IA/transcripcion/lib/stt_validador.php
 // Comparación de 2 transcripciones + validador (órganos/conceptos) + armado de bloques.
 // Compartido por el banco y por transcribir_doble.php. Sin salida, solo define funciones/listas.
 declare(strict_types=1);
@@ -67,10 +67,14 @@ $catalogoOrganos = require __DIR__ . '/../../config/organos.php';
 $ORGANOS_LISTA = $catalogoOrganos['stt'];
 $CONCEPTOS_LISTA = [
     'ecogenicidad','anecoico','anecoica','anecoicas',
-    'hipoecoico','hipoecoica','hipoecoicas','hiperecoico','hiperecoica','hiperecoicas',
+    'hipoecoico','hipoecoica','hipoecoicas',
+    'hiperecoico','hiperecoica','hiperecoicas',
+    'isoecoico','isoecoica','isoecoicos','isoecoicas',
     'parenquima','estratificacion','esplenico','felino','aguzados','engrosado','engrosada','engrosadas',
     'mucoso','corticomedular','vasculatura','homogeneo','lobulo','reactivo','distendida',
-    'redondeados','conservado','pelvica','grosor',
+    'redondeados','conservado','pelvica','grosor','doppler','peritoneal',
+    'peripancreatico','peripancreatica',
+    'peripancreaticos','peripancreaticas',
 ];
 function org_norm(string $w): string {
     $w = mb_strtolower($w, 'UTF-8');
@@ -95,18 +99,266 @@ function concepto_similar(string $valido, string $otro): bool {
     $umbral = max(1, (int)floor(mb_strlen($a) / 3));
     return levenshtein($a, $b) <= $umbral;
 }
+function concepto_equivalente_conocido(string $valido, string $otro): bool {
+    $validoNorm = org_norm($valido);
+    $otroNorm = org_norm($otro);
+
+    $equivalencias = [
+        'doppler' => ['doble'],
+        'pelvica' => ['pellicano'],
+    ];
+
+    return isset($equivalencias[$validoNorm])
+        && in_array($otroNorm, $equivalencias[$validoNorm], true);
+}
+
+function concepto_frase_equivalente_conocida(string $a, string $b): ?array
+{
+    $aNorm = org_norm($a);
+    $bNorm = org_norm($b);
+
+    /**
+     * Equivalencias STT de alta confianza.
+     *
+     * "canonico" es la forma que se enviará al generador.
+     * "variantes" son errores recurrentes conocidos.
+     *
+     * Importante: permite resolver incluso cuando AMBOS motores
+     * entregaron variantes erróneas del mismo concepto.
+     */
+    $equivalencias = [
+        'ureterno' => [
+            'canonico'  => 'ureter no',
+            'variantes' => ['ureterna'],
+        ],
+        'patronmucoso' => [
+            'canonico'  => 'patrón mucoso',
+            'variantes' => [
+                '4mucosas',
+                '4mucosa',
+                'patromoncose',
+                'patomucosa',
+            ],
+        ],
+        'anecoico' => [
+            'canonico'  => 'anecoico',
+            'variantes' => [
+                'nicoico',
+                'onicoico',
+                'anicoico',
+            ],
+        ],
+        'hipoecoicohomogeneo' => [
+            'canonico'  => 'hipoecoico homogéneo',
+            'variantes' => [
+                'hipocoicohomogenea',
+            ],
+        ],
+        'hiperecoica' => [
+            'canonico'  => 'hiperecoica',
+            'variantes' => [
+                'ypericoica',
+                'pericoica',
+            ],
+        ],
+        'ecogenicidadlevemente' => [
+            'canonico'  => 'ecogenicidad levemente',
+            'variantes' => [
+                'ecogenesisdeaislamiento',
+            ],
+        ],
+        'patronmucosoestratificacion' => [
+            'canonico'  => 'patrón mucoso, estratificación',
+            'variantes' => [
+                '4mucosasratificacion',
+                'patronmucosostratificacion',
+            ],
+        ],
+        'hiperecoico' => [
+            'canonico'  => 'hiperecoico',
+            'variantes' => [
+                'hiperacoico',
+                'ypericolico',
+            ],
+        ],
+        'anecoicohomogeneo' => [
+            'canonico'  => 'anecoico homogéneo',
+            'variantes' => [
+                'anecoecogeneo',
+                'micoecomogeneo',
+            ],
+        ],
+        'isoecoicoheterogeneo' => [
+            'canonico'  => 'isoecoico heterogéneo',
+            'variantes' => [
+                'isocoicoterigeneo',
+            ],
+        ],
+    ];
+
+    foreach ($equivalencias as $formaNorm => $config) {
+        $grupo = array_merge(
+            [$formaNorm],
+            $config['variantes']
+        );
+
+        if (
+            !in_array($aNorm, $grupo, true)
+            || !in_array($bNorm, $grupo, true)
+            || $aNorm === $bNorm
+        ) {
+            continue;
+        }
+
+        $descartadas = [];
+
+        if ($aNorm !== $formaNorm) {
+            $descartadas[] = $a;
+        }
+
+        if ($bNorm !== $formaNorm) {
+            $descartadas[] = $b;
+        }
+
+        return [
+            'accion'     => 'resuelto',
+            'elegido'    => $config['canonico'],
+            'descartado' => implode(' / ', $descartadas),
+        ];
+    }
+
+    return null;
+}
+
 function concepto_validar(string $a, string $b, array $conceptos): array {
     $a1 = org_limpia_borde($a); $b1 = org_limpia_borde($b);
-    if (strpos($a1, ' ') !== false || strpos($b1, ' ') !== false) return ['accion'=>'pasa'];
+
     if ($a1 === '' || $b1 === '') return ['accion'=>'pasa'];
+
+    // Algunas correcciones conocidas son frases y deben resolverse
+    // antes del validador normal de conceptos de una sola palabra.
+    $frase = concepto_frase_equivalente_conocida($a1, $b1);
+    if ($frase !== null) {
+        return $frase;
+    }
+
+    if (strpos($a1, ' ') !== false || strpos($b1, ' ') !== false) {
+        return ['accion'=>'pasa'];
+    }
     $ca = concepto_es($a1, $conceptos); $cb = concepto_es($b1, $conceptos);
-    if ($ca && !$cb && concepto_similar($a1, $b1)) return ['accion'=>'resuelto','elegido'=>$a1,'descartado'=>$b1];
-    if ($cb && !$ca && concepto_similar($b1, $a1)) return ['accion'=>'resuelto','elegido'=>$b1,'descartado'=>$a1];
+    if (
+        $ca
+        && !$cb
+        && (
+            concepto_similar($a1, $b1)
+            || concepto_equivalente_conocido($a1, $b1)
+        )
+    ) {
+        return [
+            'accion' => 'resuelto',
+            'elegido' => $a1,
+            'descartado' => $b1
+        ];
+    }
+
+    if (
+        $cb
+        && !$ca
+        && (
+            concepto_similar($b1, $a1)
+            || concepto_equivalente_conocido($b1, $a1)
+        )
+    ) {
+        return [
+            'accion' => 'resuelto',
+            'elegido' => $b1,
+            'descartado' => $a1
+        ];
+    }
     return ['accion'=>'pasa'];
 }
+
+/**
+ * Resuelve un error STT recurrente donde un decimal se separa como:
+ *
+ *   "0 a 37"  <->  "0,37"
+ *
+ * Solo resuelve si ambas alternativas representan exactamente
+ * el mismo decimal. No decide entre números realmente distintos.
+ */
+function numero_decimal_equivalente(string $a, string $b): ?array
+{
+    $extraerDecimalRoto = function (string $texto): ?string {
+        $texto = mb_strtolower($texto, 'UTF-8');
+
+        if (
+            preg_match(
+                '/(?:^|\s)0\s+a\s+(\d{1,3})(?:\s|$)/u',
+                $texto,
+                $m
+            )
+        ) {
+            return '0.' . $m[1];
+        }
+
+        return null;
+    };
+
+    $contieneDecimal = function (string $texto, string $decimal): bool {
+        $texto = str_replace(',', '.', $texto);
+
+        return (bool)preg_match(
+            '/(?:^|[^0-9])' . preg_quote($decimal, '/') . '(?:[^0-9]|$)/u',
+            $texto
+        );
+    };
+
+    // A trae "0 a 37" y B trae "0,37".
+    $decimalA = $extraerDecimalRoto($a);
+
+    if (
+        $decimalA !== null
+        && $contieneDecimal($b, $decimalA)
+    ) {
+        return [
+            'accion'     => 'resuelto',
+            'elegido'    => $decimalA,
+            'descartado' => $a,
+        ];
+    }
+
+    // B trae "0 a 37" y A trae "0,37".
+    $decimalB = $extraerDecimalRoto($b);
+
+    if (
+        $decimalB !== null
+        && $contieneDecimal($a, $decimalB)
+    ) {
+        return [
+            'accion'     => 'resuelto',
+            'elegido'    => $decimalB,
+            'descartado' => $b,
+        ];
+    }
+
+    return null;
+}
+
 function org_procesar(array $disc, array $organos, array $conceptos = []): array {
     $resueltas = []; $aIA = [];
     foreach ($disc as $d) {
+
+        // Resolver primero equivalencias numéricas inequívocas.
+        $n = numero_decimal_equivalente($d['a'], $d['b']);
+        if ($n !== null && $n['accion'] === 'resuelto') {
+            $resueltas[] = [
+                'elegido'    => $n['elegido'],
+                'descartado' => $n['descartado'],
+                'origen'     => 'numero',
+            ];
+            continue;
+        }
+
         $r = org_validar($d['a'], $d['b'], $organos);
         if ($r['accion'] === 'resuelto') { $resueltas[] = ['elegido'=>$r['elegido'],'descartado'=>$r['descartado'],'origen'=>'organo']; continue; }
         $c = concepto_validar($d['a'], $d['b'], $conceptos);
@@ -121,10 +373,10 @@ function construir_bloque_resueltas(array $resueltas): string {
     if (empty($resueltas)) return '';
     $lineas = [];
     foreach ($resueltas as $r) {
-        $lineas[] = '- Usa "' . $r['elegido'] . '" (un motor transcribio mal como "' . $r['descartado'] . '")';
+        $lineas[] = '- Usa "' . $r['elegido'] . '" (corrección resuelta; se descartó "' . $r['descartado'] . '")';
     }
-    return "\n\n=== CORRECCIONES YA RESUELTAS (diferencias entre las 2 transcripciones del mismo audio, ya decididas porque un motor transcribio mal; usa SIEMPRE el termino correcto indicado; no incluyas esta nota en el informe) ===\n"
-         . implode("\n", $lineas);
+    return "\n\n=== CORRECCIONES YA RESUELTAS (diferencias entre las 2 transcripciones del mismo audio, resueltas mediante reglas STT de alta confianza; usa SIEMPRE el termino correcto indicado; no incluyas esta nota en el informe) ===\n"
+        . implode("\n", $lineas);
 }
 function construir_bloque_discrepancias(array $disc): string {
     if (empty($disc)) return '';

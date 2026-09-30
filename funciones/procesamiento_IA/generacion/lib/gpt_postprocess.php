@@ -24,6 +24,9 @@ function gpt_postprocess_html(string $html, bool $incluir_conclusion, array $ctx
         $html = preg_replace('#<p>\s*<strong>\s*CONCLUSI(Ó|O)N:\s*</strong>\s*<br>\s*.*?</p>#is', '', $html);
     }
 
+    // 2.25) Normalizar formato de nombres dentro de Gastro entero.
+    $html = gpt_normalizar_formato_gastro($html);
+
     // 2.5) Marcar los XX sueltos (medidas no dictadas que quedaron en la plantilla).
     $html = gpt_marcar_xx_faltantes($html);
 
@@ -51,6 +54,38 @@ function gpt_sanitizar_html(string $html): string
     $html = preg_replace('#</?(?:html|head|body)\b[^>]*>#i', '', $html);
 
     return trim($html);
+}
+
+/**
+ * Normaliza únicamente el formato de los órganos de la sección Gastro entero.
+ *
+ * El modelo a veces devuelve alguno como <strong>Colon</strong> o texto plano,
+ * aunque en esta sección deben mostrarse en cursiva.
+ *
+ * No modifica contenido clínico: solo el tag visual del nombre inicial.
+ */
+function gpt_normalizar_formato_gastro(string $html): string
+{
+    $resultado = preg_replace_callback(
+        '#(<p\b[^>]*>\s*<strong>\s*Gastro\s+entero\s*:\s*</strong>\s*</p>)(.*?)(?=<p\b[^>]*>\s*<strong>\s*Páncreas\s*</strong>)#isu',
+        function (array $m): string {
+            $contenido = preg_replace_callback(
+                '#(<p\b[^>]*>\s*)(?:(?:<strong>|<em>)\s*)?(Estómago|Duodeno|Yeyuno|Íleon|Ciego|Colon)(?:\s*</(?:strong|em)>)?#iu',
+                function (array $organo): string {
+                    return $organo[1]
+                        . '<em>'
+                        . $organo[2]
+                        . '</em>';
+                },
+                $m[2]
+            );
+
+            return $m[1] . ($contenido ?? $m[2]);
+        },
+        $html
+    );
+
+    return $resultado ?? $html;
 }
 
 /**
@@ -390,14 +425,24 @@ function gpt_placeholder_observacion(int $n, string $tipo): string
  */
 function gpt_marcar_xx_faltantes(string $html): string
 {
-    return preg_replace_callback(
-        '/\bXX\b(?!\s*<sup\b[^>]*class=["\']flag)/',
+    // 1) XX suelto: viene de la plantilla y no tiene flag.
+    //    Lo resaltamos y creamos valor_faltante.
+    $html = preg_replace_callback(
+        '/\bXX\b(?!\s*<sup\b[^>]*class=["\']flag)/i',
         function () {
-            // Envuelve el XX en <mark> para resaltarlo en amarillo y le pega el flag.
-            // El <mark> viaja con el contenido hasta el PDF: si un XX se cuela, salta a la vista.
             return '<mark class="xx-faltante">XX</mark>'
                  . '<sup class="flag" data-flag="0" data-tipo="valor_faltante">(0)</sup>';
         },
         $html
-    );
+    ) ?? $html;
+
+    // 2) XX que YA tiene un flag del modelo (por ejemplo medida_ilegible):
+    //    conserva exactamente ese flag; solo agrega el resaltado visual.
+    $html = preg_replace(
+        '/\bXX\b(?=\s*<sup\b[^>]*class=["\']flag)/i',
+        '<mark class="xx-faltante">XX</mark>',
+        $html
+    ) ?? $html;
+
+    return $html;
 }

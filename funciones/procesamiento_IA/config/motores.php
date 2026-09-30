@@ -3,8 +3,8 @@ declare(strict_types=1);
 
 return [
     'transcripcion' => [
-        'motor_a' => 'deepgram',
-        'motor_b' => 'assembly_v3',
+        'motor_a' => 'assembly_v3',
+        'motor_b' => 'deepgram',
         'motor_por_defecto' => 'assembly_v3',
         'usar_keyterms' => '0',
 
