@@ -68,16 +68,16 @@ return [
         'parametros' => [
             'openai' => [
                 'archivo' => 'generacion/motores/openai.php',
-                'model' => 'gpt-5.4',
-                'reasoning_effort' => 'low',
+                'model' => 'gpt-6.1-sol',
+                'reasoning_effort' => 'medium',
                 'max_output_tokens' => 8000,
                 'max_prompt_bytes_soft' => 102400,
                 'max_prompt_bytes_hard' => 307200,
-                'max_attempts' => 3,
-                'retry_delays' => [0, 2, 5],
+                'max_attempts' => 2,
+                'retry_delays' => [0, 5],
                 'timeouts' => [
                     'connect' => 10,
-                    'total' => 120,
+                    'total' => 60,
                 ],
                 'snapshot' => false,
             ],
