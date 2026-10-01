@@ -241,12 +241,14 @@ ia_guardar_request($mysqli, [
     'datetime_ia'       => date('c'),
 ]);
 
-// ───── NUEVO: SNAPSHOT sencillo ─────
+// ───── SNAPSHOT sencillo ─────
 if (GPT_SNAPSHOT === 1) {
-    $snapDir = $GEN_DIR . '/snapshots';
+    $snapDir = dirname(__DIR__) . '/snapshots';
+
     if (!is_dir($snapDir)) {
         @mkdir($snapDir, 0775, true);
     }
+
     $snapFile = $snapDir . '/' . date('Ymd_His') . '_' . $rid . '.json';
 
     $snapshot = [
@@ -266,9 +268,14 @@ if (GPT_SNAPSHOT === 1) {
         ],
     ];
 
-    @file_put_contents($snapFile, json_encode($snapshot, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE));
+    @file_put_contents(
+        $snapFile,
+        json_encode(
+            $snapshot,
+            JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE
+        )
+    );
 }
-
 
 if ($mysqli instanceof mysqli) {
     @$mysqli->close();

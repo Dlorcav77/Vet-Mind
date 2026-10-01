@@ -3,8 +3,8 @@ declare(strict_types=1);
 
 return [
     'transcripcion' => [
-        'motor_a' => 'assembly_v3',
-        'motor_b' => 'deepgram',
+        'motor_a' => 'deepgram',
+        'motor_b' => 'assembly_v3',
         'motor_por_defecto' => 'assembly_v3',
         'usar_keyterms' => '0',
 
@@ -77,7 +77,7 @@ return [
                 'retry_delays' => [0, 2, 5],
                 'timeouts' => [
                     'connect' => 10,
-                    'total' => 60,
+                    'total' => 120,
                 ],
                 'snapshot' => false,
             ],

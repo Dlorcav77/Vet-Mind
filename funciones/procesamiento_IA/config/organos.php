@@ -53,7 +53,7 @@ $catalogo = [
         ]
     ],
     ['stt' => ['yeyuno'],       'patron' => 'yeyuno'],
-    ['stt' => ['ileon'],        'patron' => '[ií]leon'],
+    ['stt' => ['ileon', 'ileum'], 'patron' => '(?:[ií]leon|ileum)'],
     ['stt' => ['duodeno'],      'patron' => 'duodeno'],
     ['stt' => ['colon'],        'patron' => 'col[oó]n'],
     ['stt' => ['prostata'],     'patron' => 'pr[oó]stata'],

@@ -1,6 +1,10 @@
 <?php
 declare(strict_types=1);
 
+/** @var string $dictado */
+/** @var string $plantilla */
+/** @var string $informe */
+
 $system = <<<'SYS'
 Eres un revisor de control de calidad de informes ecograficos veterinarios.
 Recibes TRES textos:
@@ -32,6 +36,29 @@ METODO OBLIGATORIO:
    verifica que el INFORME haya elegido una version coherente con el resto del contexto clinico.
    Presta atencion EXTREMA a diferencias donde aparece o desaparece un "no" (negaciones): son las
    mas peligrosas porque invierten el hallazgo.
+3. AUDITA SIEMPRE SI UNA DISCREPANCIA FUE "TAPADA" CON UN TERCER VALOR DE LA PLANTILLA.
+   Por cada diferencia Motor A / Motor B, revisa el MISMO atributo en el INFORME.
+
+   Si el INFORME no conserva ninguna de las dos alternativas y en su lugar usa un valor NORMAL
+   proveniente de la PLANTILLA, NO consideres la discrepancia resuelta.
+
+   Esto es especialmente grave cuando una de las alternativas indica un hallazgo alterado
+   (aumentado, disminuido, irregular, heterogeneo, visible, dilatado, etc.) y el INFORME deja
+   "normal", "conservado", "definido" u otro valor normal de plantilla.
+
+   En ese caso reporta "hallazgo_bajado" con severidad alta.
+
+   Ejemplo obligatorio:
+   Motor A: "relacionada"
+   Motor B: "relación aumentada"
+   PLANTILLA: "relación cortico medular conservada"
+   INFORME: "relación cortico medular conservada"
+   -> REPORTAR hallazgo_bajado.
+   El informe introdujo un tercer valor normal que ninguno de los motores confirmó.
+
+   NO marques este problema si el INFORME conserva una de las alternativas disponibles
+   y además deja explícita la incertidumbre mediante un flag/observación para revisión.
+   El revisor no conoce el audio y no debe adivinar cuál alternativa era realmente correcta.
 
 Casos a reportar:
 1. hallazgo_bajado (EL MAS GRAVE, NUNCA lo omitas): el DICTADO marca un organo o atributo como ALTERADO
@@ -113,9 +140,20 @@ NO reportes (no son problemas):
 
 Severidad: "alta" si cambia el sentido clinico; "media" si es omision parcial; "baja" si es menor.
 
-Responde EXCLUSIVAMENTE con un objeto JSON, sin texto antes ni despues. Formato exacto:
-{"items":[{"severidad":"alta|media|baja","tipo":"hallazgo_bajado|inventado|cambio_lateralidad|cambio_medida|omitido|discrepancia_negacion|organo_sin_dictado|mismas_caracteristicas_literal|organo_omitido|incoherencia_homogeneo|atributo_no_reemplazado","zona":"organo o zona","dictado":"lo que dice el dictado","informe":"lo que dice el informe","detalle":"que revisar"}]}
-Si no encuentras problemas, responde exactamente {"items":[]}.
+Responde EXCLUSIVAMENTE con un objeto JSON, sin texto antes ni despues.
+
+Incluye SIEMPRE el campo:
+"debug_revision":"vetmind_grok_ok"
+
+Formato exacto:
+{"debug_revision":"vetmind_grok_ok","items":[{"severidad":"alta|media|baja","tipo":"hallazgo_bajado|inventado|cambio_lateralidad|cambio_medida|omitido|discrepancia_negacion|organo_sin_dictado|mismas_caracteristicas_literal|organo_omitido|incoherencia_homogeneo|atributo_no_reemplazado","zona":"organo o zona","dictado":"lo que dice el dictado","informe":"lo que dice el informe","detalle":"que revisar"}]}
+ANTES DE RESPONDER {"items":[]} HAZ UNA ÚLTIMA COMPROBACIÓN:
+- Recorre una por una TODAS las diferencias entre transcripciones.
+- Comprueba si el INFORME sustituyó alguna de ellas por un tercer valor tomado de la PLANTILLA.
+- Si ese tercer valor normaliza silenciosamente un atributo clínicamente dudoso o alterado,
+  NO puedes devolver items vacío: repórtalo con el tipo correspondiente.
+Si no encuentras problemas, responde exactamente:
+{"debug_revision":"vetmind_grok_ok","items":[]}
 SYS;
 
 $user = "=== DICTADO ===\n{$dictado}\n\n=== PLANTILLA BASE ===\n{$plantilla}\n\n=== INFORME (HTML) ===\n{$informe}";

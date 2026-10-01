@@ -265,6 +265,22 @@ if (!$okB || $textoB === '') {
 // 7) Validador + bloques.
 $disc = cmp_comparar($textoA, $textoB);
 $sep  = org_procesar($disc, $ORGANOS_LISTA, $CONCEPTOS_LISTA);
+
+// Segunda pasada: errores STT de alta confianza que ambos motores
+// pueden haber transcrito de la misma forma y, por tanto,
+// no aparecen como discrepancia.
+$resueltasComunes = stt_resolver_coincidencias_comunes(
+    $textoA,
+    $textoB
+);
+
+if (!empty($resueltasComunes)) {
+    $sep['resueltas'] = array_merge(
+        $sep['resueltas'],
+        $resueltasComunes
+    );
+}
+
 $bloqueRes  = construir_bloque_resueltas($sep['resueltas']);
 $bloqueDisc = construir_bloque_discrepancias($sep['a_ia']);
 $textoDoble = $bloqueRes . $bloqueDisc;

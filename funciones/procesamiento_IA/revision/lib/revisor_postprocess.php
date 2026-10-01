@@ -6,7 +6,7 @@ if ($finish === 'length' || trim($content) === '') {
     echo json_encode([
         'status'  => 'error',
         'message' => 'El revisor no entrego una respuesta completa (finish=' . ($finish ?: 'vacio') . '). No se puede confiar en el resultado; reintenta.',
-        'usage'   => $usageOut,
+        'usage'   => $usageOut ?? null,
         'raw'     => $content,
     ], JSON_UNESCAPED_UNICODE);
     exit;
@@ -19,16 +19,18 @@ if (!is_array($parsed) || !isset($parsed['items']) || !is_array($parsed['items']
     echo json_encode([
         'status'  => 'error',
         'message' => 'No se pudo interpretar la respuesta del revisor (JSON invalido).',
-        'usage'   => $usageOut,
+        'usage'   => $usageOut ?? null,
         'raw'     => $content,
     ], JSON_UNESCAPED_UNICODE);
     exit;
 }
 
 echo json_encode([
-    'status' => 'success',
-    'items'  => $parsed['items'],
-    'raw'    => $content,
-    'rid'    => $rid,
-    'usage'  => $usageOut,
+    'status'         => 'success',
+    'items'          => $parsed['items'],
+    'debug_revision' => $parsed['debug_revision'] ?? null,
+    'raw'            => $content,
+    'finish_reason'  => $finish,
+    'rid'            => $rid ?? null,
+    'usage'          => $usageOut ?? null,
 ], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
