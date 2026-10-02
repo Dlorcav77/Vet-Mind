@@ -264,7 +264,13 @@ if (!$okB || $textoB === '') {
 
 // 7) Validador + bloques.
 $disc = cmp_comparar($textoA, $textoB);
-$sep  = org_procesar($disc, $ORGANOS_LISTA, $CONCEPTOS_LISTA);
+$sep = org_procesar(
+    $disc,
+    $ORGANOS_LISTA,
+    $CONCEPTOS_LISTA,
+    $textoA,
+    $textoB
+);
 
 // Segunda pasada: errores STT de alta confianza que ambos motores
 // pueden haber transcrito de la misma forma y, por tanto,

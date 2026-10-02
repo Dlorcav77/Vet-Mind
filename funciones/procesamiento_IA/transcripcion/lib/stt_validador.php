@@ -75,11 +75,25 @@ function cmp_comparar(string $textoA, string $textoB): array {
             return;
         }
 
-        $hayNum = false;
+        $esNumero = static function (string $w): bool {
+            return cmp_es_numero_norm($w)
+                || in_array($w, ['un', 'una', 'uno'], true);
+        };
 
-        foreach (array_merge($bufNA, $bufNB) as $w) {
-            if (cmp_es_numero_norm($w)) {
-                $hayNum = true;
+        $hayNumA = false;
+        $hayNumB = false;
+
+        foreach ($bufNA as $w) {
+            if ($esNumero($w)) {
+                $hayNumA = true;
+                break;
+            }
+        }
+
+        foreach ($bufNB as $w) {
+            if ($esNumero($w)) {
+                $hayNumB = true;
+                break;
             }
         }
 
@@ -87,7 +101,7 @@ function cmp_comparar(string $textoA, string $textoB): array {
             $tipo = 'solo_A';
         } elseif (empty($bufA)) {
             $tipo = 'solo_B';
-        } elseif ($hayNum) {
+        } elseif ($hayNumA && $hayNumB) {
             $tipo = 'numero';
         } else {
             $tipo = 'cambio';
@@ -180,36 +194,86 @@ function org_norm(string $w): string {
 }
 function org_es_organo(string $tok, array $lista): bool { return in_array(org_norm($tok), $lista, true); }
 function org_limpia_borde(string $tok): string { return trim($tok, " .,;:"); }
-function org_validar(string $a, string $b, array $lista): array {
-    $a1 = org_limpia_borde($a); $b1 = org_limpia_borde($b);
-    if (strpos($a1, ' ') !== false || strpos($b1, ' ') !== false) return ['accion'=>'pasa'];
-    if ($a1 === '' || $b1 === '') return ['accion'=>'pasa'];
-    $oa = org_es_organo($a1, $lista); $ob = org_es_organo($b1, $lista);
-    if ($oa && !$ob) return ['accion'=>'resuelto','elegido'=>$a1,'descartado'=>$b1];
-    if ($ob && !$oa) return ['accion'=>'resuelto','elegido'=>$b1,'descartado'=>$a1];
-    return ['accion'=>'pasa'];
+
+function org_validar(
+    string $a,
+    string $b,
+    array $lista,
+    array $conceptos = []
+): array {
+    $a1 = org_limpia_borde($a);
+    $b1 = org_limpia_borde($b);
+
+    if (
+        $a1 === ''
+        || $b1 === ''
+        || strpos($a1, ' ') !== false
+        || strpos($b1, ' ') !== false
+    ) {
+        return ['accion' => 'pasa'];
+    }
+
+    $oa = org_es_organo($a1, $lista);
+    $ob = org_es_organo($b1, $lista);
+
+    if ($oa === $ob) {
+        return ['accion' => 'pasa'];
+    }
+
+    $organo = $oa ? $a1 : $b1;
+    $otro = $oa ? $b1 : $a1;
+
+    /*
+     * Un concepto clínico válido no debe perder
+     * automáticamente contra un órgano.
+     */
+    if (concepto_clinico_protegido($otro, $conceptos)) {
+        return ['accion' => 'pasa'];
+    }
+
+    $organoNorm = org_norm($organo);
+    $otroNorm = org_norm($otro);
+
+    if ($organoNorm === '' || $otroNorm === '') {
+        return ['accion' => 'pasa'];
+    }
+
+    /*
+     * Resolver solo errores STT ortográficamente cercanos.
+     * Ej.: Vaso/Bazo, Yeyuno/Yeiuno.
+     */
+    $umbral = max(
+        1,
+        (int)floor(strlen($organoNorm) / 3)
+    );
+
+    if (levenshtein($organoNorm, $otroNorm) > $umbral) {
+        return ['accion' => 'pasa'];
+    }
+
+    return [
+        'accion' => 'resuelto',
+        'elegido' => $organo,
+        'descartado' => $otro
+    ];
 }
+
 function org_validar_inicio_frase(
     string $a,
     string $b,
-    array $lista
+    array $lista,
+    array $conceptos = []
 ): array {
     $extraer = static function (string $texto): ?array {
-        $texto = trim($texto);
-
-        if (
-            !preg_match(
-                '/^([^\s,.;:]+)[,.;:]?\s+(.+)$/u',
-                $texto,
-                $m
-            )
-        ) {
-            return null;
-        }
+        if (!preg_match(
+            '/^([^\s,.;:]+)[,.;:]?\s+(.+)$/u',
+            trim($texto),
+            $m
+        )) return null;
 
         return [
             'inicio' => trim($m[1]),
-            'resto' => trim($m[2]),
+            'resto' => trim($m[2])
         ];
     };
 
@@ -220,92 +284,212 @@ function org_validar_inicio_frase(
         return ['accion' => 'pasa'];
     }
 
-    $aEsOrgano = org_es_organo($pa['inicio'], $lista);
-    $bEsOrgano = org_es_organo($pb['inicio'], $lista);
+    $aOrgano = org_es_organo($pa['inicio'], $lista);
+    $bOrgano = org_es_organo($pb['inicio'], $lista);
 
-    // Debe existir exactamente un inicio reconocido como órgano.
-    if ($aEsOrgano === $bEsOrgano) {
+    if ($aOrgano === $bOrgano) {
+        return ['accion' => 'pasa'];
+    }
+
+    $otro = $aOrgano ? $pb['inicio'] : $pa['inicio'];
+    $organo = $aOrgano ? $pa['inicio'] : $pb['inicio'];
+
+    if (concepto_clinico_protegido($otro, $conceptos)) {
         return ['accion' => 'pasa'];
     }
 
     /*
-     * El resto de las dos frases debe describir prácticamente
-     * lo mismo. Esto evita resolver una discrepancia clínica real
-     * únicamente porque una alternativa empieza con un órgano.
+     * El término descartado debe parecer realmente una corrupción
+     * del órgano, salvo equivalencias contextuales conocidas.
      */
-    $normalizarResto = static function (string $texto): string {
-        $texto = mb_strtolower($texto, 'UTF-8');
+    $organoNorm = org_norm($organo);
+    $otroNorm = org_norm($otro);
 
+    $par = [$organoNorm, $otroNorm];
+    sort($par);
+
+    $equivalenciaConocida = $par === ['bazo', 'vaso'];
+
+    $umbralOrgano = max(
+        1,
+        (int)floor(strlen($organoNorm) / 3)
+    );
+
+    if (
+        !$equivalenciaConocida
+        && levenshtein($organoNorm, $otroNorm) > $umbralOrgano
+    ) {
+        return ['accion' => 'pasa'];
+    }
+
+    $normalizar = static function (string $texto): string {
+        $texto = mb_strtolower($texto, 'UTF-8');
         $texto = strtr($texto, [
-            'á' => 'a',
-            'é' => 'e',
-            'í' => 'i',
-            'ó' => 'o',
-            'ú' => 'u',
-            'ñ' => 'n',
-            'ü' => 'u',
+            'á'=>'a','é'=>'e','í'=>'i','ó'=>'o',
+            'ú'=>'u','ñ'=>'n','ü'=>'u'
         ]);
 
-        return preg_replace(
-            '/[^a-z0-9]/',
-            '',
-            $texto
-        ) ?? '';
+        return preg_replace('/[^a-z0-9]/', '', $texto) ?? '';
     };
 
-    $restoA = $normalizarResto($pa['resto']);
-    $restoB = $normalizarResto($pb['resto']);
+    $restoA = $normalizar($pa['resto']);
+    $restoB = $normalizar($pb['resto']);
 
     if ($restoA === '' || $restoB === '') {
         return ['accion' => 'pasa'];
     }
 
-    $largoMax = max(
-        strlen($restoA),
-        strlen($restoB)
-    );
-
-    $umbral = max(
+    $umbralResto = max(
         1,
-        (int)floor($largoMax / 5)
+        (int)floor(max(strlen($restoA), strlen($restoB)) / 5)
     );
 
-    if (levenshtein($restoA, $restoB) > $umbral) {
+    if (levenshtein($restoA, $restoB) > $umbralResto) {
         return ['accion' => 'pasa'];
-    }
-
-    if ($aEsOrgano) {
-        return [
-            'accion' => 'resuelto',
-            'elegido' => $pa['inicio'],
-            'descartado' => $pb['inicio'],
-        ];
     }
 
     return [
         'accion' => 'resuelto',
-        'elegido' => $pb['inicio'],
-        'descartado' => $pa['inicio'],
+        'elegido' => $organo,
+        'descartado' => $otro
     ];
 }
+
 function concepto_es(string $tok, array $lista): bool { return in_array(org_norm($tok), $lista, true); }
+
+function concepto_clinico_protegido(string $tok, array $conceptos): bool
+{
+    if (concepto_es($tok, $conceptos)) return true;
+
+    static $protegidos = [
+        'contenido','forma','pared','borde','bordes','limite','relacion',
+        'pelvis','vasculatura','parenquima','capsula','motilidad','tamano',
+        'patron','capa','imagen','senal','ecotextura',
+
+        'homogeneo','homogenea','homogeneos','homogeneas',
+        'heterogeneo','heterogenea','heterogeneos','heterogeneas',
+
+        'anecoico','anecoica','anecoicos','anecoicas',
+        'hipoecoico','hipoecoica','hipoecoicos','hipoecoicas',
+        'hiperecoico','hiperecoica','hiperecoicos','hiperecoicas',
+
+        'aumentado','aumentada','aumentados','aumentadas',
+        'disminuido','disminuida','disminuidos','disminuidas',
+        'conservado','conservada','conservados','conservadas',
+
+        'engrosado','engrosada','engrosados','engrosadas',
+        'reactivo','reactiva','reactivos','reactivas',
+        'distendido','distendida','distendidos','distendidas',
+
+        'redondeado','redondeada','redondeados','redondeadas',
+        'aguzado','aguzada','aguzados','aguzadas',
+
+        'esplenico','esplenica','esplenicos','esplenicas',
+
+        'mucoso','mucosa','mucosos','mucosas',
+        'felino','felina','felinos','felinas',
+        'lobulo','lobulos',
+        'grosor','grosores',
+        'peritoneal','peritoneales','peritoneo','peritoneos',
+
+        'ecogenicidad','ecogenicidades',
+        'parenquima','parenquimas',
+        'estratificacion','estratificaciones',
+        'vasculatura','vasculaturas'
+    ];
+
+    return in_array(org_norm($tok), $protegidos, true);
+}
+
 function concepto_similar(string $valido, string $otro): bool {
     $a = org_norm($valido); $b = org_norm($otro);
     if ($a === '' || $b === '') return false;
     $umbral = max(1, (int)floor(mb_strlen($a) / 3));
     return levenshtein($a, $b) <= $umbral;
 }
-function concepto_equivalente_conocido(string $valido, string $otro): bool {
-    $validoNorm = org_norm($valido);
-    $otroNorm = org_norm($otro);
 
-    $equivalencias = [
-        'doppler' => ['doble'],
-        'pelvica' => ['pellicano'],
+function concepto_equivalente_contextual(
+    string $a,
+    string $b,
+    ?int $indiceA,
+    ?int $indiceB,
+    string $textoA,
+    string $textoB
+): ?array {
+    if ($indiceA === null || $indiceB === null) return null;
+
+    $aNorm = org_norm(org_limpia_borde($a));
+    $bNorm = org_norm(org_limpia_borde($b));
+
+    $ventana = static function (string $texto, int $indice): string {
+        $tokens = cmp_tokens(cmp_pre_limpiar($texto));
+        $inicio = max(0, $indice - 6);
+
+        return implode(
+            ' ',
+            array_slice($tokens, $inicio, 13)
+        );
+    };
+
+    $contexto = $ventana($textoA, $indiceA)
+        . ' '
+        . $ventana($textoB, $indiceB);
+
+    $par = [$aNorm, $bNorm];
+    sort($par);
+
+    if ($par === ['doble', 'doppler']) {
+        if (!preg_match(
+            '/\b(?:señal|senal|color|flujo|vascular|vascularizaci[oó]n)\b/iu',
+            $contexto
+        )) {
+            return null;
+        }
+
+        return [
+            'accion' => 'resuelto',
+            'elegido' => $aNorm === 'doppler' ? $a : $b,
+            'descartado' => $aNorm === 'doble' ? $a : $b
+        ];
+    }
+
+    $variantesPelvica = [
+        'pellicano',
+        'peluca',
+        'publica',
     ];
 
-    return isset($equivalencias[$validoNorm])
-        && in_array($otroNorm, $equivalencias[$validoNorm], true);
+    $esFamiliaPelvica = (
+        $aNorm === 'pelvica'
+        && in_array($bNorm, $variantesPelvica, true)
+    ) || (
+        $bNorm === 'pelvica'
+        && in_array($aNorm, $variantesPelvica, true)
+    );
+
+    if ($esFamiliaPelvica) {
+        $tieneImagen = preg_match(
+            '/\bimagen\b/iu',
+            $contexto
+        ) === 1;
+
+        $tieneContextoRenal = preg_match(
+            '/\b(?:riñ[oó]n|renal|pelvis|ur[eé]ter)\b/iu',
+            $contexto
+        ) === 1;
+
+        if (!$tieneImagen || !$tieneContextoRenal) {
+            return null;
+        }
+
+        return [
+            'accion' => 'resuelto',
+            'elegido' => $aNorm === 'pelvica' ? $a : $b,
+            'descartado' => $aNorm === 'pelvica' ? $b : $a
+        ];
+    }
+
+    return null;
 }
 
 function concepto_frase_equivalente_conocida(string $a, string $b): ?array
@@ -328,21 +512,21 @@ function concepto_frase_equivalente_conocida(string $a, string $b): ?array
             'variantes' => ['ureterna'],
         ],
         'patronmucoso' => [
-            'canonico'  => 'patrón mucoso',
+            'canonico' => 'patrón mucoso',
             'variantes' => [
-                '4mucosas',
-                '4mucosa',
-                'patromoncose',
-                'patomucosa',
+                '4mucosas','4mucosa','4mocos',
+                'patromoncose','patomucosa','patromucosa',
             ],
+            'variantes_entre_si' => true,
         ],
         'anecoico' => [
-            'canonico'  => 'anecoico',
+            'canonico' => 'anecoico',
             'variantes' => [
                 'nicoico',
                 'onicoico',
                 'anicoico',
             ],
+            'variantes_entre_si' => true,
         ],
         'hipoecoicohomogeneo' => [
             'canonico'  => 'hipoecoico homogéneo',
@@ -406,6 +590,18 @@ function concepto_frase_equivalente_conocida(string $a, string $b): ?array
             continue;
         }
 
+        $ambosSonVariantes = (
+            $aNorm !== $formaNorm
+            && $bNorm !== $formaNorm
+        );
+
+        if (
+            $ambosSonVariantes
+            && empty($config['variantes_entre_si'])
+        ) {
+            continue;
+        }
+
         $descartadas = [];
 
         if ($aNorm !== $formaNorm) {
@@ -426,29 +622,76 @@ function concepto_frase_equivalente_conocida(string $a, string $b): ?array
     return null;
 }
 
-function concepto_validar(string $a, string $b, array $conceptos): array {
-    $a1 = org_limpia_borde($a); $b1 = org_limpia_borde($b);
+function concepto_validar(
+    string $a,
+    string $b,
+    array $conceptos,
+    array $organos = []
+): array {
+    $a1 = org_limpia_borde($a);
+    $b1 = org_limpia_borde($b);
 
-    if ($a1 === '' || $b1 === '') return ['accion'=>'pasa'];
+    if ($a1 === '' || $b1 === '') {
+        return ['accion' => 'pasa'];
+    }
 
-    // Algunas correcciones conocidas son frases y deben resolverse
-    // antes del validador normal de conceptos de una sola palabra.
     $frase = concepto_frase_equivalente_conocida($a1, $b1);
+
     if ($frase !== null) {
         return $frase;
     }
 
-    if (strpos($a1, ' ') !== false || strpos($b1, ' ') !== false) {
-        return ['accion'=>'pasa'];
+    if (
+        strpos($a1, ' ') !== false
+        || strpos($b1, ' ') !== false
+    ) {
+        return ['accion' => 'pasa'];
     }
-    $ca = concepto_es($a1, $conceptos); $cb = concepto_es($b1, $conceptos);
+
+    /*
+     * Un órgano válido nunca debe perder contra un concepto
+     * solamente por similitud ortográfica.
+     */
+    if (
+        org_es_organo($a1, $organos)
+        || org_es_organo($b1, $organos)
+    ) {
+        return ['accion' => 'pasa'];
+    }
+
+    /*
+     * Si ambas formas son términos clínicos válidos,
+     * no decidir cuál es "correcta".
+     *
+     * Ejemplos:
+     *   conservado / conservada
+     *   homogéneo / homogénea
+     */
+    if (
+        concepto_clinico_protegido($a1, $conceptos)
+        && concepto_clinico_protegido($b1, $conceptos)
+    ) {
+        return ['accion' => 'pasa'];
+    }
+
+    /*
+    * La familia pélvica requiere contexto renal.
+    * No resolver por similitud léxica aislada.
+    */
+    if (
+        org_norm($a1) === 'pelvica'
+        || org_norm($b1) === 'pelvica'
+    ) {
+        return ['accion' => 'pasa'];
+    }
+
+    $ca = concepto_es($a1, $conceptos);
+    $cb = concepto_es($b1, $conceptos);
+
     if (
         $ca
         && !$cb
-        && (
-            concepto_similar($a1, $b1)
-            || concepto_equivalente_conocido($a1, $b1)
-        )
+        && concepto_similar($a1, $b1)
     ) {
         return [
             'accion' => 'resuelto',
@@ -460,10 +703,7 @@ function concepto_validar(string $a, string $b, array $conceptos): array {
     if (
         $cb
         && !$ca
-        && (
-            concepto_similar($b1, $a1)
-            || concepto_equivalente_conocido($b1, $a1)
-        )
+        && concepto_similar($b1, $a1)
     ) {
         return [
             'accion' => 'resuelto',
@@ -471,7 +711,8 @@ function concepto_validar(string $a, string $b, array $conceptos): array {
             'descartado' => $a1
         ];
     }
-    return ['accion'=>'pasa'];
+
+    return ['accion' => 'pasa'];
 }
 
 /**
@@ -484,57 +725,87 @@ function concepto_validar(string $a, string $b, array $conceptos): array {
  */
 function numero_decimal_equivalente(string $a, string $b): ?array
 {
-    $extraerDecimalRoto = function (string $texto): ?string {
-        $texto = mb_strtolower($texto, 'UTF-8');
-
-        if (
-            preg_match(
-                '/(?:^|\s)0\s+a\s+(\d{1,3})(?:\s|$)/u',
-                $texto,
-                $m
-            )
-        ) {
-            return '0.' . $m[1];
+    $extraerRoto = static function (string $texto): ?array {
+        if (!preg_match(
+            '/(?<!\d)0\s+a\s+(\d{1,3})(?!\d)/u',
+            $texto,
+            $m,
+            PREG_OFFSET_CAPTURE
+        )) {
+            return null;
         }
 
-        return null;
-    };
-
-    $contieneDecimal = function (string $texto, string $decimal): bool {
-        $texto = str_replace(',', '.', $texto);
-
-        return (bool)preg_match(
-            '/(?:^|[^0-9])' . preg_quote($decimal, '/') . '(?:[^0-9]|$)/u',
-            $texto
-        );
-    };
-
-    // A trae "0 a 37" y B trae "0,37".
-    $decimalA = $extraerDecimalRoto($a);
-
-    if (
-        $decimalA !== null
-        && $contieneDecimal($b, $decimalA)
-    ) {
         return [
-            'accion'     => 'resuelto',
-            'elegido'    => $decimalA,
-            'descartado' => $a,
+            'decimal' => '0.' . $m[1][0],
+            'original' => $m[0][0],
+            'offset' => (int)$m[0][1]
         ];
+    };
+
+    $normalizarFrase = static function (string $texto): string {
+        $tokens = cmp_tokens(cmp_pre_limpiar($texto));
+        $tokens = array_map('cmp_norm', $tokens);
+        $tokens = array_values(array_filter(
+            $tokens,
+            static fn(string $v): bool => $v !== ''
+        ));
+
+        return implode(' ', $tokens);
+    };
+
+    $resolver = static function (
+        string $textoRoto,
+        string $textoOtro,
+        array $rotura
+    ) use ($normalizarFrase): ?array {
+        $textoCorregido = substr_replace(
+            $textoRoto,
+            $rotura['decimal'],
+            $rotura['offset'],
+            strlen($rotura['original'])
+        );
+
+        /*
+         * El decimal solo se considera resuelto si, después de
+         * repararlo, TODA la discrepancia resulta equivalente.
+         *
+         * Así no ocultamos diferencias como:
+         * "grosor 0 a 37 aumentado"
+         * vs
+         * "pared 0,37 disminuida".
+         */
+        if (
+            $normalizarFrase($textoCorregido)
+            !== $normalizarFrase($textoOtro)
+        ) {
+            return null;
+        }
+
+        return [
+            'accion' => 'resuelto',
+            'elegido' => $rotura['decimal'],
+            'descartado' => $textoRoto
+        ];
+    };
+
+    $roturaA = $extraerRoto($a);
+
+    if ($roturaA !== null) {
+        $resultado = $resolver($a, $b, $roturaA);
+
+        if ($resultado !== null) {
+            return $resultado;
+        }
     }
 
-    // B trae "0 a 37" y A trae "0,37".
-    $decimalB = $extraerDecimalRoto($b);
+    $roturaB = $extraerRoto($b);
 
-    if (
-        $decimalB !== null
-        && $contieneDecimal($a, $decimalB)
-    ) {
-        return [
-            'accion'     => 'resuelto',
-            'elegido'    => $decimalB,
-            'descartado' => $b,
-        ];
+    if ($roturaB !== null) {
+        $resultado = $resolver($b, $a, $roturaB);
+
+        if ($resultado !== null) {
+            return $resultado;
+        }
     }
 
     return null;
@@ -578,9 +849,9 @@ function stt_resolver_coincidencias_comunes(
      * devolvemos la posición concreta. No es un alias global.
      */
     $patronVasoBazo = '/'
-        . '(?:^|[.!?]\s+)'
+        . '(?:^|[.!?;]\s+)'
         . '(?<organo>vaso)\b'
-        . '.{0,500}?'
+        . '[^.!?;\r\n]{0,500}?'
         . '\b(?:'
         . 'espl[eé]nic[oa]s?'
         . '|escl[eé]nic[oa]s?'
@@ -589,7 +860,7 @@ function stt_resolver_coincidencias_comunes(
         . '|cola\s+escl[eé]nica'
         . '|cabeza\s+escl[eé]nica'
         . ')\b'
-        . '/isu';
+        . '/iu';
 
     preg_match_all(
         $patronVasoBazo,
@@ -605,10 +876,14 @@ function stt_resolver_coincidencias_comunes(
         PREG_SET_ORDER | PREG_OFFSET_CAPTURE
     );
 
-    $cantidad = min(
-        count($coincidenciasA),
-        count($coincidenciasB)
-    );
+    $cantidadA = count($coincidenciasA);
+    $cantidadB = count($coincidenciasB);
+
+    if ($cantidadA === 0 || $cantidadA !== $cantidadB) {
+        $cantidad = 0;
+    } else {
+        $cantidad = $cantidadA;
+    }
 
     for ($i = 0; $i < $cantidad; $i++) {
         $offsetA = (int)$coincidenciasA[$i]['organo'][1];
@@ -635,10 +910,198 @@ function stt_resolver_coincidencias_comunes(
         ];
     }
 
+    /*
+    * Patrón mucoso: errores repetidos iguales en ambos STT.
+    * Solo actuamos cuando ambos motores tienen la misma cantidad
+    * de ocurrencias y cada par representa la misma variante.
+    */
+    $patronMucosoErroneo = '/(?<![\p{L}\d])(?:'
+        . '4\s+mucosas?'
+        . '|4\s+mocos'
+        . '|patromoncose'
+        . '|patomucosa'
+        . '|patromucosa'
+        . ')(?![\p{L}\d])/iu';
+
+    preg_match_all(
+        $patronMucosoErroneo,
+        $textoA,
+        $mucosoA,
+        PREG_SET_ORDER | PREG_OFFSET_CAPTURE
+    );
+
+    preg_match_all(
+        $patronMucosoErroneo,
+        $textoB,
+        $mucosoB,
+        PREG_SET_ORDER | PREG_OFFSET_CAPTURE
+    );
+
+    if (
+        count($mucosoA) > 0
+        && count($mucosoA) === count($mucosoB)
+    ) {
+        foreach ($mucosoA as $i => $matchA) {
+            $valorA = (string)$matchA[0][0];
+            $valorB = (string)$mucosoB[$i][0][0];
+
+            if (org_norm($valorA) !== org_norm($valorB)) {
+                continue;
+            }
+
+            $resueltas[] = [
+                'elegido' => 'patrón mucoso',
+                'descartado' => $valorA,
+                'origen' => 'concepto',
+                'motor_a' => $valorA,
+                'motor_b' => $valorB,
+                'indice_a' => $indiceTokenDesdeOffset(
+                    $textoA,
+                    (int)$matchA[0][1]
+                ),
+                'indice_b' => $indiceTokenDesdeOffset(
+                    $textoB,
+                    (int)$mucosoB[$i][0][1]
+                ),
+                'alcance' => 'coincidencia_comun'
+            ];
+        }
+    }
+
+    /*
+    * Ecogenicidad: errores léxicos repetidos iguales en ambos STT.
+    * Solo corregimos variantes inequívocas y cuando ambos motores
+    * presentan la misma variante en posiciones correspondientes.
+    */
+    $patronEcogenicidadErronea = '/(?<![\p{L}\d])(?:'
+        . 'cogenicidad'
+        . '|coginicidad'
+        . '|ecogenisidad'
+        . '|ecoginicidad'
+        . ')(?![\p{L}\d])/iu';
+
+    preg_match_all(
+        $patronEcogenicidadErronea,
+        $textoA,
+        $ecogenicidadA,
+        PREG_SET_ORDER | PREG_OFFSET_CAPTURE
+    );
+
+    preg_match_all(
+        $patronEcogenicidadErronea,
+        $textoB,
+        $ecogenicidadB,
+        PREG_SET_ORDER | PREG_OFFSET_CAPTURE
+    );
+
+    if (
+        count($ecogenicidadA) > 0
+        && count($ecogenicidadA) === count($ecogenicidadB)
+    ) {
+        foreach ($ecogenicidadA as $i => $matchA) {
+            $valorA = (string)$matchA[0][0];
+            $valorB = (string)$ecogenicidadB[$i][0][0];
+
+            if (org_norm($valorA) !== org_norm($valorB)) {
+                continue;
+            }
+
+            $resueltas[] = [
+                'elegido' => 'ecogenicidad',
+                'descartado' => $valorA,
+                'origen' => 'concepto',
+                'motor_a' => $valorA,
+                'motor_b' => $valorB,
+                'indice_a' => $indiceTokenDesdeOffset(
+                    $textoA,
+                    (int)$matchA[0][1]
+                ),
+                'indice_b' => $indiceTokenDesdeOffset(
+                    $textoB,
+                    (int)$ecogenicidadB[$i][0][1]
+                ),
+                'alcance' => 'coincidencia_comun'
+            ];
+        }
+    }
+
+    /*
+    * Bordes aguzados: corrupciones recurrentes iguales en ambos STT.
+    * Nunca corregimos "abusado" globalmente; debe estar unido
+    * explícitamente a borde/bordes.
+    */
+    $patronBordeAguzado = '/(?<![\p{L}\d])(?<frase>'
+        . '(?<borde>bordes?)\s+'
+        . '(?<descriptor>'
+        . 'abusados?'
+        . '|desabusados?'
+        . '|desgustados?'
+        . ')'
+        . ')(?![\p{L}\d])/iu';
+
+    preg_match_all(
+        $patronBordeAguzado,
+        $textoA,
+        $bordesA,
+        PREG_SET_ORDER | PREG_OFFSET_CAPTURE
+    );
+
+    preg_match_all(
+        $patronBordeAguzado,
+        $textoB,
+        $bordesB,
+        PREG_SET_ORDER | PREG_OFFSET_CAPTURE
+    );
+
+    if (
+        count($bordesA) > 0
+        && count($bordesA) === count($bordesB)
+    ) {
+        foreach ($bordesA as $i => $matchA) {
+            $fraseA = (string)$matchA['frase'][0];
+            $fraseB = (string)$bordesB[$i]['frase'][0];
+
+            if (org_norm($fraseA) !== org_norm($fraseB)) {
+                continue;
+            }
+
+            $esPlural = org_norm(
+                (string)$matchA['borde'][0]
+            ) === 'bordes';
+
+            $canonico = $esPlural
+                ? 'bordes aguzados'
+                : 'borde aguzado';
+
+            $resueltas[] = [
+                'elegido' => $canonico,
+                'descartado' => $fraseA,
+                'origen' => 'concepto',
+                'motor_a' => $fraseA,
+                'motor_b' => $fraseB,
+                'indice_a' => $indiceTokenDesdeOffset(
+                    $textoA,
+                    (int)$matchA['frase'][1]
+                ),
+                'indice_b' => $indiceTokenDesdeOffset(
+                    $textoB,
+                    (int)$bordesB[$i]['frase'][1]
+                ),
+                'alcance' => 'coincidencia_comun'
+            ];
+        }
+    }
+
     return $resueltas;
 }
 
-function org_procesar(array $disc, array $organos, array $conceptos = []): array
+function org_procesar(
+    array $disc,
+    array $organos,
+    array $conceptos = [],
+    string $textoA = '',
+    string $textoB = ''
+): array
 {
     $resueltas = [];
     $aIA = [];
@@ -681,7 +1144,12 @@ function org_procesar(array $disc, array $organos, array $conceptos = []): array
             continue;
         }
 
-        $r = org_validar($a, $b, $organos);
+        $r = org_validar(
+            $a,
+            $b,
+            $organos,
+            $conceptos
+        );
 
         if (($r['accion'] ?? '') === 'resuelto') {
             $resueltas[] = array_merge([
@@ -705,7 +1173,8 @@ function org_procesar(array $disc, array $organos, array $conceptos = []): array
         $rFrase = org_validar_inicio_frase(
             $a,
             $b,
-            $organos
+            $organos,
+            $conceptos
         );
 
         if (($rFrase['accion'] ?? '') === 'resuelto') {
@@ -718,7 +1187,31 @@ function org_procesar(array $disc, array $organos, array $conceptos = []): array
             continue;
         }
 
-        $c = concepto_validar($a, $b, $conceptos);
+        $contextual = concepto_equivalente_contextual(
+            $a,
+            $b,
+            $contextoResolucion['indice_a'],
+            $contextoResolucion['indice_b'],
+            $textoA,
+            $textoB
+        );
+
+        if (($contextual['accion'] ?? '') === 'resuelto') {
+            $resueltas[] = array_merge([
+                'elegido' => $contextual['elegido'],
+                'descartado' => $contextual['descartado'],
+                'origen' => 'concepto',
+            ], $contextoResolucion);
+
+            continue;
+        }
+
+        $c = concepto_validar(
+            $a,
+            $b,
+            $conceptos,
+            $organos
+        );
 
         if (($c['accion'] ?? '') === 'resuelto') {
             $resueltas[] = array_merge([

@@ -35,6 +35,13 @@ function interpretacion_procesar_php(string $textoRecibido, ?array $origen = nul
     $aliasesOrgano = [];
     $correccionesOrganoLocales = [];
 
+    /*
+    * Correcciones localizadas disponibles también para resolver
+    * el contexto anatómico de discrepancias posteriores.
+    */
+    $correccionesOrganoContextoA = [];
+    $correccionesOrganoContextoB = [];
+
     $normalizarClaveAlias = static function (string $valor): string {
         $valor = mb_strtolower(trim($valor), 'UTF-8');
 
@@ -82,16 +89,54 @@ function interpretacion_procesar_php(string $textoRecibido, ?array $origen = nul
          * interpretacion_php trabaja sobre Motor A, por lo que
          * usamos indice_a.
          */
-        if (
+        $indiceCorreccionA = (
             array_key_exists('indice_a', $correccion)
             && $correccion['indice_a'] !== null
-        ) {
-            $correccionesOrganoLocales[] = [
-                'elegido' => $elegido,
-                'descartado' => $descartado,
-                'indice_a' => (int)$correccion['indice_a'],
-            ];
+        )
+            ? (int)$correccion['indice_a']
+            : null;
 
+        $indiceCorreccionB = (
+            array_key_exists('indice_b', $correccion)
+            && $correccion['indice_b'] !== null
+        )
+            ? (int)$correccion['indice_b']
+            : null;
+
+        if (
+            $indiceCorreccionA !== null
+            || $indiceCorreccionB !== null
+        ) {
+            if ($indiceCorreccionA !== null) {
+                /*
+                * Esta lista se mantiene para la segmentación principal,
+                * que trabaja sobre Motor A.
+                */
+                $correccionesOrganoLocales[] = [
+                    'elegido' => $elegido,
+                    'descartado' => $descartado,
+                    'indice_a' => $indiceCorreccionA,
+                ];
+
+                $correccionesOrganoContextoA[] = [
+                    'elegido' => $elegido,
+                    'descartado' => $descartado,
+                    'indice_token' => $indiceCorreccionA,
+                ];
+            }
+
+            if ($indiceCorreccionB !== null) {
+                $correccionesOrganoContextoB[] = [
+                    'elegido' => $elegido,
+                    'descartado' => $descartado,
+                    'indice_token' => $indiceCorreccionB,
+                ];
+            }
+
+            /*
+            * Una corrección que ya posee índices nunca debe convertirse
+            * después en alias global.
+            */
             continue;
         }
 
@@ -238,6 +283,22 @@ function interpretacion_procesar_php(string $textoRecibido, ?array $origen = nul
 
     $organoActivo = null;
     $lateralidadActiva = null;
+
+    $esHallazgoCavitarioIndependiente = static function (
+        string $fragmento
+    ): bool {
+        $fragmento = trim($fragmento);
+
+        return (bool)preg_match(
+            '/^(?:se\s+observan?\s+)?(?:'
+            . 'neumoperitone\p{L}*'
+            . '|derrame\s+peritone\p{L}*'
+            . '|l[ií]quido\s+libre\b'
+            . '|efusi[oó]n\s+peritone\p{L}*'
+            . ')/iu',
+            $fragmento
+        );
+    };
 
     $esContinuacionContextual = static function (string $fragmento): bool {
         $fragmento = trim($fragmento);
@@ -470,6 +531,7 @@ function interpretacion_procesar_php(string $textoRecibido, ?array $origen = nul
             $organo === null
             && $organoActivo !== null
             && $cantidadContextosOrgano === 0
+            && !$esHallazgoCavitarioIndependiente($fragmento)
             && $esContinuacionContextual($fragmento)
         ) {
             $organo = $organoActivo;
@@ -494,21 +556,65 @@ function interpretacion_procesar_php(string $textoRecibido, ?array $origen = nul
             . '(?!\p{L})/iu',
             $fragmento,
             $coincidenciasMedidas,
-            PREG_SET_ORDER
+            PREG_SET_ORDER | PREG_OFFSET_CAPTURE
         );
 
         foreach ($coincidenciasMedidas as $medida) {
-            $valor = str_replace(',', '.', $medida[1]);
-            $valor = preg_replace('/\s*(?:x|×|por)\s*/iu', 'x', $valor);
+            $textoMedida = (string)$medida[0][0];
+            $offsetMedida = (int)$medida[0][1];
 
-            $unidad = preg_match('/^(?:mm|mil)/iu', $medida[2])
+            /*
+            * Evitar rescatar como medida válida el segundo número
+            * de una secuencia numérica corrupta.
+            *
+            * Ejemplo real:
+            *   "0.2 59 centímetros"
+            *
+            * El antiguo extractor tomaba "59 centímetros".
+            * Si inmediatamente antes de la coincidencia existe otro
+            * número separado solo por espacios, la medida queda sin
+            * extraer para que la discrepancia STT la resuelva después.
+            */
+            $textoAnterior = substr(
+                $fragmento,
+                0,
+                $offsetMedida
+            );
+
+            if (
+                preg_match(
+                    '/\d+(?:[.,]\d+)?\s+$/u',
+                    $textoAnterior
+                )
+            ) {
+                continue;
+            }
+
+            $valor = str_replace(
+                ',',
+                '.',
+                (string)$medida[1][0]
+            );
+
+            $valor = preg_replace(
+                '/\s*(?:x|×|por)\s*/iu',
+                'x',
+                $valor
+            );
+
+            $unidadTexto = (string)$medida[2][0];
+
+            $unidad = preg_match(
+                '/^(?:mm|mil)/iu',
+                $unidadTexto
+            )
                 ? 'mm'
                 : 'cm';
 
             $medidas[] = [
                 'valor' => $valor,
                 'unidad' => $unidad,
-                'original' => $medida[0]
+                'original' => $textoMedida
             ];
         }
 
@@ -524,18 +630,87 @@ function interpretacion_procesar_php(string $textoRecibido, ?array $origen = nul
         ];
     }
 
-        /*
+     /*
      * Detectar referencias explícitas entre órganos/lateralidades.
      *
      * Ejemplo:
      *   "Riñón derecho, mismas características que el izquierdo"
      *
+     * La referencia puede existir en cualquiera de los dos STT.
+     * No damos prioridad automática a Motor A ni Motor B.
+     *
      * No copiamos atributos aquí.
      * Solo dejamos estructurada la referencia para que el generador
-     * sepa que el órgano descrito hereda las características del citado.
+     * sepa que el órgano descrito hereda características del citado.
      */
     $referenciasEntreOrganos = [];
+    $clavesReferenciasEntreOrganos = [];
 
+    $agregarReferenciaEntreOrganos = static function (
+        ?string $organoDestino,
+        ?string $lateralidadDestino,
+        ?string $lateralidadReferencia,
+        string $evidencia
+    ) use (
+        &$referenciasEntreOrganos,
+        &$clavesReferenciasEntreOrganos,
+        $normalizarClaveAlias
+    ): void {
+        if (
+            $organoDestino === null
+            || $organoDestino === ''
+            || $lateralidadDestino === null
+            || $lateralidadDestino === ''
+            || $lateralidadReferencia === null
+            || $lateralidadReferencia === ''
+        ) {
+            return;
+        }
+
+        $lateralidadDestino = mb_strtolower(
+            $lateralidadDestino,
+            'UTF-8'
+        );
+
+        $lateralidadReferencia = mb_strtolower(
+            $lateralidadReferencia,
+            'UTF-8'
+        );
+
+        /*
+         * Deduplicar si ambos motores dicen la misma referencia
+         * o si ya fue detectada desde los hallazgos segmentados.
+         */
+        $clave =
+            $normalizarClaveAlias($organoDestino)
+            . '|'
+            . $lateralidadDestino
+            . '|'
+            . $lateralidadReferencia;
+
+        if (isset($clavesReferenciasEntreOrganos[$clave])) {
+            return;
+        }
+
+        $clavesReferenciasEntreOrganos[$clave] = true;
+
+        $referenciasEntreOrganos[] = [
+            'organo_destino' => $organoDestino,
+            'lateralidad_destino' => $lateralidadDestino,
+            'organo_referencia' => $organoDestino,
+            'lateralidad_referencia' => $lateralidadReferencia,
+            'evidencia' => $evidencia,
+            'estado' => 'referencia_explicita'
+        ];
+    };
+
+    /*
+     * Primera vía:
+     * conservar la detección histórica sobre hallazgos ya segmentados.
+     *
+     * Esto mantiene compatibilidad con correcciones locales de órgano
+     * que PHP ya pudo haber aplicado durante la segmentación.
+     */
     foreach ($hallazgos as $hallazgo) {
         $organoActual = $hallazgo['organo'] ?? null;
         $lateralidadActual = $hallazgo['lateralidad'] ?? null;
@@ -549,26 +724,166 @@ function interpretacion_procesar_php(string $textoRecibido, ?array $origen = nul
             continue;
         }
 
-        if (!preg_match(
-            '/\bmismas?\s+caracter[ií]sticas\s+que\s+(?:el|la)\s+'
-            . '(izquierd[oa]|derech[oa])\b/iu',
-            $textoHallazgo,
-            $m
-        )) {
+        if (
+            !preg_match(
+                '/\bmismas?\s+caracter[ií]sticas\s+que\s+(?:el|la)\s+'
+                . '(izquierd[oa]|derech[oa])\b/iu',
+                $textoHallazgo,
+                $m
+            )
+        ) {
             continue;
         }
 
-        $referenciasEntreOrganos[] = [
-            'organo_destino' => $organoActual,
-            'lateralidad_destino' => $lateralidadActual,
-            'organo_referencia' => $organoActual,
-            'lateralidad_referencia' => mb_strtolower(
-                $m[1],
-                'UTF-8'
-            ),
-            'evidencia' => $m[0],
-            'estado' => 'referencia_explicita'
-        ];
+        $agregarReferenciaEntreOrganos(
+            $organoActual,
+            $lateralidadActual,
+            $m[1],
+            $m[0]
+        );
+    }
+
+    /*
+     * Segunda vía:
+     * revisar directamente las transcripciones completas.
+     *
+     * Esto permite detectar referencias que aparecen solamente
+     * en Motor B o que la segmentación principal de Motor A
+     * no pudo estructurar.
+     */
+    $textosParaReferencias = [];
+
+    if ($texto !== '') {
+        $textosParaReferencias[] = $texto;
+    }
+
+    if ($origen !== null) {
+        $textoReferenciaB = trim(
+            (string)($origen['texto_b'] ?? '')
+        );
+
+        if ($textoReferenciaB !== '') {
+            $textosParaReferencias[] = $textoReferenciaB;
+        }
+    }
+
+    /*
+     * Evitar procesar dos veces textos idénticos.
+     */
+    $textosParaReferencias = array_values(
+        array_unique($textosParaReferencias)
+    );
+
+    $detectarReferenciasEnTexto = static function (
+        string $textoFuente
+    ) use (
+        $patronOrgano,
+        $normalizarOrganoDetectado,
+        $agregarReferenciaEntreOrganos
+    ): void {
+        $fragmentosReferencia = preg_split(
+            '/(?<=[.!?;])\s+|\R+/u',
+            $textoFuente,
+            -1,
+            PREG_SPLIT_NO_EMPTY
+        ) ?: [];
+
+        foreach ($fragmentosReferencia as $fragmentoReferencia) {
+            $fragmentoReferencia = trim(
+                (string)$fragmentoReferencia
+            );
+
+            if ($fragmentoReferencia === '') {
+                continue;
+            }
+
+            preg_match_all(
+                '/\bmismas?\s+caracter[ií]sticas\s+que\s+(?:el|la)\s+'
+                . '(izquierd[oa]|derech[oa])\b/iu',
+                $fragmentoReferencia,
+                $referenciasEncontradas,
+                PREG_SET_ORDER | PREG_OFFSET_CAPTURE
+            );
+
+            foreach ($referenciasEncontradas as $referenciaEncontrada) {
+                $evidencia = trim(
+                    (string)($referenciaEncontrada[0][0] ?? '')
+                );
+
+                $offsetReferencia = (int)(
+                    $referenciaEncontrada[0][1] ?? -1
+                );
+
+                $lateralidadReferencia = (string)(
+                    $referenciaEncontrada[1][0] ?? ''
+                );
+
+                if (
+                    $evidencia === ''
+                    || $offsetReferencia < 0
+                    || $lateralidadReferencia === ''
+                ) {
+                    continue;
+                }
+
+                /*
+                 * Buscar el órgano lateralizado más cercano
+                 * ANTES de "mismas características".
+                 *
+                 * Si hubiera más de uno en la misma frase,
+                 * el más cercano es el destino de la referencia.
+                 */
+                $textoPrevioReferencia = substr(
+                    $fragmentoReferencia,
+                    0,
+                    $offsetReferencia
+                );
+
+                preg_match_all(
+                    '/(?<!\p{L})'
+                    . '(' . $patronOrgano . ')'
+                    . '\s+(izquierd[oa]|derech[oa])'
+                    . '(?!\p{L})/iu',
+                    $textoPrevioReferencia,
+                    $organosPrevios,
+                    PREG_SET_ORDER
+                );
+
+                if (empty($organosPrevios)) {
+                    continue;
+                }
+
+                $organoPrevio =
+                    $organosPrevios[
+                        array_key_last($organosPrevios)
+                    ];
+
+                $organoDestino = $normalizarOrganoDetectado(
+                    $organoPrevio[1] ?? null
+                );
+
+                $lateralidadDestino =
+                    !empty($organoPrevio[2])
+                        ? mb_strtolower(
+                            $organoPrevio[2],
+                            'UTF-8'
+                        )
+                        : null;
+
+                $agregarReferenciaEntreOrganos(
+                    $organoDestino,
+                    $lateralidadDestino,
+                    $lateralidadReferencia,
+                    $evidencia
+                );
+            }
+        }
+    };
+
+    foreach ($textosParaReferencias as $textoParaReferencia) {
+        $detectarReferenciasEnTexto(
+            $textoParaReferencia
+        );
     }
 
         /*
@@ -662,11 +977,12 @@ function interpretacion_procesar_php(string $textoRecibido, ?array $origen = nul
     ) use (
         $resolverContextoAutocorreccion,
         $patronOrgano,
-        $normalizarOrganoDetectado
+        $normalizarOrganoDetectado,
+        $esHallazgoCavitarioIndependiente
     ): array {
         /*
-         * Mantener como fallback el resolver existente.
-         */
+        * Mantener como fallback el resolver existente.
+        */
         $contexto = $resolverContextoAutocorreccion(
             $textoFuente,
             $offset
@@ -679,8 +995,134 @@ function interpretacion_procesar_php(string $textoRecibido, ?array $origen = nul
         );
 
         /*
-         * Limitar la búsqueda para no arrastrar un órgano muy lejano.
-         */
+        * 1. Si después del marcador de corrección aparece
+        * explícitamente un órgano, ese órgano es el contexto
+        * más fuerte.
+        *
+        * Ejemplo:
+        *   "Estómago aumentado. Perdón, el colon está aumentado."
+        */
+        $desdeMarcador = substr(
+            $textoFuente,
+            $offset,
+            220
+        );
+
+        $patronOrganoDespuesCorreccion =
+            '/^(?:'
+            . 'perd[oó]n'
+            . '|corrijo'
+            . '|mejor\s+dicho'
+            . '|quise\s+decir'
+            . ')\b'
+            . '[\s,;:\-]*'
+            . '(?:(?:el|la|los|las)\s+)?'
+            . '(' . $patronOrgano . ')'
+            . '(?:\s+(izquierd[oa]|derech[oa]))?'
+            . '(?!\p{L})/iu';
+
+        if (
+            preg_match(
+                $patronOrganoDespuesCorreccion,
+                $desdeMarcador,
+                $mPosterior
+            )
+        ) {
+            $contexto['organo'] = $normalizarOrganoDetectado(
+                $mPosterior[1]
+            );
+
+            $contexto['lateralidad'] = !empty($mPosterior[2])
+                ? mb_strtolower(
+                    $mPosterior[2],
+                    'UTF-8'
+                )
+                : null;
+
+            return $contexto;
+        }
+
+        /*
+        * Obtener solamente el fragmento clínico inmediato
+        * donde apareció el marcador.
+        */
+        $fragmentosHastaMarca = preg_split(
+            '/(?<=[.!?;])\s+|\R+/u',
+            $textoAnteriorBytes,
+            -1,
+            PREG_SPLIT_NO_EMPTY
+        ) ?: [];
+
+        $fragmentoActual = !empty($fragmentosHastaMarca)
+            ? trim(
+                (string)$fragmentosHastaMarca[
+                    array_key_last($fragmentosHastaMarca)
+                ]
+            )
+            : '';
+
+        /*
+        * 2. Una autocorrección dentro de un hallazgo cavitario
+        * independiente no debe heredar el órgano anterior.
+        *
+        * Ejemplo real:
+        *   "Adrenal izquierda...
+        *    Se observa neumoperitoneo..., perdón..."
+        *
+        * El "perdón" pertenece al neumoperitoneo,
+        * no a la adrenal.
+        */
+        if (
+            $fragmentoActual !== ''
+            && $esHallazgoCavitarioIndependiente(
+                $fragmentoActual
+            )
+        ) {
+            $contexto['organo'] = null;
+            $contexto['lateralidad'] = null;
+
+            return $contexto;
+        }
+
+        /*
+        * 3. Si el propio fragmento actual comienza explícitamente
+        * con un órgano, usar ese contexto antes de buscar hacia atrás.
+        */
+        $patronInicioFragmento =
+            '/^(?:paciente\b[^,]{0,100},\s*)?'
+            . '(?:en\s+)?'
+            . '(?:(?:el|la|los|las)\s+)?'
+            . '(' . $patronOrgano . ')'
+            . '(?:\s+(izquierd[oa]|derech[oa]))?'
+            . '(?!\p{L})/iu';
+
+        if (
+            $fragmentoActual !== ''
+            && preg_match(
+                $patronInicioFragmento,
+                $fragmentoActual,
+                $mActual
+            )
+        ) {
+            $contexto['organo'] = $normalizarOrganoDetectado(
+                $mActual[1]
+            );
+
+            $contexto['lateralidad'] = !empty($mActual[2])
+                ? mb_strtolower(
+                    $mActual[2],
+                    'UTF-8'
+                )
+                : null;
+
+            return $contexto;
+        }
+
+        /*
+        * 4. Fallback histórico:
+        * buscar hacia atrás el último bloque que comience
+        * explícitamente con un órgano.
+        */
         $ventanaAnterior = mb_substr(
             $textoAnteriorBytes,
             -500,
@@ -697,19 +1139,12 @@ function interpretacion_procesar_php(string $textoRecibido, ?array $origen = nul
 
         $patronInicioContexto =
             '/^(?:paciente\b[^,]{0,100},\s*)?'
+            . '(?:en\s+)?'
             . '(?:(?:el|la|los|las)\s+)?'
             . '(' . $patronOrgano . ')'
             . '(?:\s+(izquierd[oa]|derech[oa]))?'
             . '(?!\p{L})/iu';
 
-        /*
-         * Recorrer hacia atrás hasta encontrar el último bloque
-         * que COMIENCE explícitamente con un órgano.
-         *
-         * Ignoramos introducciones de corrección como:
-         *   "Ay,"
-         *   "Ah, no,"
-         */
         for (
             $i = count($fragmentosPrevios) - 1;
             $i >= 0;
@@ -993,8 +1428,13 @@ function interpretacion_procesar_php(string $textoRecibido, ?array $origen = nul
         string $textoFuente,
         string $termino,
         int $ocurrencia = 0,
-        ?int $indiceToken = null
-    ) use ($patronOrgano, $normalizarOrganoDetectado): array {
+        ?int $indiceToken = null,
+        array $correccionesOrganoLocalesFuente = []
+    ) use (
+        $patronOrgano,
+        $normalizarOrganoDetectado,
+        $normalizarClaveAlias
+    ): array {
         $termino = trim($termino, " \t\n\r\0\x0B.,;:");
 
         if ($textoFuente === '') {
@@ -1019,22 +1459,33 @@ function interpretacion_procesar_php(string $textoRecibido, ?array $origen = nul
         /**
          * Camino principal: usar la posición exacta entregada por cmp_comparar().
          */
-        if ($indiceToken !== null && $indiceToken >= 0) {
-            preg_match_all(
-                '/\S+/u',
-                $textoTrabajo,
-                $tokens,
-                PREG_OFFSET_CAPTURE
+        $pos = null;
+
+        /*
+        * Misma tokenización usada por cmp_comparar().
+        * Además la reutilizamos para ubicar correcciones locales de órgano.
+        */
+        preg_match_all(
+            '/\S+/u',
+            $textoTrabajo,
+            $tokensTrabajo,
+            PREG_OFFSET_CAPTURE
+        );
+
+        /**
+         * Camino principal: usar la posición exacta entregada por cmp_comparar().
+         */
+        if (
+            $indiceToken !== null
+            && $indiceToken >= 0
+            && isset($tokensTrabajo[0][$indiceToken])
+        ) {
+            $byteOffset = (int)$tokensTrabajo[0][$indiceToken][1];
+
+            $pos = mb_strlen(
+                substr($textoTrabajo, 0, $byteOffset),
+                'UTF-8'
             );
-
-            if (isset($tokens[0][$indiceToken])) {
-                $byteOffset = (int)$tokens[0][$indiceToken][1];
-
-                $pos = mb_strlen(
-                    substr($textoTrabajo, 0, $byteOffset),
-                    'UTF-8'
-                );
-            }
         }
 
         /**
@@ -1139,11 +1590,23 @@ function interpretacion_procesar_php(string $textoRecibido, ?array $origen = nul
             PREG_SET_ORDER | PREG_OFFSET_CAPTURE
         );
 
+
+
+
+
+
+
+        
         $ultimo = !empty($organos)
             ? $organos[array_key_last($organos)]
             : null;
 
-        $distanciaOrgano = null;
+        /*
+        * Candidato escrito literalmente en la transcripción.
+        */
+        $organoRaw = null;
+        $lateralidadRaw = null;
+        $posOrganoRaw = null;
 
         if ($ultimo !== null) {
             $offsetOrgano = (int)$ultimo[0][1];
@@ -1153,25 +1616,158 @@ function interpretacion_procesar_php(string $textoRecibido, ?array $origen = nul
                 'UTF-8'
             );
 
-            $posOrganoGlobal = $inicioAnterior + $posOrganoLocal;
+            $posOrganoRaw = $inicioAnterior + $posOrganoLocal;
 
-            $distanciaOrgano = max(
-                0,
-                $pos - $posOrganoGlobal
+            $organoRaw = $normalizarOrganoDetectado(
+                $ultimo[1][0]
             );
-        }
 
-        return [
-            'organo' => $ultimo
-                ? $normalizarOrganoDetectado($ultimo[1][0])
-                : null,
-            'lateralidad' => (
-                $ultimo
-                && isset($ultimo[2][0])
+            $lateralidadRaw = (
+                isset($ultimo[2][0])
                 && $ultimo[2][0] !== ''
             )
                 ? mb_strtolower($ultimo[2][0], 'UTF-8')
-                : null,
+                : null;
+        }
+
+        /*
+        * Candidato procedente de una corrección STT LOCALIZADA.
+        *
+        * Ejemplo:
+        *   Motor A: "Vaso ..."
+        *   corrección en indice_a: Vaso -> Bazo
+        *
+        * Si una discrepancia posterior aparece dentro de ese bloque,
+        * Bazo debe competir como contexto anatómico con los órganos
+        * escritos literalmente.
+        */
+        $organoLocal = null;
+        $lateralidadLocal = null;
+        $posOrganoCorregido = null;
+
+        foreach ($correccionesOrganoLocalesFuente as $correccionLocal) {
+            $indiceLocal = (int)(
+                $correccionLocal['indice_token'] ?? -1
+            );
+
+            if (
+                $indiceLocal < 0
+                || !isset($tokensTrabajo[0][$indiceLocal])
+            ) {
+                continue;
+            }
+
+            $tokenLocal = (string)$tokensTrabajo[0][$indiceLocal][0];
+
+            /*
+            * Seguridad: la corrección solo vale si en esa posición
+            * realmente está el término descartado.
+            */
+            if (
+                $normalizarClaveAlias($tokenLocal)
+                !== $normalizarClaveAlias(
+                    (string)($correccionLocal['descartado'] ?? '')
+                )
+            ) {
+                continue;
+            }
+
+            $byteOffsetLocal = (int)$tokensTrabajo[0][$indiceLocal][1];
+
+            $posLocal = mb_strlen(
+                substr($textoTrabajo, 0, $byteOffsetLocal),
+                'UTF-8'
+            );
+
+            /*
+            * Solo sirven órganos anteriores o coincidentes con
+            * el punto donde comienza la discrepancia.
+            */
+            if ($posLocal > $pos) {
+                continue;
+            }
+
+            /*
+            * Mantener el mismo alcance máximo aproximado que
+            * la búsqueda histórica hacia atrás.
+            */
+            if (($pos - $posLocal) > 350) {
+                continue;
+            }
+
+            if (
+                $posOrganoCorregido !== null
+                && $posLocal <= $posOrganoCorregido
+            ) {
+                continue;
+            }
+
+            $organoLocal = trim(
+                (string)($correccionLocal['elegido'] ?? '')
+            );
+
+            if ($organoLocal === '') {
+                continue;
+            }
+
+            $posOrganoCorregido = $posLocal;
+            $lateralidadLocal = null;
+
+            /*
+            * Si la lateralidad viene inmediatamente después
+            * del término corregido, conservarla.
+            */
+            if (isset($tokensTrabajo[0][$indiceLocal + 1])) {
+                $tokenSiguiente = trim(
+                    (string)$tokensTrabajo[0][$indiceLocal + 1][0],
+                    " .,;:"
+                );
+
+                if (
+                    preg_match(
+                        '/^(izquierd[oa]|derech[oa])$/iu',
+                        $tokenSiguiente,
+                        $mLateralidad
+                    )
+                ) {
+                    $lateralidadLocal = mb_strtolower(
+                        $mLateralidad[1],
+                        'UTF-8'
+                    );
+                }
+            }
+        }
+
+        /*
+        * Elegir el candidato anatómico realmente más cercano.
+        *
+        * Si ambos ocupan exactamente la misma posición, la corrección
+        * STT localizada gana sobre el término crudo.
+        */
+        $usarCorreccionLocal =
+            $posOrganoCorregido !== null
+            && (
+                $posOrganoRaw === null
+                || $posOrganoCorregido >= $posOrganoRaw
+            );
+
+        if ($usarCorreccionLocal) {
+            $organoFinal = $organoLocal;
+            $lateralidadFinal = $lateralidadLocal;
+            $posOrganoFinal = $posOrganoCorregido;
+        } else {
+            $organoFinal = $organoRaw;
+            $lateralidadFinal = $lateralidadRaw;
+            $posOrganoFinal = $posOrganoRaw;
+        }
+
+        $distanciaOrgano = $posOrganoFinal !== null
+            ? max(0, $pos - $posOrganoFinal)
+            : null;
+
+        return [
+            'organo' => $organoFinal,
+            'lateralidad' => $lateralidadFinal,
             'distancia_organo' => $distanciaOrgano,
             'contexto' => trim(mb_substr(
                 $textoTrabajo,
@@ -1252,14 +1848,16 @@ function interpretacion_procesar_php(string $textoRecibido, ?array $origen = nul
             $textoA,
             $a,
             $ocurrenciaA,
-            $indiceA
+            $indiceA,
+            $correccionesOrganoContextoA
         );
 
         $contextoB = $buscarContexto(
             $textoB,
             $b,
             $ocurrenciaB,
-            $indiceB
+            $indiceB,
+            $correccionesOrganoContextoB
         );
 
         /**
