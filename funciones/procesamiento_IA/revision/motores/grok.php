@@ -1,5 +1,8 @@
 <?php
 declare(strict_types=1);
+/** @var string $system Generado por el motor de revisión incluido a continuación. */
+/** @var string $user Generado por el motor de revisión incluido a continuación. */
+
 
 if (
     !defined('VETMIND_REVISOR_DISPATCH')
@@ -17,6 +20,7 @@ if (!$api_key) {
 
 $payload = [
     'model'       => $configMotor['model'],
+    'reasoning_effort' => $configMotor['reasoning_effort'],
     'messages'    => [
         ['role'=>'system','content'=>$system],
         ['role'=>'user','content'=>$user],

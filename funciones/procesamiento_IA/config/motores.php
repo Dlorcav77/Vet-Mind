@@ -145,6 +145,7 @@ return [
             'grok' => [
                 'archivo' => 'revision/motores/grok.php',
                 'model' => 'grok-4.3',
+                'reasoning_effort' => 'medium',
                 'max_tokens' => 6000,
                 'temperature' => 0.1,
                 'response_format' => [

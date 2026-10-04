@@ -129,3 +129,90 @@ function interpretacion_guardar_resultado(mysqli $mysqli, array $datos): int
         $stmt->close();
     }
 }
+
+/**
+ * Recupera la última interpretación completada asociada
+ * al usuario, flujo y dictado exacto.
+ */
+function interpretacion_cargar_resultado_flujo(
+    mysqli $mysqli,
+    int $usuarioId,
+    string $flujoId,
+    string $textoEntrada
+): ?array {
+    $flujoId = trim($flujoId);
+    $textoEntrada = trim($textoEntrada);
+
+    if (
+        $usuarioId <= 0
+        || $flujoId === ''
+        || $textoEntrada === ''
+    ) {
+        return null;
+    }
+
+    $sql = "
+        SELECT
+            id,
+            transcripcion_id,
+            motor,
+            modelo,
+            version_esquema,
+            version_prompt,
+            resultado_json
+        FROM ia_interpretaciones
+        WHERE usuario_id = ?
+          AND flujo_id = ?
+          AND estado = 'completado'
+          AND texto_entrada = ?
+        ORDER BY id DESC
+        LIMIT 1
+    ";
+
+    $stmt = $mysqli->prepare($sql);
+
+    if (!$stmt) {
+        throw new RuntimeException(
+            'No se pudo preparar la lectura de interpretación.'
+        );
+    }
+
+    $stmt->bind_param(
+        'iss',
+        $usuarioId,
+        $flujoId,
+        $textoEntrada
+    );
+
+    $stmt->execute();
+
+    $fila = $stmt->get_result()->fetch_assoc();
+
+    $stmt->close();
+
+    if (!$fila) {
+        return null;
+    }
+
+    $resultado = json_decode(
+        (string)($fila['resultado_json'] ?? ''),
+        true
+    );
+
+    if (!is_array($resultado)) {
+        return null;
+    }
+
+    unset($fila['resultado_json']);
+
+    $fila['id'] = (int)$fila['id'];
+
+    $fila['transcripcion_id'] =
+        $fila['transcripcion_id'] !== null
+            ? (int)$fila['transcripcion_id']
+            : null;
+
+    $fila['resultado'] = $resultado;
+
+    return $fila;
+}

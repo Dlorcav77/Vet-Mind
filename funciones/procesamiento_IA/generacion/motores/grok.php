@@ -1,6 +1,8 @@
 <?php
 // funciones/procesamiento_IA/generacion/motores/grok.php
 
+/** @var array $configMotor Generado por el motor de revisión incluido a continuación. */
+
 declare(strict_types=1);
 
 if (

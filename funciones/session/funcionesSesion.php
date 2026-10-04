@@ -57,6 +57,7 @@ function iniciarSesionSegura(): void
     ini_set('session.use_strict_mode', '1');
     ini_set('session.use_only_cookies', '1');
     ini_set('session.cookie_httponly', '1');
+    ini_set('session.gc_maxlifetime', '14400'); // 4 horas
 
     $protocoloProxy = strtolower(
         $_SERVER['HTTP_X_FORWARDED_PROTO'] ?? ''
@@ -126,7 +127,7 @@ function exigirAutenticacion(
     string $redirectUrl = '../index.php'
 ): void
 {
-    $inactivo = 28800; // 8 horas
+    $inactivo = 14400; // 4 horas
 
     $usuarioId = $_SESSION['usuario_id'] ?? null;
     $perfilId  = $_SESSION['perfil_id'] ?? null;

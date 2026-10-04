@@ -265,7 +265,8 @@ function ejecutarRevisor(dictado, informeHtml, plantillaBase, observacionesGener
                 tipo: item.tipo || 'Revisar',
                 detalle: item.detalle || '',
                 dictado: item.dictado || '',
-                informe: item.informe || ''
+                informe: item.informe || '',
+                objetivo: item.objetivo || ''
             });
         });
 

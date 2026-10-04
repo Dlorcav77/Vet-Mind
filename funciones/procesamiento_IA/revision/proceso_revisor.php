@@ -1,7 +1,10 @@
 <?php
 // funciones/GPT/proceso_ia/proceso_revisor.php
+
 // IA revisora (2a pasada). Compara DICTADO vs INFORME y devuelve SOLO una lista
 // de posibles inconsistencias. NO reescribe el informe. Motor: grok-4.3.
+/** @var string $rid Generado por el motor de revisión incluido a continuación. */
+
 declare(strict_types=1);
 
 header('X-VetMind-revision: nuevo');
@@ -60,6 +63,16 @@ require_once($ROOT_DIR . "/configP.php");
 require_once($FUNC_DIR . "/logs/logger.php");
 require_once(dirname(__DIR__) . "/comun/ia_store.php");
 
+require_once(
+    dirname(__DIR__)
+    . "/interpretacion/lib/interpretacion_origen.php"
+);
+
+require_once(
+    dirname(__DIR__)
+    . "/interpretacion/lib/interpretacion_store.php"
+);
+
 date_default_timezone_set('America/Santiago');
 header('Content-Type: application/json; charset=utf-8');
 
@@ -72,9 +85,60 @@ $dictado = trim((string)($_POST['dictado'] ?? ''));
 $informe = trim((string)($_POST['informe'] ?? ''));
 $plantilla = trim((string)($_POST['plantilla'] ?? ''));
 
+$flujoId = trim(
+    (string)($_POST['flujo_id'] ?? '')
+);
+
 if ($dictado === '' || $informe === '') {
     echo json_encode(['status'=>'error','message'=>'Falta dictado o informe.']);
     exit;
+}
+
+/*
+ * Evidencia original del mismo flujo.
+ *
+ * $origenStt contiene:
+ * - texto_a
+ * - texto_b
+ * - texto_doble
+ * - motor_a
+ * - motor_b
+ * - resueltas
+ * - discrepancias
+ */
+$origenStt = null;
+
+/*
+ * Interpretación estructurada utilizada durante
+ * la generación del informe.
+ */
+$interpretacionRegistro = null;
+$interpretacionData = null;
+
+if ($flujoId !== '') {
+    $origenStt = interpretacion_cargar_origen(
+        $mysqli,
+        $userId,
+        $flujoId,
+        $dictado
+    );
+
+    $interpretacionRegistro =
+        interpretacion_cargar_resultado_flujo(
+            $mysqli,
+            $userId,
+            $flujoId,
+            $dictado
+        );
+
+    if (
+        is_array($interpretacionRegistro)
+        && isset($interpretacionRegistro['resultado'])
+        && is_array($interpretacionRegistro['resultado'])
+    ) {
+        $interpretacionData =
+            $interpretacionRegistro['resultado'];
+    }
 }
 
 $config = require dirname(__DIR__) . '/config/motores.php';
@@ -107,13 +171,7 @@ require __DIR__ . '/lib/revisor_prompt.php';
 define('VETMIND_REVISOR_DISPATCH', true);
 require $rutaMotor;
 
-$flujoIdRevision = '';
-if (isset($input) && is_array($input)) {
-    $flujoIdRevision = (string)($input['flujo_id'] ?? '');
-}
-if ($flujoIdRevision === '') {
-    $flujoIdRevision = (string)($_POST['flujo_id'] ?? $_GET['flujo_id'] ?? '');
-}
+$flujoIdRevision = $flujoId;
 
 // guardar request en BD (ia_requests)
 ia_guardar_request($mysqli, [
