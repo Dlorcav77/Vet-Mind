@@ -635,6 +635,42 @@ function concepto_validar(
         return ['accion' => 'pasa'];
     }
 
+    /*
+     * No resolver automáticamente entre descriptores ecográficos
+     * de polaridad opuesta.
+     *
+     * Un STT puede deformar, por ejemplo:
+     *   hiperecoica -> hipercoica / hipericoica
+     *   hipoecoica  -> hipocoica
+     *
+     * Aunque sean ortográficamente similares, hiper/hipo cambian
+     * el significado clínico y deben quedar como discrepancia.
+     */
+    $detectarPolaridadEco = static function (string $valor): ?string {
+        $valor = org_norm($valor);
+
+        if (preg_match('/^hiper[ei]?(?:coic|cogen)/', $valor)) {
+            return 'hiper';
+        }
+
+        if (preg_match('/^hipo[ei]?(?:coic|cogen)/', $valor)) {
+            return 'hipo';
+        }
+
+        return null;
+    };
+
+    $polaridadA = $detectarPolaridadEco($a1);
+    $polaridadB = $detectarPolaridadEco($b1);
+
+    if (
+        $polaridadA !== null
+        && $polaridadB !== null
+        && $polaridadA !== $polaridadB
+    ) {
+        return ['accion' => 'pasa'];
+    }
+
     $frase = concepto_frase_equivalente_conocida($a1, $b1);
 
     if ($frase !== null) {

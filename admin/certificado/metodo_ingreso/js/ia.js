@@ -356,6 +356,7 @@ function ejecutarRevisor(dictado, informeHtml, plantillaBase, observacionesGener
                 zona: indice !== -1 ? organosVisuales[indice].organo : 'Informe',
                 dictado: '',
                 informe: obs.contexto || '',
+                objetivo: obs.objetivo || '',
                 detalle: obs.texto || 'Punto marcado por el generador para revisión.'
             };
 
@@ -367,7 +368,8 @@ function ejecutarRevisor(dictado, informeHtml, plantillaBase, observacionesGener
                 severidad: 'media',
                 tipo: 'Generador · ' + (obs.tipo || 'revisar'),
                 detalle: obs.texto || 'Punto marcado por el generador para revisión.',
-                informe: obs.contexto || ''
+                informe: obs.contexto || '',
+                objetivo: obs.objetivo || ''
             });
         });
 
@@ -1303,12 +1305,39 @@ $('#procesarIA').on('click', function () {
                     && typeof window.VetmindRevision.aplicar === 'function'
                     && organosOrigen.length
                 ) {
+                    let revisionActual = null;
+
+                    try {
+                        if (typeof window.VetmindRevision.exportar === 'function') {
+                            revisionActual = window.VetmindRevision.exportar()?.revision || null;
+                        }
+                    } catch (e) {
+                        revisionActual = null;
+                    }
+
+                    const organosPrevios = Array.isArray(revisionActual?.organos)
+                        ? revisionActual.organos
+                        : [];
+
+                    const normalizarOrgano = function (valor) {
+                        return String(valor || '').trim().toLowerCase();
+                    };
+
                     window.VetmindRevision.aplicar({
                         organos: organosOrigen.map(function (organo) {
+                            const previo = organosPrevios.find(function (item) {
+                                return normalizarOrgano(item.organo) === normalizarOrgano(organo.organo);
+                            });
+
                             return {
                                 organo: organo.organo,
                                 atributos: Array.isArray(organo.atributos) ? organo.atributos : [],
-                                alertas: []
+                                alertas: Array.isArray(organo.alertas)
+                                    ? organo.alertas
+                                    : (Array.isArray(previo?.alertas) ? previo.alertas : []),
+                                dudasTranscripcion: Array.isArray(organo.dudasTranscripcion)
+                                    ? organo.dudasTranscripcion
+                                    : (Array.isArray(previo?.dudasTranscripcion) ? previo.dudasTranscripcion : [])
                             };
                         })
                     });

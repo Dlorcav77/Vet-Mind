@@ -17,8 +17,7 @@ $contenidoInforme = isset($fila['contenido_html']) ? (string)$fila['contenido_ht
             <div id="revision_ia_leyenda" class="vm-revision-leyenda" style="display:none;">
                 <span><i class="vm-leyenda-color vm-leyenda-plantilla"></i>Plantilla</span>
                 <span><i class="vm-leyenda-color vm-leyenda-dictado"></i>Dictado</span>
-                <span><i class="vm-leyenda-color vm-leyenda-desconocido"></i>Origen dudoso</span>
-                <span class="vm-leyenda-discrepancia">Duda transcripción</span>
+                <span class="vm-leyenda-discrepancia">Requiere revisión</span>
             </div>
         </div>
 

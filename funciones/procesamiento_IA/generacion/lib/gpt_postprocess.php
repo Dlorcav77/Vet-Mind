@@ -391,10 +391,103 @@ function gpt_extraer_observaciones(string $html): array
             'tipo'     => $tipo,
             'texto'    => $texto,
             'contexto' => $contexto,
+            'objetivo' => gpt_objetivo_antes_flag($cuerpo, $offset),
         ];
     }
 
     return $resultado;
+}
+
+function gpt_objetivo_antes_flag(string $cuerpo, int $offset): string
+{
+    if ($offset <= 0 || $cuerpo === '') {
+        return '';
+    }
+
+    $antes = substr($cuerpo, 0, $offset);
+
+    /*
+     * Tomamos solamente el párrafo donde está el flag.
+     */
+    $inicioParrafo = 0;
+
+    if (
+        preg_match_all(
+            '/<p(?:\s|>)/i',
+            $antes,
+            $inicios,
+            PREG_OFFSET_CAPTURE
+        )
+        && !empty($inicios[0])
+    ) {
+        $ultimoInicio = end($inicios[0]);
+        $inicioParrafo = (int)$ultimoInicio[1];
+    }
+
+    $fragmento = substr(
+        $cuerpo,
+        $inicioParrafo,
+        $offset - $inicioParrafo
+    );
+
+    /*
+     * Por seguridad eliminamos otros flags anteriores que puedan
+     * existir dentro del mismo párrafo.
+     */
+    $fragmento = preg_replace(
+        '#<sup\b[^>]*class=["\'][^"\']*\bflag\b[^"\']*["\'][^>]*>.*?</sup>#is',
+        '',
+        $fragmento
+    ) ?? $fragmento;
+
+    $texto = html_entity_decode(
+        strip_tags($fragmento),
+        ENT_QUOTES | ENT_HTML5,
+        'UTF-8'
+    );
+
+    $texto = trim(
+        preg_replace('/\s+/u', ' ', $texto) ?? $texto
+    );
+
+    if ($texto === '') {
+        return '';
+    }
+
+    /*
+     * El flag está pegado inmediatamente después del dato dudoso.
+     * Nos quedamos con el último segmento clínico antes del flag.
+     *
+     * No usamos "." entre números como corte para no romper 0.58 cm.
+     */
+    $partes = preg_split(
+        '/(?:,\s+|;\s+|:\s+|(?<!\d)\.\s+(?!\d))/u',
+        $texto
+    );
+
+    $objetivo = trim((string)end($partes));
+
+    /*
+     * Evitar devolver fragmentos excesivamente largos.
+     */
+    if (mb_strlen($objetivo, 'UTF-8') > 180) {
+        $objetivo = mb_substr(
+            $objetivo,
+            -180,
+            null,
+            'UTF-8'
+        );
+
+        $objetivo = preg_replace(
+            '/^\S+\s+/u',
+            '',
+            $objetivo
+        ) ?? $objetivo;
+
+        $objetivo = trim($objetivo);
+    }
+
+    return $objetivo;
 }
 
 /**

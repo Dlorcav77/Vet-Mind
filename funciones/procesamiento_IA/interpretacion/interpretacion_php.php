@@ -295,6 +295,9 @@ function interpretacion_procesar_php(string $textoRecibido, ?array $origen = nul
             . '|derrame\s+peritone\p{L}*'
             . '|l[ií]quido\s+libre\b'
             . '|efusi[oó]n\s+peritone\p{L}*'
+            . '|(?:una?\s+)?(?:masa|lesi[oó]n|estructura|n[oó]dulo)\b'
+            . '[^.!?;]{0,80}'
+            . '\ben\s+(?:la\s+)?cavidad\s+abdominal\b'
             . ')/iu',
             $fragmento
         );
@@ -437,12 +440,36 @@ function interpretacion_procesar_php(string $textoRecibido, ?array $origen = nul
             $lateralidadActiva = $lateralidad;
         }
 
+        /*
+        * Para decidir si un fragmento mezcla órganos distintos,
+        * ignoramos órganos usados únicamente como referencia comparativa.
+        *
+        * Ejemplo:
+        *   "Hígado ... ecogenicidad disminuida respecto al Bazo"
+        *
+        * El sujeto clínico sigue siendo Hígado; Bazo es solo referencia.
+        * El texto original del hallazgo NO se modifica.
+        */
+        $fragmentoParaContextosOrgano = preg_replace(
+            '/\b(?:'
+            . 'respecto\s+(?:a|al)'
+            . '|en\s+comparaci[oó]n\s+con'
+            . '|comparad[oa]s?\s+con'
+            . ')\s+'
+            . '(?:(?:el|la|los|las)\s+)?'
+            . '(?:' . $patronOrgano . ')'
+            . '(?:\s+(?:izquierd[oa]|derech[oa]))?'
+            . '(?!\p{L})/iu',
+            '__VMREFORG__',
+            $fragmento
+        ) ?? $fragmento;
+
         // Si aparecen varios órganos DISTINTOS, no atribuir todo a uno solo.
         preg_match_all(
             '/(?<!\p{L})(?<organo>' . $patronOrgano . ')'
             . '(?:\s+(?<lateralidad>izquierd[oa]|derech[oa]))?'
             . '(?!\p{L})/iu',
-            $fragmento,
+            $fragmentoParaContextosOrgano,
             $coincidencias,
             PREG_SET_ORDER
         );
@@ -726,7 +753,7 @@ function interpretacion_procesar_php(string $textoRecibido, ?array $origen = nul
 
         if (
             !preg_match(
-                '/\bmismas?\s+caracter[ií]sticas\s+que\s+(?:el|la)\s+'
+                '/\bmismas?\s+caracter[ií]sticas?\s+que\s+(?:el|la)\s+'
                 . '(izquierd[oa]|derech[oa])\b/iu',
                 $textoHallazgo,
                 $m
@@ -798,7 +825,7 @@ function interpretacion_procesar_php(string $textoRecibido, ?array $origen = nul
             }
 
             preg_match_all(
-                '/\bmismas?\s+caracter[ií]sticas\s+que\s+(?:el|la)\s+'
+                '/\bmismas?\s+caracter[ií]sticas?\s+que\s+(?:el|la)\s+'
                 . '(izquierd[oa]|derech[oa])\b/iu',
                 $fragmentoReferencia,
                 $referenciasEncontradas,
@@ -902,56 +929,186 @@ function interpretacion_procesar_php(string $textoRecibido, ?array $origen = nul
     $resolverContextoAutocorreccion = static function (
         string $textoFuente,
         int $offset
-    ) use ($patronOrgano, $normalizarOrganoDetectado): array {
-        $textoAnteriorBytes = substr($textoFuente, 0, $offset);
-
-        $contextoAnterior = mb_substr(
-            $textoAnteriorBytes,
-            -350,
-            null,
-            'UTF-8'
+    ) use (
+        $patronOrgano,
+        $normalizarOrganoDetectado,
+        $esHallazgoCavitarioIndependiente
+    ): array {
+        $textoAnteriorBytes = substr(
+            $textoFuente,
+            0,
+            $offset
         );
 
-        preg_match_all(
-            '/(?<!\p{L})(' . $patronOrgano . ')'
+        /*
+        * Fragmento clínico inmediato donde aparece el valor corregido.
+        */
+        $fragmentosHastaValor = preg_split(
+            '/(?<=[.!?;])\s+|\R+/u',
+            $textoAnteriorBytes,
+            -1,
+            PREG_SPLIT_NO_EMPTY
+        ) ?: [];
+
+        $fragmentoActual = !empty($fragmentosHastaValor)
+            ? trim(
+                (string)$fragmentosHastaValor[
+                    array_key_last($fragmentosHastaValor)
+                ]
+            )
+            : '';
+
+        $organo = null;
+        $lateralidad = null;
+
+        /*
+        * 1. Si el propio bloque actual comienza con un órgano,
+        * ese contexto es más fuerte que cualquier término anatómico
+        * mencionado después dentro de la misma descripción.
+        *
+        * Ejemplo:
+        *   "Páncreas rama derecha ... peritoneo reactivo ...
+        *    grosor 0.8, no era 1.4"
+        *
+        * El contexto sigue siendo Páncreas.
+        */
+        $patronInicioFragmento =
+            '/^(?:paciente\b[^,]{0,100},\s*)?'
+            . '(?:en\s+)?'
+            . '(?:(?:el|la|los|las)\s+)?'
+            . '(' . $patronOrgano . ')'
             . '(?:\s+(izquierd[oa]|derech[oa]))?'
-            . '(?!\p{L})/iu',
-            $contextoAnterior,
-            $organos,
-            PREG_SET_ORDER
-        );
+            . '(?!\p{L})/iu';
 
-        $ultimoOrgano = !empty($organos)
-            ? end($organos)
-            : null;
+        if (
+            $fragmentoActual !== ''
+            && preg_match(
+                $patronInicioFragmento,
+                $fragmentoActual,
+                $mActual
+            )
+        ) {
+            $organo = $normalizarOrganoDetectado(
+                $mActual[1]
+            );
 
-        $organo = $ultimoOrgano
-            ? $normalizarOrganoDetectado($ultimoOrgano[1])
-            : null;
+            $lateralidad = !empty($mActual[2])
+                ? mb_strtolower(
+                    $mActual[2],
+                    'UTF-8'
+                )
+                : null;
+        }
 
-        $lateralidad = $ultimoOrgano && !empty($ultimoOrgano[2])
-            ? mb_strtolower($ultimoOrgano[2], 'UTF-8')
-            : null;
+        /*
+        * 2. Un hallazgo cavitario independiente nunca debe heredar
+        * el órgano previo.
+        */
+        if (
+            $fragmentoActual !== ''
+            && $esHallazgoCavitarioIndependiente(
+                $fragmentoActual
+            )
+        ) {
+            $organo = null;
+            $lateralidad = null;
+        } elseif ($organo === null) {
+            /*
+            * 3. Fallback: último órgano cercano hacia atrás.
+            *
+            * Se mantiene para continuaciones legítimas como:
+            *
+            *   "Estómago aumentado. Grosor 0.23..., no era 0.33..."
+            */
+            $contextoAnterior = mb_substr(
+                $textoAnteriorBytes,
+                -350,
+                null,
+                'UTF-8'
+            );
 
-        $ventanaAtributo = mb_substr(
-            $textoAnteriorBytes,
-            -140,
-            null,
-            'UTF-8'
-        );
+            preg_match_all(
+                '/(?<!\p{L})(' . $patronOrgano . ')'
+                . '(?:\s+(izquierd[oa]|derech[oa]))?'
+                . '(?!\p{L})/iu',
+                $contextoAnterior,
+                $organos,
+                PREG_SET_ORDER
+            );
+
+            $ultimoOrgano = !empty($organos)
+                ? end($organos)
+                : null;
+
+            $organo = $ultimoOrgano
+                ? $normalizarOrganoDetectado(
+                    $ultimoOrgano[1]
+                )
+                : null;
+
+            $lateralidad = (
+                $ultimoOrgano
+                && !empty($ultimoOrgano[2])
+            )
+                ? mb_strtolower(
+                    $ultimoOrgano[2],
+                    'UTF-8'
+                )
+                : null;
+        }
+
+        /*
+        * Determinar el atributo usando solamente el fragmento clínico
+        * donde aparece el valor corregido.
+        *
+        * No buscamos en frases anteriores porque podrían contener atributos
+        * legítimos de otro dato del mismo órgano.
+        *
+        * Si hay varios candidatos dentro del fragmento, gana el mencionado
+        * más cerca del valor que inicia la autocorrección.
+        */
+        $ventanaAtributo = $fragmentoActual !== ''
+            ? mb_substr(
+                $fragmentoActual,
+                -140,
+                null,
+                'UTF-8'
+            )
+            : '';
 
         $atributo = 'medida';
+        $mejorOffsetAtributo = -1;
 
-        if (preg_match('/\bpolo\s+caudal\b/iu', $ventanaAtributo)) {
-            $atributo = 'polo_caudal';
-        } elseif (preg_match('/\bpolo\s+craneal\b/iu', $ventanaAtributo)) {
-            $atributo = 'polo_craneal';
-        } elseif (preg_match('/\bgrosor\b/iu', $ventanaAtributo)) {
-            $atributo = 'grosor';
-        } elseif (preg_match('/\bpared\b/iu', $ventanaAtributo)) {
-            $atributo = 'pared';
-        } elseif (preg_match('/\btamañ[oa]\b/iu', $ventanaAtributo)) {
-            $atributo = 'tamaño';
+        $candidatosAtributo = [
+            'polo_caudal' => '/\bpolo\s+caudal\b/iu',
+            'polo_craneal' => '/\bpolo\s+craneal\b/iu',
+            'grosor' => '/\bgrosor\b/iu',
+            'pared' => '/\bpared\b/iu',
+            'tamaño' => '/\btamañ[oa]\b/iu',
+        ];
+
+        foreach ($candidatosAtributo as $nombreAtributo => $patronAtributo) {
+            preg_match_all(
+                $patronAtributo,
+                $ventanaAtributo,
+                $coincidenciasAtributo,
+                PREG_OFFSET_CAPTURE
+            );
+
+            if (empty($coincidenciasAtributo[0])) {
+                continue;
+            }
+
+            $ultimaCoincidencia = $coincidenciasAtributo[0][
+                array_key_last($coincidenciasAtributo[0])
+            ];
+
+            $offsetAtributo = (int)$ultimaCoincidencia[1];
+
+            if ($offsetAtributo > $mejorOffsetAtributo) {
+                $mejorOffsetAtributo = $offsetAtributo;
+                $atributo = $nombreAtributo;
+            }
         }
 
         return [
@@ -978,7 +1135,9 @@ function interpretacion_procesar_php(string $textoRecibido, ?array $origen = nul
         $resolverContextoAutocorreccion,
         $patronOrgano,
         $normalizarOrganoDetectado,
-        $esHallazgoCavitarioIndependiente
+        $normalizarClaveAlias,
+        $esHallazgoCavitarioIndependiente,
+        $origen
     ): array {
         /*
         * Mantener como fallback el resolver existente.
@@ -1040,6 +1199,107 @@ function interpretacion_procesar_php(string $textoRecibido, ?array $origen = nul
                 : null;
 
             return $contexto;
+        }
+
+                /*
+         * Si el término posterior al marcador no es reconocido como órgano,
+         * permitir que una discrepancia A/B LOCAL confirme su identidad.
+         *
+         * Ejemplo Rocko:
+         *   Motor A: "Perdón, la adrenalina izquierda..."
+         *   Motor B:              "adrenal izquierda..."
+         *
+         * No creamos alias global "adrenalina -> adrenal".
+         * La equivalencia vale únicamente porque existe evidencia A/B
+         * dentro de este mismo caso.
+         */
+        $patronTerminoLateralizadoDespuesCorreccion =
+            '/^(?:'
+            . 'perd[oó]n'
+            . '|corrijo'
+            . '|mejor\s+dicho'
+            . '|quise\s+decir'
+            . ')\b'
+            . '[\s,;:\-]*'
+            . '(?:(?:el|la|los|las)\s+)?'
+            . '(\p{L}+)'
+            . '\s+(izquierd[oa]|derech[oa])'
+            . '(?!\p{L})/iu';
+
+        if (
+            preg_match(
+                $patronTerminoLateralizadoDespuesCorreccion,
+                $desdeMarcador,
+                $mTerminoPosterior
+            )
+        ) {
+            $terminoPosterior = trim(
+                (string)$mTerminoPosterior[1]
+            );
+
+            $lateralidadPosterior = mb_strtolower(
+                (string)$mTerminoPosterior[2],
+                'UTF-8'
+            );
+
+            foreach (($origen['discrepancias'] ?? []) as $d) {
+                if (!is_array($d)) {
+                    continue;
+                }
+
+                $valorA = trim(
+                    (string)($d['a'] ?? ''),
+                    " \t\n\r\0\x0B.,;:"
+                );
+
+                $valorB = trim(
+                    (string)($d['b'] ?? ''),
+                    " \t\n\r\0\x0B.,;:"
+                );
+
+                $otraAlternativa = null;
+
+                if (
+                    $normalizarClaveAlias($valorA)
+                    === $normalizarClaveAlias($terminoPosterior)
+                ) {
+                    $otraAlternativa = $valorB;
+                } elseif (
+                    $normalizarClaveAlias($valorB)
+                    === $normalizarClaveAlias($terminoPosterior)
+                ) {
+                    $otraAlternativa = $valorA;
+                }
+
+                if (
+                    $otraAlternativa === null
+                    || $otraAlternativa === ''
+                ) {
+                    continue;
+                }
+
+                if (
+                    !preg_match(
+                        '/^(?:(?:el|la|los|las)\s+)?'
+                        . '(' . $patronOrgano . ')'
+                        . '(?!\p{L})$/iu',
+                        $otraAlternativa,
+                        $mOrganoAlternativo
+                    )
+                ) {
+                    continue;
+                }
+
+                $contexto['organo'] =
+                    $normalizarOrganoDetectado(
+                        $mOrganoAlternativo[1]
+                    );
+
+                $contexto['lateralidad'] =
+                    $lateralidadPosterior;
+
+                return $contexto;
+            }
         }
 
         /*
@@ -1204,13 +1464,16 @@ function interpretacion_procesar_php(string $textoRecibido, ?array $origen = nul
      *
      * El primer valor es descartado y el segundo es el corregido.
      */
-    preg_match_all(
+    $patronAutocorreccionNumericaDirecta =
         '/(?P<anterior>\d+(?:[.,]\d+)?)'
         . '\s*(?:cm|mm|cent[ií]metros?|mil[ií]metros?)?'
         . '[\s,.;:…-]{0,15}'
         . '\bno\s*,?\s*(?:era|es)\s+'
         . '(?P<corregido>\d+(?:[.,]\d+)?)'
-        . '\s*(?:cm|mm|cent[ií]metros?|mil[ií]metros?)?/iu',
+        . '\s*(?:cm|mm|cent[ií]metros?|mil[ií]metros?)?/iu';
+
+    preg_match_all(
+        $patronAutocorreccionNumericaDirecta,
         $texto,
         $coincidenciasAutocorreccion,
         PREG_SET_ORDER | PREG_OFFSET_CAPTURE
@@ -1243,12 +1506,15 @@ function interpretacion_procesar_php(string $textoRecibido, ?array $origen = nul
      * Aquí el valor correcto aparece PRIMERO
      * y después el veterinario niega el valor anterior.
      */
-    preg_match_all(
+    $patronAutocorreccionNumericaInvertida =
         '/(?P<corregido>\d+(?:[.,]\d+)?)'
         . '\s*(?:cm|mm|cent[ií]metros?|mil[ií]metros?)?'
         . '\s*,?\s*\bno\s+en\s+'
         . '(?P<anterior>\d+(?:[.,]\d+)?)'
-        . '\s*(?:cm|mm|cent[ií]metros?|mil[ií]metros?)?/iu',
+        . '\s*(?:cm|mm|cent[ií]metros?|mil[ií]metros?)?/iu';
+
+    preg_match_all(
+        $patronAutocorreccionNumericaInvertida,
         $texto,
         $coincidenciasAutocorreccionInvertida,
         PREG_SET_ORDER | PREG_OFFSET_CAPTURE
@@ -1342,6 +1608,41 @@ function interpretacion_procesar_php(string $textoRecibido, ?array $origen = nul
         $textoAutocorreccionSemantica
     ) ?? $textoAutocorreccionSemantica;
 
+    /*
+    * Ubicar sobre la MISMA copia semántica las autocorrecciones
+    * numéricas que ya fueron resueltas determinísticamente.
+    *
+    * Así evitamos enviar además el mismo "no era/no es" como
+    * autocorrección semántica candidata.
+    */
+    $rangosAutocorreccionNumerica = [];
+
+    foreach ([
+        $patronAutocorreccionNumericaDirecta,
+        $patronAutocorreccionNumericaInvertida,
+    ] as $patronNumerico) {
+        preg_match_all(
+            $patronNumerico,
+            $textoAutocorreccionSemantica,
+            $coincidenciasNumericasSemanticas,
+            PREG_SET_ORDER | PREG_OFFSET_CAPTURE
+        );
+
+        foreach ($coincidenciasNumericasSemanticas as $coincidenciaNumerica) {
+            $textoCoincidencia = (string)($coincidenciaNumerica[0][0] ?? '');
+            $offsetCoincidencia = (int)($coincidenciaNumerica[0][1] ?? -1);
+
+            if ($textoCoincidencia === '' || $offsetCoincidencia < 0) {
+                continue;
+            }
+
+            $rangosAutocorreccionNumerica[] = [
+                'inicio' => $offsetCoincidencia,
+                'fin' => $offsetCoincidencia + strlen($textoCoincidencia),
+            ];
+        }
+    }
+
     $patronAutocorreccionSemantica = '/(?:'
         . '\bperd[oó]n\b'
         . '|\bcorrijo\b'
@@ -1366,6 +1667,26 @@ function interpretacion_procesar_php(string $textoRecibido, ?array $origen = nul
         $offsetBytes = (int)($m[0][1] ?? -1);
 
         if ($evidenciaMarca === '' || $offsetBytes < 0) {
+            continue;
+        }
+
+        /*
+        * Si este marcador está dentro de una autocorrección numérica
+        * ya resuelta determinísticamente, no duplicarlo como candidata.
+        */
+        $yaResueltaNumericamente = false;
+
+        foreach ($rangosAutocorreccionNumerica as $rangoNumerico) {
+            if (
+                $offsetBytes >= $rangoNumerico['inicio']
+                && $offsetBytes < $rangoNumerico['fin']
+            ) {
+                $yaResueltaNumericamente = true;
+                break;
+            }
+        }
+
+        if ($yaResueltaNumericamente) {
             continue;
         }
 
@@ -1433,7 +1754,8 @@ function interpretacion_procesar_php(string $textoRecibido, ?array $origen = nul
     ) use (
         $patronOrgano,
         $normalizarOrganoDetectado,
-        $normalizarClaveAlias
+        $normalizarClaveAlias,
+        $esHallazgoCavitarioIndependiente
     ): array {
         $termino = trim($termino, " \t\n\r\0\x0B.,;:");
 
@@ -1564,6 +1886,52 @@ function interpretacion_procesar_php(string $textoRecibido, ?array $origen = nul
                     220,
                     'UTF-8'
                 )),
+                'previo' => trim(
+                    mb_substr(
+                        $textoTrabajo,
+                        max(0, $pos - 60),
+                        min(60, $pos),
+                        'UTF-8'
+                    )
+                ),
+                'continuacion' => mb_substr(
+                    $textoTrabajo,
+                    $pos,
+                    60,
+                    'UTF-8'
+                )
+            ];
+        }
+
+                /*
+         * Una discrepancia que comienza en un hallazgo cavitario
+         * independiente no debe heredar el último órgano previo.
+         *
+         * Ejemplo:
+         *   "Riñón derecho ... No se observa derrame peritoneal"
+         *
+         * Si la diferencia comienza en "derrame", el contexto
+         * anatómico debe quedar sin órgano.
+         */
+        if ($esHallazgoCavitarioIndependiente($desdePosicion)) {
+            return [
+                'organo' => null,
+                'lateralidad' => null,
+                'distancia_organo' => null,
+                'contexto' => trim(mb_substr(
+                    $textoTrabajo,
+                    max(0, $pos - 90),
+                    220,
+                    'UTF-8'
+                )),
+                'previo' => trim(
+                    mb_substr(
+                        $textoTrabajo,
+                        max(0, $pos - 60),
+                        min(60, $pos),
+                        'UTF-8'
+                    )
+                ),
                 'continuacion' => mb_substr(
                     $textoTrabajo,
                     $pos,
@@ -1775,6 +2143,14 @@ function interpretacion_procesar_php(string $textoRecibido, ?array $origen = nul
                 220,
                 'UTF-8'
             )),
+            'previo' => trim(
+                mb_substr(
+                    $textoTrabajo,
+                    max(0, $pos - 60),
+                    min(60, $pos),
+                    'UTF-8'
+                )
+            ),
             'continuacion' => mb_substr(
                 $textoTrabajo,
                 $pos,
@@ -1908,26 +2284,63 @@ function interpretacion_procesar_php(string $textoRecibido, ?array $origen = nul
         $atributo = null;
 
         $textoAlternativas = $a . ' ' . $b;
+
         $esRinon = $organo !== null
             && preg_match(
                 '/(?<!\p{L})ri(?:ñ|n)[oó]n(?!\p{L})/iu',
                 (string)$organo
             );
 
+        /*
+        * La palabra "relación" puede haber quedado fuera de la discrepancia
+        * porque LCS conserva el término común y deja únicamente los valores:
+        *
+        *   aumentada / disminuida
+        *
+        * Por eso aceptamos dos evidencias:
+        *   1. "relación" aparece dentro de las alternativas;
+        *   2. "relación [córtico-medular]" termina inmediatamente antes
+        *      del punto de discrepancia en cualquiera de los motores.
+        */
+        $relacionEnAlternativas = preg_match(
+            '/(?<!\p{L})relaci[oó]n(?!\p{L})/iu',
+            $textoAlternativas
+        ) === 1;
+
+        $patronRelacionPrevia =
+            '/\brelaci[oó]n'
+            . '(?:\s+c[oó]rtico[\s-]*medular)?'
+            . '[\s,:;-]*$/iu';
+
+        $relacionJustoAntes = (
+            preg_match(
+                $patronRelacionPrevia,
+                (string)($contextoA['previo'] ?? '')
+            ) === 1
+            || preg_match(
+                $patronRelacionPrevia,
+                (string)($contextoB['previo'] ?? '')
+            ) === 1
+        );
+
+        $hayValorRelacion = preg_match(
+            '/(?<!\p{L})(?:'
+            . 'aumentad[oa]s?'
+            . '|disminuid[oa]s?'
+            . '|conservad[oa]s?'
+            . ')(?!\p{L})/iu',
+            $textoAlternativas
+        ) === 1;
+
         if (
             $esRinon
-            && preg_match(
-                '/(?<!\p{L})relaci[oó]n(?!\p{L})/iu',
-                $textoAlternativas
-            )
-            && preg_match(
-                '/(?<!\p{L})(?:aumentad[oa]|disminuid[oa]|conservad[oa])(?!\p{L})/iu',
-                $textoAlternativas
-            )
+            && ($relacionEnAlternativas || $relacionJustoAntes)
+            && $hayValorRelacion
         ) {
             $prioridad = 'alta';
             $atributo = 'relacion_cortico_medular';
         }
+
 
         if ($tipo === 'numero') {
             $continuacion = (string)($contexto['continuacion'] ?? '');
@@ -1952,12 +2365,40 @@ function interpretacion_procesar_php(string $textoRecibido, ?array $origen = nul
                 : 'dato_numerico_por_confirmar';
         }
 
-        // Un órgano mencionado solamente por B merece atención especial.
-        if ($tipo === 'solo_B' && preg_match(
-            '/^(?:' . $patronOrgano . ')$/iu',
-            $b
-        )) {
-            $organo = $b;
+        /*
+        * Un órgano mencionado solamente por B merece atención especial.
+        *
+        * Admitimos únicamente una referencia anatómica aislada:
+        *
+        *   "Riñón"
+        *   "Riñón derecho"
+        *   "el Riñón izquierdo"
+        *   "Adrenal derecha,"
+        *
+        * No interpretamos aquí frases clínicas completas.
+        */
+        if (
+            $tipo === 'solo_B'
+            && preg_match(
+                '/^(?:(?:el|la|los|las)\s+)?'
+                . '(' . $patronOrgano . ')'
+                . '(?:\s+(izquierd[oa]|derech[oa]))?'
+                . '[\s.,;:]*$/iu',
+                trim($b),
+                $mOrganoSoloB
+            )
+        ) {
+            $organo = $normalizarOrganoDetectado(
+                $mOrganoSoloB[1]
+            );
+
+            $lateralidad = !empty($mOrganoSoloB[2])
+                ? mb_strtolower(
+                    $mOrganoSoloB[2],
+                    'UTF-8'
+                )
+                : null;
+
             $prioridad = 'alta';
             $atributo = 'presencia_de_organo';
         }

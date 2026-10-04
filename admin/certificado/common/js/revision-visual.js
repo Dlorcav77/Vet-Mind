@@ -326,6 +326,61 @@ function obtenerOverlay() {
     return overlay;
 }
 
+function cerrarDetalleAlertaClickFuera(e) {
+    const detalle = document.getElementById('vm_revision_detalle');
+    if (!detalle) return;
+
+    if (detalle.contains(e.target)) return;
+
+    if (
+        e.target.closest &&
+        e.target.closest('.vm-revision-alerta-badge')
+    ) {
+        return;
+    }
+
+    cerrarDetalleAlerta();
+}
+
+function posicionarDetalleAlerta(detalle, badge) {
+    if (!detalle || !badge) return;
+
+    const margen = 10;
+    const separacion = 6;
+    const badgeRect = badge.getBoundingClientRect();
+    const detalleRect = detalle.getBoundingClientRect();
+
+    let left = badgeRect.right - detalleRect.width;
+
+    left = Math.max(
+        margen,
+        Math.min(
+            left,
+            window.innerWidth - detalleRect.width - margen
+        )
+    );
+
+    let top = badgeRect.bottom + separacion;
+
+    if (
+        top + detalleRect.height >
+        window.innerHeight - margen
+    ) {
+        top = badgeRect.top - detalleRect.height - separacion;
+    }
+
+    top = Math.max(
+        margen,
+        Math.min(
+            top,
+            window.innerHeight - detalleRect.height - margen
+        )
+    );
+
+    detalle.style.left = left + 'px';
+    detalle.style.top = top + 'px';
+}
+
 function cerrarDetalleAlerta() {
     const detalle = document.getElementById('vm_revision_detalle');
     if (detalle) detalle.remove();
@@ -333,6 +388,12 @@ function cerrarDetalleAlerta() {
     document.querySelectorAll('.vm-revision-alerta-badge.active').forEach(el => {
         el.classList.remove('active');
     });
+
+    document.removeEventListener(
+        'pointerdown',
+        cerrarDetalleAlertaClickFuera,
+        true
+    );
 
     alertaAbierta = null;
 }
@@ -489,6 +550,19 @@ function mostrarEditorNota(boton, organo, claveCard = '') {
         });
     });
 
+    input.addEventListener('input', function () {
+        const texto = input.value.trim();
+
+        if (texto) {
+            notasOrganos[clave] = texto;
+        } else {
+            delete notasOrganos[clave];
+        }
+
+        sincronizarNotasHidden();
+        actualizarCardNota(organo);
+    });
+
     let finalizado = false;
 
     function guardar() {
@@ -536,6 +610,170 @@ function mostrarEditorNota(boton, organo, claveCard = '') {
     }, 0);
 }
 
+function obtenerTipoBaseAlerta(tipo) {
+    const valor = normalizarComparacion(
+        String(tipo || '')
+    );
+
+    const tipos = [
+        'valor_sospechoso',
+        'falta_unidad',
+        'termino_confuso',
+        'incongruencia',
+        'medida_ilegible',
+        'valor_faltante',
+
+        'hallazgo_bajado',
+        'inventado',
+        'cambio_lateralidad',
+        'cambio_medida',
+        'omitido',
+        'discrepancia_negacion',
+        'organo_sin_dictado',
+        'mismas_caracteristicas_literal',
+        'organo_omitido',
+        'incoherencia_homogeneo',
+        'atributo_no_reemplazado'
+    ];
+
+    return tipos.find(tipoBase =>
+        valor.includes(tipoBase)
+    ) || valor;
+}
+
+function obtenerDetalleVisibleAlerta(alerta) {
+    const tipo = obtenerTipoBaseAlerta(
+        alerta?.tipo
+    );
+
+    /*
+     * Si el generador identificó expresamente un término dudoso
+     * entre comillas, mostramos ese término directamente.
+     */
+    if (tipo === 'termino_confuso') {
+        const detalle = String(alerta?.detalle || '');
+        const objetivo = String(alerta?.objetivo || '').trim();
+
+        const detalleNorm = normalizarComparacion(detalle);
+
+        if (
+            detalleNorm.includes('mismas caracteristicas')
+            && detalleNorm.includes('incertidumbre')
+        ) {
+            return 'Esta descripción hereda una duda del órgano de referencia. ' +
+                'Confirmar el grado de aumento de la ecogenicidad cortical.';
+        }
+
+        const match = detalle.match(
+            /[«“"]([^»”"]{1,100})[»”"]/u
+        );
+
+        if (match && match[1]) {
+            const termino = match[1].trim();
+
+            if (
+                objetivo
+                && !normalizarComparacion(objetivo)
+                    .includes(normalizarComparacion(termino))
+            ) {
+                return 'Se omitió «' + termino +
+                    '» del dictado. Confirmar que «' +
+                    objetivo + '» sea correcto.';
+            }
+
+            return 'Confirmar «' + termino + '».';
+        }
+
+        return 'Confirmar este término.';
+    }
+
+    if (tipo === 'discrepancia_negacion') {
+        const dictado = String(alerta?.dictado || '').trim();
+        const informe = String(alerta?.informe || '').trim();
+
+        if (dictado && informe) {
+            return 'Las transcripciones difieren en esta afirmación. ' +
+                'El informe dejó «' + informe + '». Confirmar en el audio.';
+        }
+
+        if (informe) {
+            return 'Confirmar en el audio: «' + informe + '».';
+        }
+
+        return 'Hay una diferencia de negación entre transcripciones. Confirmar en el audio.';
+    }
+
+    if (tipo === 'incongruencia') {
+        const detalle = String(alerta?.detalle || '');
+
+        const medidas = Array.from(
+            detalle.matchAll(/\b\d+(?:[.,]\d+)?\s*cm\b/giu)
+        ).map(match => match[0]);
+
+        const medidasUnicas = [...new Set(medidas)];
+
+        if (medidasUnicas.length >= 2) {
+            return 'Se dictaron ' +
+                medidasUnicas[0] +
+                ' y ' +
+                medidasUnicas[1] +
+                '. El informe dejó ' +
+                medidasUnicas[medidasUnicas.length - 1] +
+                '. Confirmar la medida.';
+        }
+
+        return 'Hay información contradictoria. Confirmar cuál corresponde.';
+    }
+
+    const mensajes = {
+        valor_sospechoso:
+            'Confirmar este valor.',
+
+        falta_unidad:
+            'Confirmar la unidad de esta medida.',
+
+        medida_ilegible:
+            'La medida no es clara. Revisar el audio.',
+
+        valor_faltante:
+            'Completar este valor.',
+
+        hallazgo_bajado:
+            'Confirmar este hallazgo: podría haberse dejado como normal.',
+
+        inventado:
+            'Confirmar este dato: no aparece en el dictado ni en la plantilla.',
+
+        cambio_lateralidad:
+            'Confirmar el lado indicado.',
+
+        cambio_medida:
+            'Confirmar esta medida.',
+
+        omitido:
+            'Falta un hallazgo mencionado en el dictado.',
+
+        organo_sin_dictado:
+            'Confirmar si este órgano fue evaluado.',
+
+        mismas_caracteristicas_literal:
+            'Faltan detallar las características de este órgano.',
+
+        organo_omitido:
+            'Falta un órgano mencionado en el dictado.',
+
+        incoherencia_homogeneo:
+            'Hay descripciones incompatibles en este órgano.',
+
+        atributo_no_reemplazado:
+            'Revisar este atributo: quedó un valor anterior de la plantilla.'
+    };
+
+    return mensajes[tipo]
+        || String(alerta?.detalle || '').trim()
+        || 'Revisar este punto.';
+}
+
 function mostrarDetalleAlerta(badge, organo) {
     if (alertaAbierta === organo.organo) {
         cerrarDetalleAlerta();
@@ -545,9 +783,6 @@ function mostrarDetalleAlerta(badge, organo) {
     cerrarDetalleAlerta();
     alertaAbierta = organo.organo;
     badge.classList.add('active');
-
-    const wrapper = document.getElementById('contenido_html_editor_wrapper');
-    if (!wrapper) return;
 
     const detalle = document.createElement('div');
     detalle.id = 'vm_revision_detalle';
@@ -566,27 +801,96 @@ function mostrarDetalleAlerta(badge, organo) {
     titulo.appendChild(cerrar);
     detalle.appendChild(titulo);
 
-    (organo.alertas || []).forEach(alerta => {
+    (organo.alertas || []).forEach((alerta, indiceAlerta) => {
         const item = document.createElement('div');
         item.className = 'vm-revision-detalle-item vm-revision-severidad-' + (alerta.severidad || 'media');
 
-        if (alerta.tipo) {
-            const tipo = document.createElement('strong');
-            tipo.textContent = alerta.tipo + ': ';
-            item.appendChild(tipo);
-        }
+        const contenido = document.createElement('div');
+        contenido.className = 'vm-revision-detalle-item-contenido';
 
-        item.appendChild(document.createTextNode(alerta.detalle || alerta.texto || 'Revisar.'));
+        contenido.appendChild(
+            document.createTextNode(
+                obtenerDetalleVisibleAlerta(alerta)
+            )
+        );
+
+        const eliminar = document.createElement('button');
+        eliminar.type = 'button';
+        eliminar.className = 'vm-revision-alerta-eliminar';
+        eliminar.title = 'Eliminar alerta';
+        eliminar.setAttribute('aria-label', 'Eliminar alerta');
+        eliminar.innerHTML = `
+            <svg viewBox="0 0 24 24" aria-hidden="true">
+                <path d="M3 6h18"></path>
+                <path d="M8 6V4h8v2"></path>
+                <path d="M19 6l-1 14H6L5 6"></path>
+                <path d="M10 10v6"></path>
+                <path d="M14 10v6"></path>
+            </svg>
+        `;
+
+        eliminar.addEventListener('click', function (e) {
+            e.preventDefault();
+            e.stopPropagation();
+
+            if (!Array.isArray(organo.alertas)) return;
+
+            organo.alertas.splice(indiceAlerta, 1);
+
+            sincronizarRevisionHidden(datosRevisionActual, true);
+
+            /*
+            * Cerramos explícitamente el detalle anterior antes de repintar.
+            * Así alertaAbierta también vuelve a null.
+            */
+            cerrarDetalleAlerta();
+            pintarAlertas(datosRevisionActual);
+
+            /*
+            * Si eliminamos la última alerta, simplemente queda cerrado.
+            */
+            if (!organo.alertas.length) return;
+
+            /*
+            * Si todavía quedan alertas, buscamos el badge recién creado
+            * por pintarAlertas() y volvemos a abrir el mismo órgano.
+            */
+            const clave = claveNotaOrgano(organo.organo);
+            const overlay = document.getElementById('vm_revision_overlay');
+
+            const contenedor = Array.from(
+                overlay?.querySelectorAll('.vm-revision-organo-acciones') || []
+            ).find(function (el) {
+                return claveNotaOrgano(el.dataset.organo) === clave;
+            });
+
+            const nuevoBadge = contenedor?.querySelector('.vm-revision-alerta-badge');
+
+            if (nuevoBadge) {
+                mostrarDetalleAlerta(nuevoBadge, organo);
+            }
+        });
+
+        item.appendChild(contenido);
+        item.appendChild(eliminar);
         detalle.appendChild(item);
     });
 
-    wrapper.appendChild(detalle);
+    document.body.appendChild(detalle);
 
-    const wrapperRect = wrapper.getBoundingClientRect();
-    const badgeRect = badge.getBoundingClientRect();
+    posicionarDetalleAlerta(detalle, badge);
 
-    detalle.style.top = (badgeRect.bottom - wrapperRect.top + 4) + 'px';
-    detalle.style.right = '10px';
+    document.removeEventListener(
+        'pointerdown',
+        cerrarDetalleAlertaClickFuera,
+        true
+    );
+
+    document.addEventListener(
+        'pointerdown',
+        cerrarDetalleAlertaClickFuera,
+        true
+    );
 }
 
 function pintarAlertas(datos = null) {
@@ -708,8 +1012,6 @@ function actualizarPosicionAlertas() {
         contenedor.style.width = rect.width + 'px';
         contenedor.style.height = rect.height + 'px';
     });
-
-    cerrarDetalleAlerta();
 }
 
 function activarReaplicacionEnEdicion() {
@@ -734,9 +1036,7 @@ function activarReaplicacionEnEdicion() {
     observerRevisionEditor.observe(raiz, {
         subtree: true,
         childList: true,
-        characterData: true,
-        attributes: true,
-        attributeFilter: ['style', 'class']
+        characterData: true
     });
 }
 
@@ -758,6 +1058,11 @@ function programarPintadoNotas() {
 
     timerNotasEditor = setTimeout(function () {
         if (notaAbierta || datosRevisionActual) return;
+
+        if (cargarRevisionInicialDesdeHidden()) {
+            return;
+        }
+
         pintarAlertas(null);
     }, 100);
 }
@@ -888,14 +1193,64 @@ function aplicar(datos, persistir = true) {
                 ? atributo.origen
                 : 'desconocido';
 
+            /*
+            * Procedencia desconocida se conserva internamente,
+            * pero no necesita un color propio.
+            */
+            if (origen === 'desconocido') {
+                return;
+            }
+
+            const textoAtributo = String(atributo.texto || '');
+
+            /*
+            * Los XX tienen su propio resaltado amarillo persistente.
+            * No superponer gris/azul porque dificulta ver el dato faltante.
+            */
+            if (/\bXX\b/i.test(textoAtributo)) {
+                return;
+            }
+
             const rango = buscarRangoSinRepetir(
                 bloque.el,
-                atributo.texto
+                textoAtributo
             );
+
             if (rango) porOrigen[origen].push(rango);
         });
         (organo.dudasTranscripcion || []).forEach(frase => {
             const rango = buscarRangoDom(bloque.el, frase);
+
+            if (rango) {
+                rangosDudaSTT.push(rango);
+            }
+        });
+
+        (organo.alertas || []).forEach(alerta => {
+            const tipo = normalizarComparacion(
+                String(alerta.tipo || '')
+            );
+
+            /*
+            * Los XX ya tienen su propio resaltado amarillo persistente.
+            * No necesitan además el subrayado de revisión.
+            */
+            if (tipo.includes('valor_faltante')) {
+                return;
+            }
+
+            const objetivo = String(
+                alerta.objetivo || ''
+            ).trim();
+
+            if (!objetivo) {
+                return;
+            }
+
+            const rango = buscarRangoDom(
+                bloque.el,
+                objetivo
+            );
 
             if (rango) {
                 rangosDudaSTT.push(rango);
