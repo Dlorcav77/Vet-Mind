@@ -37,6 +37,7 @@ $borrador_id                     = $formData['borrador_id'];
 $borrador_updated_at             = $formData['borrador_updated_at'];
 $borrador_payload                = $formData['borrador_payload'];
 $notas_organos                   = $formData['notas_organos'];
+$alertas_revision                = $formData['alertas_revision'] ?? [];
 $borrador_scope_key              = $formData['borrador_scope_key'];
 $modo_ingreso_contenido_inicial  = $formData['modo_ingreso_contenido_inicial'];
 $clinicas_recinto                = $formData['clinicas_recinto'];

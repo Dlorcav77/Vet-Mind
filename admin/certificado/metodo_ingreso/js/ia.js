@@ -266,7 +266,8 @@ function ejecutarRevisor(dictado, informeHtml, plantillaBase, observacionesGener
                 detalle: item.detalle || '',
                 dictado: item.dictado || '',
                 informe: item.informe || '',
-                objetivo: item.objetivo || ''
+                objetivo: item.objetivo || '',
+                origen: 'revisor'
             });
         });
 
@@ -370,7 +371,8 @@ function ejecutarRevisor(dictado, informeHtml, plantillaBase, observacionesGener
                 tipo: 'Generador · ' + (obs.tipo || 'revisar'),
                 detalle: obs.texto || 'Punto marcado por el generador para revisión.',
                 informe: obs.contexto || '',
-                objetivo: obs.objetivo || ''
+                objetivo: obs.objetivo || '',
+                origen: 'generador'
             });
         });
 

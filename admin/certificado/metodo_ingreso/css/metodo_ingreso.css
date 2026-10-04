@@ -766,6 +766,41 @@ mark.xx-faltante {
     stroke-linejoin: round;
 }
 
+.vm-revision-alerta-acciones {
+    flex: 0 0 auto;
+    display: flex;
+    align-items: center;
+    gap: 3px;
+    margin-left: auto;
+}
+
+.vm-revision-alerta-origen {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    height: 17px;
+    min-width: 27px;
+    padding: 0 5px;
+    border-radius: 999px;
+    font-size: 9px;
+    line-height: 1;
+    font-weight: 700;
+    letter-spacing: .03em;
+    white-space: nowrap;
+    cursor: help;
+    opacity: .78;
+}
+
+.vm-revision-alerta-origen-gen {
+    color: #1e40af;
+    background: rgba(59, 130, 246, .10);
+}
+
+.vm-revision-alerta-origen-rev {
+    color: #92400e;
+    background: rgba(245, 158, 11, .12);
+}
+
 .vm-revision-severidad-alta {
     background: #fef2f2;
     border-left-color: #dc2626;

@@ -278,6 +278,7 @@ Ejemplos de atributos independientes:
 - contenido ≠ grosor;
 - tamaño ≠ ecogenicidad;
 - forma ≠ bordes;
+- bordes ≠ límite;
 - ecogenicidad ≠ ecotextura;
 - medida ≠ estado cualitativo.
 
@@ -293,7 +294,8 @@ INFORME:
 "Estómago distendido con patrón gaseoso"
 
 La evidencia modificó solamente el atributo PATRÓN.
-"distendido" pertenece a otro atributo y puede conservarse.
+"distendido" pertenece al atributo DISTENSIÓN y debe conservarse
+porque no fue reemplazado ni contradicho.
 
 Ejemplo A REPORTAR:
 
@@ -307,11 +309,27 @@ INFORME:
 "Estómago distendido con patrón mucoso y gaseoso"
 
 El atributo PATRÓN fue redefinido como "gaseoso",
-pero sobrevivió "mucoso" desde el valor anterior del mismo atributo.
+pero sobrevivió "mucoso" desde el valor anterior del MISMO atributo.
+
+Otro ejemplo A REPORTAR:
+
+PLANTILLA:
+"Yeyuno con patrón mucoso y gaseoso"
+
+EVIDENCIA:
+"Yeyuno con patrón mucoso"
+
+INFORME:
+"Yeyuno con patrón mucoso y gaseoso"
+
+El valor "gaseoso" pertenece al mismo atributo PATRÓN y no está
+respaldado por la nueva evidencia.
 
 Si no puedes identificar con claridad que el valor residual pertenece
 al MISMO atributo modificado, NO reportes atributo_no_reemplazado.
 
+No marques como residuo de plantilla un descriptor perteneciente a otro
+atributo únicamente porque está escrito junto al atributo modificado.
 
 3. cambio_medida
 
@@ -393,6 +411,7 @@ NO reportes:
 - información ya corregida correctamente en el informe;
 - una discrepancia STT que ya fue resuelta de forma inequívoca;
 - una primera medida descartada por una autocorrección explícita.
+- valores de plantilla pertenecientes a atributos independientes que el dictado no modificó;
 
 No inventes rangos normales ni valores de referencia externos.
 

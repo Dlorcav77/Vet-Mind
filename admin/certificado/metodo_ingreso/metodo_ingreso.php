@@ -6,14 +6,48 @@ $isManualInitial = $initialMode === 'manual';
 
 $revisionVisualInicial = '';
 
+/*
+ * 1. Un borrador activo tiene prioridad.
+ *
+ * Mientras se trabaja conservamos la revisión completa:
+ * colores, procedencia, alertas, etc.
+ */
 if (
     isset($borrador_payload['revision_visual']) &&
-    is_array($borrador_payload['revision_visual'])
+    is_array($borrador_payload['revision_visual']) &&
+    isset($borrador_payload['revision_visual']['organos']) &&
+    is_array($borrador_payload['revision_visual']['organos'])
 ) {
     $revisionVisualInicial = json_encode(
         $borrador_payload['revision_visual'],
-        JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES
+        JSON_UNESCAPED_UNICODE |
+        JSON_UNESCAPED_SLASHES
     );
+
+/*
+ * 2. Si el certificado ya fue guardado y no existe
+ * un borrador con revisión completa, restaurar únicamente
+ * las alertas persistentes.
+ *
+ * No reconstruimos atributos/orígenes, por lo que
+ * plantilla/dictado no recuperan sus colores.
+ */
+} elseif (
+    isset($alertas_revision) &&
+    is_array($alertas_revision) &&
+    !empty($alertas_revision)
+) {
+    $revisionVisualInicial = json_encode(
+        [
+            'organos' => $alertas_revision
+        ],
+        JSON_UNESCAPED_UNICODE |
+        JSON_UNESCAPED_SLASHES
+    );
+}
+
+if ($revisionVisualInicial === false) {
+    $revisionVisualInicial = '';
 }
 ?>
 

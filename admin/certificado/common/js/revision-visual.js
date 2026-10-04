@@ -633,7 +633,8 @@ function obtenerTipoBaseAlerta(tipo) {
         'mismas_caracteristicas_literal',
         'organo_omitido',
         'incoherencia_homogeneo',
-        'atributo_no_reemplazado'
+        'atributo_no_reemplazado',
+        'discrepancia_stt'
     ];
 
     return tipos.find(tipoBase =>
@@ -645,6 +646,29 @@ function obtenerDetalleVisibleAlerta(alerta) {
     const tipo = obtenerTipoBaseAlerta(
         alerta?.tipo
     );
+
+    const origen = String(alerta?.origen || '')
+        .trim()
+        .toLowerCase();
+
+    /*
+    * Las alertas del revisor ya vienen con una explicación
+    * concreta del problema. La mostramos directamente para no
+    * reemplazarla por mensajes genéricos del frontend.
+    */
+    if (origen === 'revisor') {
+        const detalleRevisor = String(alerta?.detalle || '')
+            .replace(/\s+/g, ' ')
+            .trim();
+
+        if (detalleRevisor) {
+            const maximo = 260;
+
+            return detalleRevisor.length > maximo
+                ? detalleRevisor.slice(0, maximo - 1).trimEnd() + '…'
+                : detalleRevisor;
+        }
+    }
 
     /*
      * Si el generador identificó expresamente un término dudoso
@@ -814,6 +838,32 @@ function mostrarDetalleAlerta(badge, organo) {
             )
         );
 
+        const origenAlerta = String(alerta?.origen || '')
+            .trim()
+            .toLowerCase();
+
+        const etiquetaOrigen = document.createElement('span');
+        etiquetaOrigen.className =
+            'vm-revision-alerta-origen ' +
+            (
+                origenAlerta === 'generador'
+                    ? 'vm-revision-alerta-origen-gen'
+                    : origenAlerta === 'revisor'
+                        ? 'vm-revision-alerta-origen-rev'
+                        : ''
+            );
+
+        if (origenAlerta === 'generador') {
+            etiquetaOrigen.textContent = 'GEN';
+            etiquetaOrigen.title = 'Alerta del generador';
+        } else if (origenAlerta === 'revisor') {
+            etiquetaOrigen.textContent = 'REV';
+            etiquetaOrigen.title = 'Alerta del revisor';
+        } else {
+            etiquetaOrigen.textContent = 'IA';
+            etiquetaOrigen.title = 'Alerta de IA';
+        }
+
         const eliminar = document.createElement('button');
         eliminar.type = 'button';
         eliminar.className = 'vm-revision-alerta-eliminar';
@@ -871,8 +921,14 @@ function mostrarDetalleAlerta(badge, organo) {
             }
         });
 
+        const acciones = document.createElement('div');
+        acciones.className = 'vm-revision-alerta-acciones';
+
+        acciones.appendChild(etiquetaOrigen);
+        acciones.appendChild(eliminar);
+
         item.appendChild(contenido);
-        item.appendChild(eliminar);
+        item.appendChild(acciones);
         detalle.appendChild(item);
     });
 

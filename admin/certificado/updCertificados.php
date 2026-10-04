@@ -799,6 +799,54 @@ if ($notasOrganosRecibidas) {
     }
 }
 
+$alertasRevisionRecibidas = array_key_exists('revision_visual', $_POST);
+$alertasRevision = [];
+
+if ($alertasRevisionRecibidas) {
+    $revisionVisualRaw = trim((string)($_POST['revision_visual'] ?? ''));
+
+    if ($revisionVisualRaw !== '') {
+        $revisionVisualTmp = json_decode($revisionVisualRaw, true);
+
+        if (!is_array($revisionVisualTmp)) {
+            echo json_encode([
+                'status' => 'error',
+                'message' => 'La revisión visual tiene un formato inválido.'
+            ], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+            exit;
+        }
+
+        foreach (($revisionVisualTmp['organos'] ?? []) as $organoRevision) {
+            if (!is_array($organoRevision)) {
+                continue;
+            }
+
+            $organoNombre = trim((string)($organoRevision['organo'] ?? ''));
+
+            if ($organoNombre === '') {
+                continue;
+            }
+
+            $alertasOrgano = $organoRevision['alertas'] ?? [];
+
+            if (!is_array($alertasOrgano)) {
+                continue;
+            }
+
+            foreach ($alertasOrgano as $alerta) {
+                if (!is_array($alerta)) {
+                    continue;
+                }
+
+                $alertasRevision[] = [
+                    'organo' => $organoNombre,
+                    'alerta' => $alerta
+                ];
+            }
+        }
+    }
+}
+
 $borrador_scope_key = (
     $action === 'modificar' && $id > 0
 )
@@ -2114,6 +2162,209 @@ if ($stmt->execute()) {
             }
 
             $stmtNota->close();
+        }
+    }
+    if ($alertasRevisionRecibidas) {
+        $stmtAlertasDelete = $mysqli->prepare("
+            DELETE FROM certificado_alertas
+            WHERE certificado_id = ?
+            AND usuario_id = ?
+        ");
+
+        if (!$stmtAlertasDelete) {
+            rollbackCertificadoSiActivo($mysqli, $transaccionActiva);
+            limpiarArchivosNuevosCertificado($imagenesNuevas, $pdfPathFisico);
+
+            error_log(
+                '[updCertificados][alertas][delete_prepare] ' .
+                $mysqli->error
+            );
+
+            echo json_encode([
+                'status' => 'error',
+                'message' => 'No se pudieron preparar las alertas del certificado.'
+            ], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+            exit;
+        }
+
+        $stmtAlertasDelete->bind_param(
+            "ii",
+            $certId,
+            $veterinario
+        );
+
+        if (!$stmtAlertasDelete->execute()) {
+            error_log(
+                '[updCertificados][alertas][delete_execute] ' .
+                $stmtAlertasDelete->error
+            );
+
+            $stmtAlertasDelete->close();
+
+            rollbackCertificadoSiActivo($mysqli, $transaccionActiva);
+            limpiarArchivosNuevosCertificado(
+                $imagenesNuevas,
+                $pdfPathFisico
+            );
+
+            echo json_encode([
+                'status' => 'error',
+                'message' => 'No se pudieron actualizar las alertas del certificado.'
+            ], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+            exit;
+        }
+
+        $stmtAlertasDelete->close();
+
+        if (!empty($alertasRevision)) {
+            $stmtAlerta = $mysqli->prepare("
+                INSERT INTO certificado_alertas
+                    (
+                        certificado_id,
+                        usuario_id,
+                        organo_clave,
+                        organo_nombre,
+                        alerta_orden,
+                        alerta_json,
+                        created_at,
+                        updated_at
+                    )
+                VALUES (?, ?, ?, ?, ?, ?, NOW(), NOW())
+            ");
+
+            if (!$stmtAlerta) {
+                rollbackCertificadoSiActivo($mysqli, $transaccionActiva);
+                limpiarArchivosNuevosCertificado(
+                    $imagenesNuevas,
+                    $pdfPathFisico
+                );
+
+                error_log(
+                    '[updCertificados][alertas][insert_prepare] ' .
+                    $mysqli->error
+                );
+
+                echo json_encode([
+                    'status' => 'error',
+                    'message' => 'No se pudieron preparar las alertas del certificado.'
+                ], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+                exit;
+            }
+
+            $ordenPorOrgano = [];
+
+            foreach ($alertasRevision as $itemAlerta) {
+                $organoNombre = mb_substr(
+                    trim((string)($itemAlerta['organo'] ?? '')),
+                    0,
+                    255,
+                    'UTF-8'
+                );
+
+                $alerta = $itemAlerta['alerta'] ?? null;
+
+                if (
+                    $organoNombre === '' ||
+                    !is_array($alerta)
+                ) {
+                    continue;
+                }
+
+                /*
+                * La clave solo identifica el órgano dentro de esta tabla.
+                * Al reconstruir la revisión utilizaremos también organo_nombre.
+                */
+                $organoClave = mb_strtolower(
+                    $organoNombre,
+                    'UTF-8'
+                );
+
+                $organoClave = preg_replace(
+                    '/\s+/u',
+                    ' ',
+                    $organoClave
+                ) ?? $organoClave;
+
+                $organoClave = mb_substr(
+                    trim($organoClave),
+                    0,
+                    191,
+                    'UTF-8'
+                );
+
+                if ($organoClave === '') {
+                    continue;
+                }
+
+                if (!isset($ordenPorOrgano[$organoClave])) {
+                    $ordenPorOrgano[$organoClave] = 0;
+                }
+
+                $alertaOrden = $ordenPorOrgano[$organoClave]++;
+
+                $alertaJson = json_encode(
+                    $alerta,
+                    JSON_UNESCAPED_UNICODE |
+                    JSON_UNESCAPED_SLASHES
+                );
+
+                if ($alertaJson === false) {
+                    $stmtAlerta->close();
+
+                    rollbackCertificadoSiActivo(
+                        $mysqli,
+                        $transaccionActiva
+                    );
+
+                    limpiarArchivosNuevosCertificado(
+                        $imagenesNuevas,
+                        $pdfPathFisico
+                    );
+
+                    echo json_encode([
+                        'status' => 'error',
+                        'message' => 'Una alerta del certificado tiene un formato inválido.'
+                    ], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+                    exit;
+                }
+
+                $stmtAlerta->bind_param(
+                    "iissis",
+                    $certId,
+                    $veterinario,
+                    $organoClave,
+                    $organoNombre,
+                    $alertaOrden,
+                    $alertaJson
+                );
+
+                if (!$stmtAlerta->execute()) {
+                    error_log(
+                        '[updCertificados][alertas][insert_execute] ' .
+                        $stmtAlerta->error
+                    );
+
+                    $stmtAlerta->close();
+
+                    rollbackCertificadoSiActivo(
+                        $mysqli,
+                        $transaccionActiva
+                    );
+
+                    limpiarArchivosNuevosCertificado(
+                        $imagenesNuevas,
+                        $pdfPathFisico
+                    );
+
+                    echo json_encode([
+                        'status' => 'error',
+                        'message' => 'No se pudieron guardar las alertas del certificado.'
+                    ], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+                    exit;
+                }
+            }
+
+            $stmtAlerta->close();
         }
     }
     if ($transaccionActiva) {

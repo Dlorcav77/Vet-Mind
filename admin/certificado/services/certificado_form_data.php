@@ -40,6 +40,7 @@ if (!function_exists('certificado_get_form_data')) {
         $imagenesGuardadas = [];
         $mostrarImagenesAntiguas = false;
         $notas_organos = [];
+        $alertas_revision = [];
 
         if ($action === 'modificar') {
             $accion = 'Modificar';
@@ -155,6 +156,81 @@ if (!function_exists('certificado_get_form_data')) {
                     }
 
                     $stmtNotas->close();
+                }
+                $stmtAlertas = $mysqli->prepare("
+                    SELECT
+                        organo_clave,
+                        organo_nombre,
+                        alerta_orden,
+                        alerta_json
+                    FROM certificado_alertas
+                    WHERE certificado_id = ?
+                    AND usuario_id = ?
+                    ORDER BY organo_clave ASC, alerta_orden ASC, id ASC
+                ");
+
+                if ($stmtAlertas) {
+                    $stmtAlertas->bind_param(
+                        "ii",
+                        $id,
+                        $usuario_id
+                    );
+
+                    if ($stmtAlertas->execute()) {
+                        $resAlertas = $stmtAlertas->get_result();
+
+                        while ($rowAlerta = $resAlertas->fetch_assoc()) {
+                            $clave = trim(
+                                (string)($rowAlerta['organo_clave'] ?? '')
+                            );
+
+                            $organoNombre = trim(
+                                (string)($rowAlerta['organo_nombre'] ?? '')
+                            );
+
+                            $alertaRaw = trim(
+                                (string)($rowAlerta['alerta_json'] ?? '')
+                            );
+
+                            if (
+                                $clave === '' ||
+                                $organoNombre === '' ||
+                                $alertaRaw === ''
+                            ) {
+                                continue;
+                            }
+
+                            $alerta = json_decode(
+                                $alertaRaw,
+                                true
+                            );
+
+                            if (!is_array($alerta)) {
+                                continue;
+                            }
+
+                            if (!isset($alertas_revision[$clave])) {
+                                $alertas_revision[$clave] = [
+                                    'organo' => $organoNombre,
+
+                                    /*
+                                    * No restauramos procedencia visual:
+                                    * plantilla / dictado / mixto.
+                                    */
+                                    'atributos' => [],
+
+                                    /*
+                                    * Las alertas sí son persistentes.
+                                    */
+                                    'alertas' => []
+                                ];
+                            }
+
+                            $alertas_revision[$clave]['alertas'][] = $alerta;
+                        }
+                    }
+
+                    $stmtAlertas->close();
                 }
             }
 
@@ -470,6 +546,7 @@ if (!function_exists('certificado_get_form_data')) {
             'borrador_updated_at'             => $borrador_updated_at,
             'borrador_payload'                => $borrador_payload,
             'notas_organos'                   => $notas_organos,
+            'alertas_revision'                => array_values($alertas_revision),
             'borrador_scope_key'              => $scopeKey,
             'modo_ingreso_contenido_inicial'  => $modo_ingreso_contenido_inicial,
             'toggle_manual_inicial'           => $toggle_manual_inicial,
