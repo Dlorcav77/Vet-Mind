@@ -64,6 +64,14 @@ require_once($FUNC_DIR . "/logs/logger.php");
 require_once(dirname(__DIR__) . "/comun/ia_store.php");
 
 require_once(
+    dirname(__DIR__) . "/generacion/lib/gpt_postprocess.php"
+);
+
+require_once(
+    dirname(__DIR__) . "/generacion/lib/gpt_origen.php"
+);
+
+require_once(
     dirname(__DIR__)
     . "/interpretacion/lib/interpretacion_origen.php"
 );
@@ -89,10 +97,22 @@ $flujoId = trim(
     (string)($_POST['flujo_id'] ?? '')
 );
 
+$ridGeneracion = trim(
+    (string)($_POST['rid_generacion'] ?? '')
+);
+
 if ($dictado === '' || $informe === '') {
     echo json_encode(['status'=>'error','message'=>'Falta dictado o informe.']);
     exit;
 }
+
+$observacionesGenerador = gpt_extraer_observaciones($informe);
+
+$origenInforme = gpt_clasificar_origen_informe(
+    $dictado,
+    $plantilla,
+    $informe
+);
 
 /*
  * Evidencia original del mismo flujo.
@@ -181,7 +201,7 @@ ia_guardar_request($mysqli, [
     'plantilla_id'      => null,
     'provider'          => $motor,
     'model'             => $configMotor['model'],
-    'input'             => ['dictado'=>$dictado, 'informe'=>$informe, 'plantilla'=>$plantilla],
+    'input'             => ['rid_generacion' => $ridGeneracion, 'dictado'=>$dictado, 'informe'=>$informe, 'plantilla'=>$plantilla],
     'system'            => $system,
     'prompt'            => $user,
     'content_final'     => $content,

@@ -634,6 +634,7 @@ function obtenerTipoBaseAlerta(tipo) {
         'organo_omitido',
         'incoherencia_homogeneo',
         'atributo_no_reemplazado',
+        'atributo_plantilla_omitido',
         'discrepancia_stt'
     ];
 
@@ -647,114 +648,232 @@ function obtenerDetalleVisibleAlerta(alerta) {
         alerta?.tipo
     );
 
-    const origen = String(alerta?.origen || '')
-        .trim()
-        .toLowerCase();
-
-    /*
-    * Las alertas del revisor ya vienen con una explicación
-    * concreta del problema. La mostramos directamente para no
-    * reemplazarla por mensajes genéricos del frontend.
-    */
-    if (origen === 'revisor') {
-        const detalleRevisor = String(alerta?.detalle || '')
+    const limpiarTexto = function (valor, maximo = 260) {
+        let texto = String(valor || '')
             .replace(/\s+/g, ' ')
             .trim();
 
-        if (detalleRevisor) {
-            const maximo = 260;
-
-            return detalleRevisor.length > maximo
-                ? detalleRevisor.slice(0, maximo - 1).trimEnd() + '…'
-                : detalleRevisor;
+        if (!texto) {
+            return '';
         }
+
+        /*
+         * Quitar etiquetas internas que no aportan información
+         * clínica al veterinario.
+         */
+        texto = texto
+            .replace(
+                /^(?:valor_sospechoso|falta_unidad|termino_confuso|incongruencia|medida_ilegible|valor_faltante)\s*(?:→|:|-)\s*/iu,
+                ''
+            )
+            .replace(
+                /^(?:hallazgo_bajado|inventado|cambio_lateralidad|cambio_medida|omitido|organo_omitido|atributo_no_reemplazado|atributo_plantilla_omitido)\s*(?:→|:|-)\s*/iu,
+                ''
+            );
+
+        if (texto.length > maximo) {
+            texto =
+                texto.slice(0, maximo - 1)
+                    .trimEnd()
+                + '…';
+        }
+
+        return texto;
+    };
+
+    const detalle = limpiarTexto(
+        alerta?.detalle
+    );
+
+    const objetivo = limpiarTexto(
+        alerta?.objetivo,
+        120
+    );
+
+    const dictado = limpiarTexto(
+        alerta?.dictado,
+        120
+    );
+
+    const informe = limpiarTexto(
+        alerta?.informe,
+        120
+    );
+
+    /*
+     * REGLA PRINCIPAL:
+     * si backend ya entregó una explicación concreta,
+     * esa explicación tiene prioridad para GEN y revisor.
+     */
+    if (detalle) {
+        return detalle;
     }
 
     /*
-     * Si el generador identificó expresamente un término dudoso
-     * entre comillas, mostramos ese término directamente.
+     * Si por algún motivo no existe detalle,
+     * intentamos construir un mensaje contextual
+     * con los datos disponibles.
      */
-    if (tipo === 'termino_confuso') {
-        const detalle = String(alerta?.detalle || '');
-        const objetivo = String(alerta?.objetivo || '').trim();
-
-        const detalleNorm = normalizarComparacion(detalle);
-
-        if (
-            detalleNorm.includes('mismas caracteristicas')
-            && detalleNorm.includes('incertidumbre')
-        ) {
-            return 'Esta descripción hereda una duda del órgano de referencia. ' +
-                'Confirmar el grado de aumento de la ecogenicidad cortical.';
-        }
-
-        const match = detalle.match(
-            /[«“"]([^»”"]{1,100})[»”"]/u
-        );
-
-        if (match && match[1]) {
-            const termino = match[1].trim();
-
-            if (
-                objetivo
-                && !normalizarComparacion(objetivo)
-                    .includes(normalizarComparacion(termino))
-            ) {
-                return 'Se omitió «' + termino +
-                    '» del dictado. Confirmar que «' +
-                    objetivo + '» sea correcto.';
-            }
-
-            return 'Confirmar «' + termino + '».';
-        }
-
-        return 'Confirmar este término.';
-    }
-
     if (tipo === 'discrepancia_negacion') {
-        const dictado = String(alerta?.dictado || '').trim();
-        const informe = String(alerta?.informe || '').trim();
-
         if (dictado && informe) {
-            return 'Las transcripciones difieren en esta afirmación. ' +
-                'El informe dejó «' + informe + '». Confirmar en el audio.';
+            return 'Confirmar esta afirmación. Se registró «'
+                + dictado
+                + '», mientras el informe indica «'
+                + informe
+                + '».';
         }
 
         if (informe) {
-            return 'Confirmar en el audio: «' + informe + '».';
+            return 'Confirmar si corresponde «'
+                + informe
+                + '».';
         }
 
-        return 'Hay una diferencia de negación entre transcripciones. Confirmar en el audio.';
+        return 'Confirmar si este hallazgo está presente o ausente.';
     }
 
-    if (tipo === 'incongruencia') {
-        const detalle = String(alerta?.detalle || '');
-
-        const medidas = Array.from(
-            detalle.matchAll(/\b\d+(?:[.,]\d+)?\s*cm\b/giu)
-        ).map(match => match[0]);
-
-        const medidasUnicas = [...new Set(medidas)];
-
-        if (medidasUnicas.length >= 2) {
-            return 'Se dictaron ' +
-                medidasUnicas[0] +
-                ' y ' +
-                medidasUnicas[1] +
-                '. El informe dejó ' +
-                medidasUnicas[medidasUnicas.length - 1] +
-                '. Confirmar la medida.';
+    const conObjetivo = function (inicio, final = '') {
+        if (!objetivo) {
+            return '';
         }
 
-        return 'Hay información contradictoria. Confirmar cuál corresponde.';
+        return inicio
+            + '«'
+            + objetivo
+            + '»'
+            + final;
+    };
+
+    const mensajesContextuales = {
+        valor_sospechoso:
+            conObjetivo(
+                'Confirmar ',
+                ': el valor podría no corresponder.'
+            ),
+
+        falta_unidad:
+            conObjetivo(
+                'Confirmar la unidad de ',
+                '.'
+            ),
+
+        termino_confuso:
+            conObjetivo(
+                'Confirmar ',
+                ': el término no pudo determinarse con seguridad.'
+            ),
+
+        incongruencia:
+            conObjetivo(
+                'Confirmar ',
+                ': existen datos clínicos contradictorios.'
+            ),
+
+        medida_ilegible:
+            conObjetivo(
+                'Confirmar la medida de ',
+                ': no pudo determinarse con claridad.'
+            ),
+
+        valor_faltante:
+            conObjetivo(
+                'Completar ',
+                ': falta este valor.'
+            ),
+
+        hallazgo_bajado:
+            conObjetivo(
+                'Revisar ',
+                ': existe evidencia de un hallazgo que podría haberse dejado como normal.'
+            ),
+
+        inventado:
+            conObjetivo(
+                'Revisar ',
+                ': este dato no está respaldado por la evidencia disponible.'
+            ),
+
+        cambio_lateralidad:
+            conObjetivo(
+                'Confirmar la lateralidad de ',
+                '.'
+            ),
+
+        cambio_medida:
+            conObjetivo(
+                'Confirmar la medida de ',
+                '.'
+            ),
+
+        omitido:
+            conObjetivo(
+                'Revisar ',
+                ': este hallazgo podría faltar en el informe.'
+            ),
+
+        organo_sin_dictado:
+            conObjetivo(
+                'Confirmar ',
+                ': no queda claro si esta estructura fue evaluada.'
+            ),
+
+        mismas_caracteristicas_literal:
+            conObjetivo(
+                'Revisar ',
+                ': faltan detallar las características heredadas del órgano de referencia.'
+            ),
+
+        organo_omitido:
+            conObjetivo(
+                'Revisar ',
+                ': esta estructura fue mencionada pero podría faltar en el informe.'
+            ),
+
+        incoherencia_homogeneo:
+            conObjetivo(
+                'Revisar ',
+                ': existen descripciones incompatibles sobre su homogeneidad.'
+            ),
+
+        atributo_no_reemplazado:
+            conObjetivo(
+                'Revisar ',
+                ': podría haberse conservado un valor anterior de la plantilla.'
+            ),
+
+        atributo_plantilla_omitido:
+            conObjetivo(
+                'Revisar ',
+                ': este atributo de la plantilla podría haberse eliminado sin ser reemplazado.'
+            ),
+
+        discrepancia_stt:
+            conObjetivo(
+                'Confirmar ',
+                ': existen dos interpretaciones posibles de este dato.'
+            )
+    };
+
+    if (mensajesContextuales[tipo]) {
+        return mensajesContextuales[tipo];
     }
 
-    const mensajes = {
+    /*
+     * Último respaldo. Solo debería aparecer cuando backend
+     * no entregó detalle ni objetivo clínico.
+     */
+    const mensajesGenericos = {
         valor_sospechoso:
             'Confirmar este valor.',
 
         falta_unidad:
             'Confirmar la unidad de esta medida.',
+
+        termino_confuso:
+            'Confirmar este término.',
+
+        incongruencia:
+            'Hay información clínica contradictoria. Confirmar cuál corresponde.',
 
         medida_ilegible:
             'La medida no es clara. Revisar el audio.',
@@ -763,10 +882,10 @@ function obtenerDetalleVisibleAlerta(alerta) {
             'Completar este valor.',
 
         hallazgo_bajado:
-            'Confirmar este hallazgo: podría haberse dejado como normal.',
+            'Confirmar este hallazgo.',
 
         inventado:
-            'Confirmar este dato: no aparece en el dictado ni en la plantilla.',
+            'Confirmar este dato.',
 
         cambio_lateralidad:
             'Confirmar el lado indicado.',
@@ -775,26 +894,34 @@ function obtenerDetalleVisibleAlerta(alerta) {
             'Confirmar esta medida.',
 
         omitido:
-            'Falta un hallazgo mencionado en el dictado.',
+            'Revisar este hallazgo omitido.',
+
+        discrepancia_negacion:
+            'Confirmar si este hallazgo está presente o ausente.',
 
         organo_sin_dictado:
-            'Confirmar si este órgano fue evaluado.',
+            'Confirmar si esta estructura fue evaluada.',
 
         mismas_caracteristicas_literal:
-            'Faltan detallar las características de este órgano.',
+            'Revisar las características de esta estructura.',
 
         organo_omitido:
-            'Falta un órgano mencionado en el dictado.',
+            'Revisar esta estructura omitida.',
 
         incoherencia_homogeneo:
-            'Hay descripciones incompatibles en este órgano.',
+            'Revisar la homogeneidad descrita.',
 
         atributo_no_reemplazado:
-            'Revisar este atributo: quedó un valor anterior de la plantilla.'
+            'Revisar este atributo de la plantilla.',
+
+        atributo_plantilla_omitido:
+            'Revisar este atributo omitido de la plantilla.',
+
+        discrepancia_stt:
+            'Confirmar este dato.'
     };
 
-    return mensajes[tipo]
-        || String(alerta?.detalle || '').trim()
+    return mensajesGenericos[tipo]
         || 'Revisar este punto.';
 }
 
@@ -894,7 +1021,13 @@ function mostrarDetalleAlerta(badge, organo) {
             * Así alertaAbierta también vuelve a null.
             */
             cerrarDetalleAlerta();
-            pintarAlertas(datosRevisionActual);
+
+            /*
+            * Reconstruir también los highlights.
+            * Así, al eliminar una alerta desaparece inmediatamente
+            * su subrayado del informe.
+            */
+            aplicar(datosRevisionActual, false);
 
             /*
             * Si eliminamos la última alerta, simplemente queda cerrado.
@@ -1248,14 +1381,6 @@ function aplicar(datos, persistir = true) {
             const origen = Object.prototype.hasOwnProperty.call(porOrigen, atributo.origen)
                 ? atributo.origen
                 : 'desconocido';
-
-            /*
-            * Procedencia desconocida se conserva internamente,
-            * pero no necesita un color propio.
-            */
-            if (origen === 'desconocido') {
-                return;
-            }
 
             const textoAtributo = String(atributo.texto || '');
 
@@ -1716,9 +1841,9 @@ function prepararInformeParaPortapapeles() {
 
         // Incorporar los colores directamente al HTML de Word.
         const colores = {
-            plantilla: '#fef08a',
-            dictado: '#bbf7d0',
-            desconocido: '#e5e7eb'
+            plantilla: '#f8fafc',
+            dictado: '#dbeafe',
+            desconocido: '#dbeafe'
         };
 
         (organoRevision?.atributos || []).forEach(atributo => {

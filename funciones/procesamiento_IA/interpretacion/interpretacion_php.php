@@ -289,15 +289,54 @@ function interpretacion_procesar_php(string $textoRecibido, ?array $origen = nul
     ): bool {
         $fragmento = trim($fragmento);
 
+        /*
+        * Hallazgos generales abdominales/peritoneales no pertenecen
+        * automáticamente al último órgano descrito.
+        *
+        * Incluimos tanto afirmaciones como negaciones:
+        *
+        *   "se observa derrame peritoneal"
+        *   "no se observa derrame peritoneal"
+        *   "no se visualiza líquido libre"
+        *   "no se evidencia masa abdominal"
+        *
+        * Esta función solo corta continuidad anatómica.
+        * No interpreta si el hallazgo está presente o ausente.
+        */
+        $prefijoObservacion =
+            '(?:'
+            . '(?:no\s+)?'
+            . '(?:se\s+)?'
+            . '(?:observan?|visualizan?|evidencian?|identifican?|aprecian?)'
+            . '\s+'
+            . ')?';
+
         return (bool)preg_match(
-            '/^(?:se\s+observan?\s+)?(?:'
+            '/^'
+            . $prefijoObservacion
+            . '(?:'
+
+            // Hallazgos peritoneales generales.
             . 'neumoperitone\p{L}*'
             . '|derrame\s+peritone\p{L}*'
             . '|l[ií]quido\s+libre\b'
             . '|efusi[oó]n\s+peritone\p{L}*'
-            . '|(?:una?\s+)?(?:masa|lesi[oó]n|estructura|n[oó]dulo)\b'
+
+            // Masa / lesión abdominal expresada directamente.
+            . '|(?:una?\s+)?'
+            . '(?:masa|masas|lesi[oó]n|lesiones|estructura|estructuras|n[oó]dulo|n[oó]dulos)'
+            . '\s+abdominal(?:es)?\b'
+
+            // Masa / lesión localizada en cavidad abdominal.
+            . '|(?:una?\s+)?'
+            . '(?:masa|masas|lesi[oó]n|lesiones|estructura|estructuras|n[oó]dulo|n[oó]dulos)\b'
             . '[^.!?;]{0,80}'
             . '\ben\s+(?:la\s+)?cavidad\s+abdominal\b'
+
+            // Mención general de cavidad abdominal.
+            . '|(?:hallazgos?\s+(?:en\s+)?)?'
+            . '(?:la\s+)?cavidad\s+abdominal\b'
+
             . ')/iu',
             $fragmento
         );
@@ -1755,7 +1794,8 @@ function interpretacion_procesar_php(string $textoRecibido, ?array $origen = nul
         $patronOrgano,
         $normalizarOrganoDetectado,
         $normalizarClaveAlias,
-        $esHallazgoCavitarioIndependiente
+        $esHallazgoCavitarioIndependiente,
+        $esContinuacionContextual
     ): array {
         $termino = trim($termino, " \t\n\r\0\x0B.,;:");
 
@@ -1880,6 +1920,7 @@ function interpretacion_procesar_php(string $textoRecibido, ?array $origen = nul
                     ? mb_strtolower($actual[2], 'UTF-8')
                     : null,
                 'distancia_organo' => 0,
+                'tipo_contexto' => 'organo_explicito',
                 'contexto' => trim(mb_substr(
                     $textoTrabajo,
                     max(0, $pos - 90),
@@ -2129,14 +2170,144 @@ function interpretacion_procesar_php(string $textoRecibido, ?array $origen = nul
             $posOrganoFinal = $posOrganoRaw;
         }
 
+        /*
+        * No permitir que una discrepancia herede un órgano situado
+        * en un segmento clínico anterior solo porque está cerca.
+        *
+        * Ejemplos que deben cortar continuidad:
+        *
+        *   "Adrenal izquierda ... . Y 1 ..."
+        *   "Adrenal izquierda ... . hilio esplénico ..."
+        *   "Riñón derecho ... . masa abdominal ..."
+        *
+        * Una ruptura de frase solo permite conservar el órgano previo
+        * cuando el nuevo segmento comienza como una continuación
+        * descriptiva reconocible:
+        *
+        *   "Riñón izquierdo ... . Ecogenicidad aumentada ..."
+        *   "Riñón izquierdo ... . Pelvis conservada ..."
+        */
+        $tipoContexto = 'mismo_segmento';
+
+        if (
+            $posOrganoFinal !== null
+            && $posOrganoFinal < $pos
+        ) {
+            $entreOrganoYDiscrepancia = mb_substr(
+                $textoTrabajo,
+                $posOrganoFinal,
+                $pos - $posOrganoFinal,
+                'UTF-8'
+            );
+
+            /*
+            * Si existe puntuación estructural entre el órgano candidato
+            * y la discrepancia, analizamos el segmento que comenzó después
+            * del último corte.
+            */
+            if (
+                preg_match(
+                    '/[.!?;]\s*([^.!?;]*)$/u',
+                    $entreOrganoYDiscrepancia,
+                    $mCorte
+                )
+            ) {
+                $segmentoActual = trim(
+                    (string)($mCorte[1] ?? '')
+                    . ' '
+                    . $desdePosicion
+                );
+
+                /*
+                * Los hallazgos cavitarios/generalizados nunca mantienen
+                * el órgano previo.
+                */
+                if (
+                    $esHallazgoCavitarioIndependiente(
+                        $segmentoActual
+                    )
+                ) {
+                    return [
+                        'organo' => null,
+                        'lateralidad' => null,
+                        'distancia_organo' => null,
+                        'tipo_contexto' => 'corte_estructural',
+                        'contexto' => trim(mb_substr(
+                            $textoTrabajo,
+                            max(0, $pos - 90),
+                            220,
+                            'UTF-8'
+                        )),
+                        'previo' => trim(mb_substr(
+                            $textoTrabajo,
+                            max(0, $pos - 60),
+                            min(60, $pos),
+                            'UTF-8'
+                        )),
+                        'continuacion' => mb_substr(
+                            $textoTrabajo,
+                            $pos,
+                            60,
+                            'UTF-8'
+                        )
+                    ];
+                }
+
+                /*
+                * Si después del corte no comienza una continuación clínica
+                * reconocible, el órgano anterior deja de ser válido.
+                *
+                * Ante duda preferimos dejar la discrepancia sin órgano antes
+                * que atribuirla incorrectamente al órgano previo.
+                */
+                if (
+                    !$esContinuacionContextual(
+                        $segmentoActual
+                    )
+                ) {
+                    return [
+                        'organo' => null,
+                        'lateralidad' => null,
+                        'distancia_organo' => null,
+                        'tipo_contexto' => 'corte_estructural',
+                        'contexto' => trim(mb_substr(
+                            $textoTrabajo,
+                            max(0, $pos - 90),
+                            220,
+                            'UTF-8'
+                        )),
+                        'previo' => trim(mb_substr(
+                            $textoTrabajo,
+                            max(0, $pos - 60),
+                            min(60, $pos),
+                            'UTF-8'
+                        )),
+                        'continuacion' => mb_substr(
+                            $textoTrabajo,
+                            $pos,
+                            60,
+                            'UTF-8'
+                        )
+                    ];
+                }
+
+                $tipoContexto = 'continuacion';
+            }
+        }
+
+        $distanciaOrgano = $posOrganoFinal !== null
+            ? max(0, $pos - $posOrganoFinal)
+            : null;
+
         $distanciaOrgano = $posOrganoFinal !== null
             ? max(0, $pos - $posOrganoFinal)
             : null;
 
         return [
-            'organo' => $organoFinal,
-            'lateralidad' => $lateralidadFinal,
-            'distancia_organo' => $distanciaOrgano,
+        'organo' => $organoFinal,
+        'lateralidad' => $lateralidadFinal,
+        'distancia_organo' => $distanciaOrgano,
+        'tipo_contexto' => $tipoContexto,
             'contexto' => trim(mb_substr(
                 $textoTrabajo,
                 max(0, $pos - 90),
@@ -2194,15 +2365,18 @@ function interpretacion_procesar_php(string $textoRecibido, ?array $origen = nul
             }
         }
 
-        // "un" y "1" son representaciones equivalentes del mismo número.
-        $numerosTextuales = ['un' => '1', 'una' => '1', 'uno' => '1'];
-
-        $numeroA = $numerosTextuales[$normalizar($a)] ?? $normalizar($a);
-        $numeroB = $numerosTextuales[$normalizar($b)] ?? $normalizar($b);
-
-        if ($tipo === 'numero' && $numeroA === $numeroB) {
-            continue;
-        }
+        /*
+        * Las equivalencias numéricas se resuelven previamente en
+        * stt_validador.php, donde pueden validarse de forma segura:
+        *
+        * - igualdad exacta del valor;
+        * - unidad compatible;
+        * - órgano/contexto compatible;
+        * - sin tolerancias numéricas.
+        *
+        * No resolver aquí "un/uno/una" -> "1" de forma aislada,
+        * porque podría ocultar una discrepancia real.
+        */
 
         $claveA = $normalizar($a);
         $claveB = $normalizar($b);
@@ -2236,46 +2410,118 @@ function interpretacion_procesar_php(string $textoRecibido, ?array $origen = nul
             $correccionesOrganoContextoB
         );
 
+
+
+
+
+
+
         /**
-         * Elegir la referencia anatómica más cercana a la discrepancia.
-         * Si ambas son igual de cercanas pero apuntan a órganos distintos,
-         * no adjudicar silenciosamente.
+         * Elegir primero el contexto anatómico de mayor calidad.
+         *
+         * Prioridad:
+         *
+         * 1. órgano explícito en el punto de discrepancia;
+         * 2. órgano encontrado dentro del mismo segmento clínico;
+         * 3. órgano heredado mediante una continuación válida.
+         *
+         * La distancia solo decide cuando ambos contextos tienen
+         * la misma calidad.
+         *
+         * Esto evita que un órgano anterior gane únicamente porque
+         * está unos caracteres más cerca.
          */
         $tieneA = !empty($contextoA['organo']);
         $tieneB = !empty($contextoB['organo']);
 
+        $prioridadContexto = static function (array $contexto): int {
+            if (empty($contexto['organo'])) {
+                return 0;
+            }
+
+            return match ($contexto['tipo_contexto'] ?? null) {
+                'organo_explicito' => 3,
+                'mismo_segmento' => 2,
+                'continuacion' => 1,
+
+                /*
+                * Compatibilidad defensiva:
+                * si apareciera un contexto antiguo sin clasificación,
+                * no le damos ventaja sobre uno explícitamente clasificado.
+                */
+                default => 1,
+            };
+        };
+
         if ($tieneA && !$tieneB) {
             $contexto = $contextoA;
+
         } elseif ($tieneB && !$tieneA) {
             $contexto = $contextoB;
+
         } elseif ($tieneA && $tieneB) {
-            $distanciaA = $contextoA['distancia_organo'] ?? PHP_INT_MAX;
-            $distanciaB = $contextoB['distancia_organo'] ?? PHP_INT_MAX;
+            $prioridadA = $prioridadContexto($contextoA);
+            $prioridadB = $prioridadContexto($contextoB);
 
-            if ($distanciaA < $distanciaB) {
+            if ($prioridadA > $prioridadB) {
                 $contexto = $contextoA;
-            } elseif ($distanciaB < $distanciaA) {
+
+            } elseif ($prioridadB > $prioridadA) {
                 $contexto = $contextoB;
+
             } else {
-                $mismoOrgano = mb_strtolower(
-                    (string)$contextoA['organo'],
-                    'UTF-8'
-                ) === mb_strtolower(
-                    (string)$contextoB['organo'],
-                    'UTF-8'
-                );
+                /*
+                * Solo si ambos contextos tienen la misma calidad
+                * usamos la distancia anatómica como desempate.
+                */
+                $distanciaA =
+                    $contextoA['distancia_organo']
+                    ?? PHP_INT_MAX;
 
-                $mismaLateralidad =
-                    ($contextoA['lateralidad'] ?? null)
-                    === ($contextoB['lateralidad'] ?? null);
+                $distanciaB =
+                    $contextoB['distancia_organo']
+                    ?? PHP_INT_MAX;
 
-                $contexto = ($mismoOrgano && $mismaLateralidad)
-                    ? $contextoA
-                    : [];
+                if ($distanciaA < $distanciaB) {
+                    $contexto = $contextoA;
+
+                } elseif ($distanciaB < $distanciaA) {
+                    $contexto = $contextoB;
+
+                } else {
+                    /*
+                    * Misma calidad y misma distancia:
+                    * solo adjudicamos si ambos motores coinciden
+                    * realmente en órgano y lateralidad.
+                    */
+                    $mismoOrgano = mb_strtolower(
+                        (string)$contextoA['organo'],
+                        'UTF-8'
+                    ) === mb_strtolower(
+                        (string)$contextoB['organo'],
+                        'UTF-8'
+                    );
+
+                    $mismaLateralidad =
+                        ($contextoA['lateralidad'] ?? null)
+                        === ($contextoB['lateralidad'] ?? null);
+
+                    $contexto = (
+                        $mismoOrgano
+                        && $mismaLateralidad
+                    )
+                        ? $contextoA
+                        : [];
+                }
             }
+
         } else {
             $contexto = [];
         }
+
+
+
+
 
         $organo = $contexto['organo'] ?? null;
         $lateralidad = $contexto['lateralidad'] ?? null;

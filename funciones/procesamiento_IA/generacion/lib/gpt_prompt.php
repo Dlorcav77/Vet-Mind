@@ -484,17 +484,69 @@ Trabaja atributo por atributo.
 - Una lesión, estructura o masa localizada debe permanecer separada de los atributos globales salvo que la evidencia indique expresamente lo contrario.
 - Si se describe una lesión focal, elimina cualquier frase de la plantilla que afirme ausencia de lesiones focales en ese mismo órgano.
 
+=== CONSERVACIÓN DE ATRIBUTOS DE LA PLANTILLA ===
+
+La conservación de atributos debe resolverse dinámicamente comparando cada atributo de la PLANTILLA BASE con la evidencia clínica.
+
+Para cada atributo presente en la plantilla, determina si la evidencia:
+
+1. lo reemplaza explícitamente;
+2. lo contradice explícitamente;
+3. lo hace directa e inequívocamente incompatible;
+4. o simplemente agrega otro hallazgo independiente.
+
+Si ocurre 1, 2 o 3, modifica o elimina únicamente ese atributo.
+
+Si ocurre 4, conserva el atributo original de la plantilla.
+
+La ausencia de un atributo en el dictado NO significa que deba eliminarse.
+
+La aparición de un hallazgo adicional tampoco significa por sí sola que otros atributos normales de la plantilla hayan dejado de ser válidos.
+
+Ejemplos de atributos independientes que deben evaluarse por separado:
+- homogeneidad;
+- ecogenicidad;
+- ecotextura;
+- forma;
+- bordes;
+- límites;
+- relaciones;
+- estratificación;
+- vasculatura;
+- contenido;
+- grosor o pared;
+- posición;
+- tamaño.
+
+No elimines uno de estos atributos solamente porque el dictado agregó otro descriptor o hallazgo.
+
 === HOMOGENEIDAD Y HETEROGENEIDAD ===
 
-Distingue entre información procedente de la plantilla e información dictada explícitamente.
+"Homogéneo", "heterogéneo" y equivalentes describen un atributo propio.
 
-Si "homogéneo" existe solo en la plantilla y aparece un hallazgo explícito incompatible como sedimento, material intraluminal, lesión o estructura focal, no conserves automáticamente ese descriptor normal.
+Si la plantilla contiene "homogéneo", consérvalo mientras la evidencia no modifique específicamente la homogeneidad.
 
-No inventes "heterogéneo" únicamente para reemplazar "homogéneo" si ninguna fuente lo sustenta.
+La presencia de sedimento, material intraluminal, una estructura focal o una lesión localizada NO implica automáticamente que el contenido o parénquima global sea heterogéneo ni obliga a eliminar "homogéneo".
 
-Si el veterinario dictó explícitamente "homogéneo" y también dictó un hallazgo aparentemente incompatible, conserva ambas afirmaciones y marca la incongruencia. No borres silenciosamente ninguna.
+Ejemplo:
 
-Ecogenicidad y homogeneidad/ecotextura son atributos diferentes. No marques una incongruencia solo porque uno esté conservado y el otro alterado.
+PLANTILLA:
+"contenido anecoico, homogéneo"
+
+DICTADO:
+"contenido anecoico, con sedimento urinario en leve cantidad"
+
+RESULTADO:
+conserva "homogéneo" y agrega el sedimento, porque el dictado no modificó explícitamente la homogeneidad.
+
+Solo reemplaza o elimina "homogéneo" cuando:
+- la evidencia diga explícitamente "heterogéneo", "no homogéneo" o equivalente;
+- la evidencia entregue un nuevo valor para ese mismo atributo;
+- exista una incompatibilidad directa e inequívoca que afecte específicamente la homogeneidad global.
+
+No inventes "heterogéneo" para reemplazar "homogéneo" si ninguna fuente lo sustenta.
+
+Si el veterinario dicta explícitamente afirmaciones incompatibles sobre la homogeneidad, conserva la duda y utiliza el flag correspondiente.
 
 === GROSOR, PARED Y TAMAÑO ===
 
@@ -683,8 +735,11 @@ Antes de responder, revisa internamente el informe órgano por órgano y confirm
    ningún dato clínico explícito desapareció sin haber sido incorporado, corregido, descartado por una corrección confirmada o marcado como dudoso.
 
 2. ATRIBUTOS Y PLANTILLA:
-   ningún atributo alterado quedó reemplazado por el estado normal de la plantilla;
-   ningún atributo normal, calificador o placeholder de la plantilla desapareció si la evidencia no lo reemplazó, contradijo o hizo incompatible.
+   revisa atributo por atributo cada descripción de la PLANTILLA BASE;
+   para cada atributo confirma si fue conservado, reemplazado, contradicho o hecho incompatible por la evidencia;
+   ningún atributo normal, calificador o placeholder debe desaparecer solamente porque no fue mencionado en el dictado;
+   ningún hallazgo adicional debe provocar la eliminación automática de atributos independientes;
+   ningún atributo alterado debe quedar reemplazado por el estado normal anterior de la plantilla.
 
 3. MEDIDAS:
    cada medida conserva su valor, dimensiones, unidad y órgano/estructura correctos.

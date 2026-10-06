@@ -88,6 +88,7 @@ if (
  */
 $tiposPermitidos = [
     'hallazgo_bajado',
+    'atributo_plantilla_omitido',
     'atributo_no_reemplazado',
     'cambio_medida',
     'cambio_lateralidad',
@@ -113,6 +114,7 @@ $severidadesPermitidas = [
 $tiposSinObjetivoPermitido = [
     'omitido',
     'organo_omitido',
+    'atributo_plantilla_omitido',
 ];
 
 

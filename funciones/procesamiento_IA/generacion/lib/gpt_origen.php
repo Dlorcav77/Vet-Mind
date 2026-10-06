@@ -767,26 +767,48 @@ function gpt_origen_clasificar_atributo(string $atributo, string $plantilla, str
         return $scorePlantilla >= 0.45 ? 'plantilla' : 'desconocido';
     }
 
-    // Si el atributo final está literalmente contenido en la plantilla,
-    // no necesitamos destacarlo aunque también haya sido dictado.
     if ($atributoNorm !== '' && str_contains($plantillaNorm, $atributoNorm)) {
         return 'plantilla';
     }
 
-    // Si el texto final no es igual a plantilla pero el dictado lo respalda
-    // claramente, consideramos que hubo aporte/cambio del dictado.
+    if ($scorePlantilla >= 0.55 && $scoreDictado >= 0.55) {
+        return 'plantilla';
+    }
+
+    if ($scorePlantilla >= 0.55) {
+        return 'plantilla';
+    }
+
     if ($scoreDictado >= 0.55) {
         return 'dictado';
     }
 
-    // Si no encontramos respaldo suficiente en dictado pero sí en plantilla,
-    // probablemente es una pequeña reformulación del texto base.
-    if ($scorePlantilla >= 0.55) {
+    if ($scorePlantilla >= 0.45 && $scoreDictado >= 0.45) {
         return 'plantilla';
     }
 
     if ($scoreDictado >= 0.45) {
         return 'dictado';
+    }
+
+    $exclusivoDictado = gpt_origen_tiene_token_exclusivo(
+        $atributo,
+        $dictado,
+        $plantilla
+    );
+
+    $exclusivoPlantilla = gpt_origen_tiene_token_exclusivo(
+        $atributo,
+        $plantilla,
+        $dictado
+    );
+
+    if ($exclusivoDictado && !$exclusivoPlantilla) {
+        return 'dictado';
+    }
+
+    if ($exclusivoPlantilla && !$exclusivoDictado) {
+        return 'plantilla';
     }
 
     return 'desconocido';

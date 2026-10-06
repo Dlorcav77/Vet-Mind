@@ -7,7 +7,8 @@ declare(strict_types=1);
 /** @var string $informe */
 /** @var ?array $origenStt */
 /** @var ?array $interpretacionData */
-
+/** @var string $observacionesGenerador */
+/** @var string $origenInforme */
 
 /*
  * ============================================================
@@ -106,11 +107,14 @@ $paqueteRevision = [
 
     'interpretacion_estructurada' => $interpretacionRevision,
 
+    'observaciones_generador' => $observacionesGenerador,
+
+    'procedencia_informe' => $origenInforme,
+
     'plantilla_base' => $plantilla,
 
     'informe_final' => $informe
 ];
-
 
 /*
  * Fallback para informes antiguos o flujos donde no
@@ -184,7 +188,49 @@ Puede contener:
 
 NO asumas que es infalible.
 
-4. TRANSCRIPCIÓN A y TRANSCRIPCIÓN B
+4. OBSERVACIONES DEL GENERADOR
+Contienen los flags y dudas que el generador ya dejó explícitamente marcados en el informe.
+
+NO vuelvas a reportar como error una duda que ya fue identificada y manejada correctamente mediante un flag.
+
+Sí debes reportar si:
+- el contenido del informe contradice la propia observación;
+- la alerta no cubre realmente el cambio realizado;
+- existe otro error independiente no explicado por esa observación.
+
+Regla obligatoria de coherencia entre cuerpo y flag:
+
+Un flag NO valida automáticamente el contenido del informe.
+
+Compara siempre el texto clínico afectado con la observación asociada.
+
+Reporta una inconsistencia si:
+- el cuerpo afirma como confirmado un hallazgo que la observación declara dudoso;
+- el cuerpo elige una de dos alternativas mientras la observación indica que siguen sin resolverse;
+- el cuerpo expresa presencia cuando la observación mantiene duda entre presencia y ausencia;
+- la observación indica que un dato debe confirmarse, pero el informe lo presenta sin incertidumbre como hecho establecido.
+
+Ejemplo:
+
+CUERPO:
+"Se observa masa abdominal."
+
+OBSERVACIÓN:
+"Una evidencia indica presencia y otra ausencia; no puede establecerse el hallazgo hasta confirmar."
+
+Esto debe reportarse, porque el contenido clínico del cuerpo contradice la incertidumbre que el propio generador dejó registrada.
+
+5. PROCEDENCIA DEL INFORME
+Indica qué fragmentos del informe provienen principalmente del dictado, de la plantilla o quedaron como origen desconocido.
+
+Úsala como ayuda para distinguir:
+- atributos heredados legítimamente desde la plantilla;
+- contenido incorporado desde el dictado;
+- fragmentos que requieren revisión adicional.
+
+La procedencia es una ayuda de auditoría, no reemplaza la evidencia clínica.
+
+6. TRANSCRIPCIÓN A y TRANSCRIPCIÓN B
 Son evidencia primaria del audio.
 
 Úsalas principalmente cuando necesites verificar:
@@ -255,8 +301,45 @@ INFORME:
 
 Debe reportarse.
 
+2. atributo_plantilla_omitido
 
-2. atributo_no_reemplazado
+Úsalo cuando un atributo clínico presente en la PLANTILLA BASE desapareció del INFORME FINAL y la evidencia no lo reemplazó, contradijo ni hizo incompatible.
+
+Regla clave:
+La ausencia de un atributo en el dictado NO significa que deba eliminarse de la plantilla.
+
+Ejemplo:
+
+PLANTILLA:
+"Vejiga urinaria distendida por contenido anecoico, homogéneo, con sedimento urinario aglomerado"
+
+EVIDENCIA:
+"Vejiga urinaria distendida por contenido anecoico, con sedimento urinario aglomerado"
+
+INFORME INCORRECTO:
+"Vejiga urinaria distendida por contenido anecoico, con sedimento urinario aglomerado"
+
+Debe reportarse la pérdida de "homogéneo", porque corresponde a un atributo independiente no modificado por la evidencia.
+
+Regla especial para atributos independientes:
+
+No asumas que la aparición de un hallazgo adicional elimina automáticamente un atributo previo de la plantilla.
+
+Ejemplo importante:
+- "contenido anecoico, homogéneo" + "sedimento urinario en leve cantidad"
+  NO implica automáticamente eliminar "homogéneo".
+- La presencia de sedimento puede coexistir con la descripción global del contenido.
+- Solo considera reemplazado "homogéneo" si la evidencia describe explícitamente heterogeneidad, contenido no homogéneo, o existe una contradicción clínica directa e inequívoca.
+
+Por lo tanto, si la plantilla contiene "homogéneo", el dictado agrega sedimento y el informe elimina "homogéneo" sin otra evidencia que lo contradiga, reporta:
+tipo = "atributo_plantilla_omitido".
+
+NO reportes si:
+- el dictado reemplazó explícitamente ese mismo atributo;
+- existe un hallazgo incompatible que obliga a retirarlo;
+- el atributo pertenece al mismo valor compuesto que fue redefinido por el dictado.
+
+3. atributo_no_reemplazado
 
 Úsalo ÚNICAMENTE cuando el informe conserve un valor anterior de la
 PLANTILLA perteneciente al MISMO ATRIBUTO que la evidencia redefinió.
@@ -517,6 +600,7 @@ discrepancia_negacion
 discrepancia_stt
 inventado
 mismas_caracteristicas_literal
+atributo_plantilla_omitido
 
 
 ============================================================
@@ -531,7 +615,11 @@ realiza obligatoriamente estas comprobaciones:
 
 1. Recorre todos los hallazgos alterados de la interpretación y comprueba que no terminaron normales en el informe.
 
-2. Compara todos los atributos explícitamente modificados contra la plantilla y confirma que no sobrevivieron valores anteriores del mismo atributo.
+2. Compara la PLANTILLA BASE contra la evidencia y el INFORME FINAL:
+   - confirma que los atributos explícitamente modificados reemplazaron correctamente el valor anterior;
+   - confirma que los atributos independientes NO modificados ni contradichos permanecieron en el informe;
+   - no consideres eliminado un atributo solo porque apareció otro hallazgo adicional;
+   - presta especial atención a atributos normales de plantilla que desaparecieron silenciosamente, como homogeneidad, bordes, forma, ecogenicidad, relaciones, límites, estratificación o vasculatura.
 
 3. Comprueba todas las medidas y lateralidades.
 
@@ -539,7 +627,11 @@ realiza obligatoriamente estas comprobaciones:
 
 5. Revisa las discrepancias STT clínicamente relevantes.
 
-6. Comprueba especialmente negaciones.
+7. COHERENCIA CON FLAGS DEL GENERADOR:
+   - para cada observación del generador, verifica que el contenido clínico asociado del informe sea compatible con la duda expresada;
+   - un flag correctamente existente no suprime una discrepancia si el cuerpo afirma algo que la propia observación deja sin resolver;
+   - si el cuerpo confirma una de dos alternativas mientras la observación mantiene incertidumbre, repórtalo;
+   - si el cuerpo afirma presencia o ausencia mientras la observación mantiene duda entre ambas, repórtalo.
 
 Si después de estas comprobaciones no existe ninguna discrepancia real, devuelve items vacío.
 SYS;

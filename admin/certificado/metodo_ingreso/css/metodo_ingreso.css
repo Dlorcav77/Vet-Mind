@@ -580,7 +580,7 @@ mark.xx-faltante {
 }
 
 .vm-tiptap-editor .ProseMirror .vm-revision-plantilla {
-    background: #f1f5f9;
+    background: #f8fafc;
 }
 
 .vm-tiptap-editor .ProseMirror .vm-revision-dictado {
@@ -588,11 +588,11 @@ mark.xx-faltante {
 }
 
 .vm-tiptap-editor .ProseMirror .vm-revision-mixto {
-    background: #ede9fe;
+    background: #f8fafc;
 }
 
 .vm-tiptap-editor .ProseMirror .vm-revision-desconocido {
-    background: #fef3c7;
+    background: #e0f2fe;
 }
 
 .vm-revision-alerta {
@@ -630,7 +630,7 @@ mark.xx-faltante {
 }
 
 ::highlight(vm-revision-plantilla) {
-    background-color: #e2e8ef;
+    background-color: #f8fafc;
 }
 
 ::highlight(vm-revision-dictado) {
@@ -638,11 +638,11 @@ mark.xx-faltante {
 }
 
 ::highlight(vm-revision-mixto) {
-    background-color: #ede9fe;
+    background-color: #f8fafc;
 }
 
 ::highlight(vm-revision-desconocido) {
-    background-color: #fef3c7;
+    background-color: #dbeafe;
 }
 
 .vm-revision-overlay {

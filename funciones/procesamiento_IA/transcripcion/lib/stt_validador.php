@@ -408,6 +408,305 @@ function concepto_similar(string $valido, string $otro): bool {
     return levenshtein($a, $b) <= $umbral;
 }
 
+/**
+ * Variantes STT conocidas del concepto "pélvica".
+ *
+ * IMPORTANTE:
+ * pertenecer a esta familia NO basta para corregir una palabra.
+ * La normalización solo puede realizarse cuando además existe
+ * contexto renal seguro.
+ */
+function stt_es_variante_pelvica(string $valor): bool
+{
+    static $variantes = [
+        'pelvica',
+
+        // Variantes históricas ya observadas.
+        'pellicano',
+        'peluca',
+        'publica',
+        'periferica',
+        'preliquea',
+        'perita',
+
+        // Variantes observadas en nuevos casos reales.
+        'pelilica',
+        'pyecta',
+        'perihepatica',
+        'pepetica',
+        'pelica',
+    ];
+
+    return in_array(
+        org_norm(org_limpia_borde($valor)),
+        $variantes,
+        true
+    );
+}
+
+/**
+ * Determina si una ocurrencia puede interpretarse con seguridad
+ * como el concepto renal "pélvica".
+ *
+ * La palabra "imagen" es obligatoria.
+ * Además debe existir terminología renal cercana.
+ *
+ * Esto evita sustituciones globales de términos que pueden ser
+ * clínicamente válidos en otros contextos, como "perihepática".
+ */
+function stt_contexto_pelvico_seguro(
+    string $texto,
+    int $indice
+): bool {
+    $tokens = cmp_tokens(
+        cmp_pre_limpiar($texto)
+    );
+
+    /*
+     * Conservamos una ventana local deliberadamente acotada.
+     * No queremos utilizar información de órganos alejados.
+     */
+    $inicio = max(0, $indice - 6);
+
+    $contexto = implode(
+        ' ',
+        array_slice($tokens, $inicio, 13)
+    );
+
+    $tieneImagen = preg_match(
+        '/\bimagen\b/iu',
+        $contexto
+    ) === 1;
+
+    if (!$tieneImagen) {
+        return false;
+    }
+
+    $tieneContextoRenal = preg_match(
+        '/\b(?:riñ[oó]n|renal|pelvis|ur[eé]ter)\b/iu',
+        $contexto
+    ) === 1;
+
+    return $tieneContextoRenal;
+}
+
+/**
+ * Clasifica variantes STT conocidas de "Yeyuno".
+ *
+ * Hay tres niveles porque algunas deformaciones son mucho más
+ * ambiguas que otras:
+ *
+ * - fonetica:     deformación claramente compatible con Yeyuno;
+ * - ambigua:      secuencias que pueden tener otros significados;
+ * - frase_valida: expresiones clínicamente válidas por sí mismas,
+ *                 como "en ayuno" o "de ayuno".
+ *
+ * IMPORTANTE:
+ * esta función solo clasifica. NO autoriza una corrección.
+ */
+function stt_tipo_variante_yeyuno(string $valor): ?string
+{
+    $normalizado = org_norm(
+        org_limpia_borde($valor)
+    );
+
+    static $foneticas = [
+        'yeyuno',
+        'yejuno',
+        'yiyuno',
+        'geyuno',
+        'yeiuno',   // yei-uno
+        'digiuno',
+    ];
+
+    static $ambiguas = [
+        'y1',       // Y 1
+        'yei1',     // yei 1
+        'jjun',     // JJ un
+    ];
+
+    static $frasesValidas = [
+        'enayuno',
+        'deayuno',
+    ];
+
+    if (in_array($normalizado, $foneticas, true)) {
+        return 'fonetica';
+    }
+
+    if (in_array($normalizado, $ambiguas, true)) {
+        return 'ambigua';
+    }
+
+    if (in_array($normalizado, $frasesValidas, true)) {
+        return 'frase_valida';
+    }
+
+    return null;
+}
+
+
+/**
+ * Indica si un término pertenece a alguna variante conocida
+ * de la familia Yeyuno.
+ *
+ * Esto NO implica que deba corregirse automáticamente.
+ */
+function stt_es_variante_yeyuno(string $valor): bool
+{
+    return stt_tipo_variante_yeyuno($valor) !== null;
+}
+
+
+/**
+ * Evalúa si alrededor de una ocurrencia existe contexto
+ * gastrointestinal suficiente para interpretar una variante
+ * como "Yeyuno".
+ *
+ * Las variantes ambiguas requieren más evidencia que una
+ * deformación fonética.
+ *
+ * "en ayuno" y "de ayuno" son todavía más restrictivas porque
+ * son expresiones clínicas válidas y no deben convertirse
+ * accidentalmente en un órgano.
+ */
+function stt_contexto_yeyuno_seguro(
+    string $texto,
+    int $indice,
+    string $tipoVariante
+): bool {
+    $tokens = cmp_tokens(
+        cmp_pre_limpiar($texto)
+    );
+
+    /*
+     * Ventana local acotada.
+     * No utilizamos todo el dictado para evitar heredar señales
+     * gastrointestinales de órganos alejados.
+     */
+    $inicio = max(0, $indice - 8);
+
+    $contexto = implode(
+        ' ',
+        array_slice($tokens, $inicio, 17)
+    );
+
+    /*
+     * Señales altamente características de un bloque intestinal.
+     */
+    $senalesFuertes = 0;
+
+    if (preg_match(
+        '/\bestratificaci[oó]n\b/iu',
+        $contexto
+    )) {
+        $senalesFuertes++;
+    }
+
+    if (preg_match(
+        '/\bpatr[oó]n\s+(?:mucoso|gaseoso)\b/iu',
+        $contexto
+    )) {
+        $senalesFuertes++;
+    }
+
+    if (preg_match(
+        '/\bmotilidad\b/iu',
+        $contexto
+    )) {
+        $senalesFuertes++;
+    }
+
+    if (preg_match(
+        '/\b(?:duodeno|[ií]leon|colon|col[oó]n)\b/iu',
+        $contexto
+    )) {
+        $senalesFuertes++;
+    }
+
+    if (preg_match(
+        '/\b(?:intestinal|intestino|asas?)\b/iu',
+        $contexto
+    )) {
+        $senalesFuertes++;
+    }
+
+    /*
+     * Señales compatibles con una descripción intestinal,
+     * pero no suficientemente específicas por sí solas.
+     */
+    $senalesModeradas = 0;
+
+    if (preg_match(
+        '/\bpared\b/iu',
+        $contexto
+    )) {
+        $senalesModeradas++;
+    }
+
+    if (preg_match(
+        '/\bgrosor\b/iu',
+        $contexto
+    )) {
+        $senalesModeradas++;
+    }
+
+    /*
+     * Una medida cercana ayuda especialmente en variantes fonéticas:
+     *
+     *   "Geyuno aumentado en 0.62 cm"
+     */
+    $tieneMedida = preg_match(
+        '/\b\d+(?:[.,]\d+)?\s*'
+        . '(?:cm|mm|cent[ií]metros?|mil[ií]metros?)\b/iu',
+        $contexto
+    ) === 1;
+
+    /*
+     * Deformación fonética relativamente específica.
+     *
+     * Una señal GI fuerte es suficiente.
+     * También aceptamos una medida asociada, porque el propio término
+     * ya aporta una evidencia fonética importante.
+     */
+    if ($tipoVariante === 'fonetica') {
+        return (
+            $senalesFuertes >= 1
+            || $tieneMedida
+        );
+    }
+
+    /*
+     * Formas como "Y 1", "yei 1" o "JJ un" necesitan
+     * evidencia gastrointestinal inequívoca.
+     */
+    if ($tipoVariante === 'ambigua') {
+        return (
+            $senalesFuertes >= 2
+            || (
+                $senalesFuertes >= 1
+                && $senalesModeradas >= 1
+                && $tieneMedida
+            )
+        );
+    }
+
+    /*
+     * "en ayuno" y "de ayuno" son expresiones válidas.
+     *
+     * Nunca bastan pared, grosor o una medida.
+     * Exigimos varias señales GI específicas.
+     *
+     * Más adelante, si el otro motor dice explícitamente "Yeyuno",
+     * podremos aprovechar además esa evidencia A/B.
+     */
+    if ($tipoVariante === 'frase_valida') {
+        return $senalesFuertes >= 2;
+    }
+
+    return false;
+}
+
 function concepto_equivalente_contextual(
     string $a,
     string $b,
@@ -453,39 +752,169 @@ function concepto_equivalente_contextual(
         ];
     }
 
-    $variantesPelvica = [
-        'pellicano',
-        'peluca',
-        'publica',
-    ];
+    /*
+    * Familia contextual Yeyuno.
+    *
+    * No usamos aliases globales porque algunas variantes,
+    * especialmente "en ayuno" y "de ayuno", son expresiones
+    * clínicas válidas fuera de un bloque intestinal.
+    */
+    $tipoYeyunoA = stt_tipo_variante_yeyuno($a);
+    $tipoYeyunoB = stt_tipo_variante_yeyuno($b);
 
-    $esFamiliaPelvica = (
-        $aNorm === 'pelvica'
-        && in_array($bNorm, $variantesPelvica, true)
-    ) || (
-        $bNorm === 'pelvica'
-        && in_array($aNorm, $variantesPelvica, true)
-    );
+    $esFamiliaYeyuno =
+        $tipoYeyunoA !== null
+        && $tipoYeyunoB !== null
+        && $aNorm !== $bNorm;
+
+    if ($esFamiliaYeyuno) {
+        $aEsCanonico = $aNorm === 'yeyuno';
+        $bEsCanonico = $bNorm === 'yeyuno';
+
+        /*
+        * Caso de máxima confianza:
+        * uno de los motores ya entregó explícitamente "Yeyuno"
+        * y el otro produjo una deformación fonética.
+        *
+        * Ejemplos:
+        *   Yeyuno / Yejuno
+        *   Yeyuno / Geyuno
+        *   Yeyuno / digiuno
+        *
+        * El órgano canónico aportado por un motor es evidencia
+        * suficiente siempre que la otra alternativa sea una
+        * deformación fonética conocida.
+        */
+        if (
+            $aEsCanonico
+            && $tipoYeyunoB === 'fonetica'
+        ) {
+            return [
+                'accion' => 'resuelto',
+                'elegido' => $a,
+                'descartado' => $b
+            ];
+        }
+
+        if (
+            $bEsCanonico
+            && $tipoYeyunoA === 'fonetica'
+        ) {
+            return [
+                'accion' => 'resuelto',
+                'elegido' => $b,
+                'descartado' => $a
+            ];
+        }
+
+        /*
+        * Para variantes ambiguas o cuando ambos motores están
+        * corruptos exigimos contexto GI suficiente en AMBAS
+        * transcripciones.
+        */
+        $contextoYeyunoA = stt_contexto_yeyuno_seguro(
+            $textoA,
+            $indiceA,
+            $tipoYeyunoA
+        );
+
+        $contextoYeyunoB = stt_contexto_yeyuno_seguro(
+            $textoB,
+            $indiceB,
+            $tipoYeyunoB
+        );
+
+        if (!$contextoYeyunoA || !$contextoYeyunoB) {
+            return null;
+        }
+
+        /*
+        * Si uno de los motores ya entregó la forma canónica,
+        * conservar esa forma original.
+        */
+        if ($aEsCanonico) {
+            return [
+                'accion' => 'resuelto',
+                'elegido' => $a,
+                'descartado' => $b
+            ];
+        }
+
+        if ($bEsCanonico) {
+            return [
+                'accion' => 'resuelto',
+                'elegido' => $b,
+                'descartado' => $a
+            ];
+        }
+
+        /*
+        * Ambos motores entregaron variantes no canónicas,
+        * pero las dos están respaldadas por contexto GI fuerte.
+        */
+        return [
+            'accion' => 'resuelto',
+            'elegido' => 'Yeyuno',
+            'descartado' => $a . ' / ' . $b
+        ];
+    }
+
+    $esFamiliaPelvica =
+        stt_es_variante_pelvica($a)
+        && stt_es_variante_pelvica($b)
+        && $aNorm !== $bNorm;
 
     if ($esFamiliaPelvica) {
-        $tieneImagen = preg_match(
-            '/\bimagen\b/iu',
-            $contexto
-        ) === 1;
+        /*
+        * Exigimos contexto renal seguro en AMBAS transcripciones.
+        *
+        * Esto es deliberadamente conservador:
+        * si una de las dos ocurrencias quedó demasiado dañada como
+        * para demostrar el contexto renal, la discrepancia continúa
+        * pendiente y puede ser revisada posteriormente.
+        */
+        $contextoPelvicoA = stt_contexto_pelvico_seguro(
+            $textoA,
+            $indiceA
+        );
 
-        $tieneContextoRenal = preg_match(
-            '/\b(?:riñ[oó]n|renal|pelvis|ur[eé]ter)\b/iu',
-            $contexto
-        ) === 1;
+        $contextoPelvicoB = stt_contexto_pelvico_seguro(
+            $textoB,
+            $indiceB
+        );
 
-        if (!$tieneImagen || !$tieneContextoRenal) {
+        if (!$contextoPelvicoA || !$contextoPelvicoB) {
             return null;
+        }
+
+        /*
+        * Si uno de los motores ya entregó "pélvica",
+        * conservamos esa forma original.
+        *
+        * Si ambos motores deformaron el concepto,
+        * el contexto permite reconstruir de forma
+        * inequívoca el concepto clínico "pélvica".
+        */
+        if ($aNorm === 'pelvica') {
+            return [
+                'accion' => 'resuelto',
+                'elegido' => $a,
+                'descartado' => $b
+            ];
+        }
+
+        if ($bNorm === 'pelvica') {
+            return [
+                'accion' => 'resuelto',
+                'elegido' => $b,
+                'descartado' => $a
+            ];
         }
 
         return [
             'accion' => 'resuelto',
-            'elegido' => $aNorm === 'pelvica' ? $a : $b,
-            'descartado' => $aNorm === 'pelvica' ? $b : $a
+            'elegido' => 'pélvica',
+            'descartado' => $a . ' / ' . $b
         ];
     }
 
@@ -759,92 +1188,409 @@ function concepto_validar(
  * Solo resuelve si ambas alternativas representan exactamente
  * el mismo decimal. No decide entre números realmente distintos.
  */
-function numero_decimal_equivalente(string $a, string $b): ?array
-{
-    $extraerRoto = static function (string $texto): ?array {
-        if (!preg_match(
-            '/(?<!\d)0\s+a\s+(\d{1,3})(?!\d)/u',
-            $texto,
-            $m,
-            PREG_OFFSET_CAPTURE
-        )) {
-            return null;
-        }
+function numero_decimal_equivalente(
+    string $a,
+    string $b,
+    ?int $indiceA,
+    ?int $indiceB,
+    string $textoA,
+    string $textoB,
+    array $organos = []
+): ?array {
+    if ($indiceA === null || $indiceB === null) {
+        return null;
+    }
 
-        return [
-            'decimal' => '0.' . $m[1][0],
-            'original' => $m[0][0],
-            'offset' => (int)$m[0][1]
-        ];
-    };
-
-    $normalizarFrase = static function (string $texto): string {
-        $tokens = cmp_tokens(cmp_pre_limpiar($texto));
-        $tokens = array_map('cmp_norm', $tokens);
-        $tokens = array_values(array_filter(
-            $tokens,
-            static fn(string $v): bool => $v !== ''
-        ));
-
-        return implode(' ', $tokens);
-    };
-
-    $resolver = static function (
-        string $textoRoto,
-        string $textoOtro,
-        array $rotura
-    ) use ($normalizarFrase): ?array {
-        $textoCorregido = substr_replace(
-            $textoRoto,
-            $rotura['decimal'],
-            $rotura['offset'],
-            strlen($rotura['original'])
+    /*
+     * Convierte únicamente representaciones numéricas
+     * inequívocas a una forma canónica.
+     *
+     * NO usa tolerancia matemática.
+     *
+     * Ejemplos:
+     *   0 coma un  -> 0.1
+     *   0 coma uno -> 0.1
+     *   0 a 37     -> 0.37
+     *   un          -> 1
+     *   1           -> 1
+     */
+    $normalizarValor = static function (string $valor): ?string {
+        $valor = mb_strtolower(
+            trim($valor, " \t\n\r\0\x0B.,;:"),
+            'UTF-8'
         );
 
+        $valor = strtr($valor, [
+            'á' => 'a',
+            'é' => 'e',
+            'í' => 'i',
+            'ó' => 'o',
+            'ú' => 'u',
+            'ü' => 'u',
+        ]);
+
+        $valor = preg_replace(
+            '/\s+/u',
+            ' ',
+            $valor
+        ) ?? $valor;
+
         /*
-         * El decimal solo se considera resuelto si, después de
-         * repararlo, TODA la discrepancia resulta equivalente.
+         * Forma numérica literal.
          *
-         * Así no ocultamos diferencias como:
-         * "grosor 0 a 37 aumentado"
-         * vs
-         * "pared 0,37 disminuida".
+         * La coma decimal y el punto decimal son equivalentes.
          */
-        if (
-            $normalizarFrase($textoCorregido)
-            !== $normalizarFrase($textoOtro)
-        ) {
+        if (preg_match(
+            '/^\d+(?:[.,]\d+)?$/u',
+            $valor
+        )) {
+            return str_replace(',', '.', $valor);
+        }
+
+        /*
+         * Cantidad verbal simple.
+         *
+         * Esta conversión solo podrá aceptarse más abajo
+         * si existe una unidad de medida compatible.
+         */
+        if (in_array(
+            $valor,
+            ['un', 'una', 'uno'],
+            true
+        )) {
+            return '1';
+        }
+
+        $digitos = [
+            'cero' => '0',
+            'un' => '1',
+            'una' => '1',
+            'uno' => '1',
+            'dos' => '2',
+            'tres' => '3',
+            'cuatro' => '4',
+            'cinco' => '5',
+            'seis' => '6',
+            'siete' => '7',
+            'ocho' => '8',
+            'nueve' => '9',
+        ];
+
+        /*
+         * Decimal hablado simple:
+         *
+         *   0 coma un
+         *   0 coma uno
+         *   cero coma uno
+         *   0 coma 1
+         *
+         * Solo admitimos UNA cifra decimal hablada.
+         */
+        if (preg_match(
+            '/^(?:0|cero)\s+coma\s+'
+            . '(cero|un|una|uno|dos|tres|cuatro|cinco|seis|siete|ocho|nueve|\d)$/u',
+            $valor,
+            $m
+        )) {
+            $decimal = $digitos[$m[1]] ?? $m[1];
+
+            return '0.' . $decimal;
+        }
+
+        /*
+         * Error STT histórico ya soportado:
+         *
+         *   0 a 37 -> 0.37
+         */
+        if (preg_match(
+            '/^(?:0|cero)\s+a\s+(\d{1,3})$/u',
+            $valor,
+            $m
+        )) {
+            return '0.' . $m[1];
+        }
+
+        return null;
+    };
+
+    /*
+     * Normalizar unidad únicamente cuando está asociada
+     * inmediatamente a ESTA discrepancia.
+     *
+     * La unidad puede haber quedado:
+     * - dentro de la propia discrepancia; o
+     * - justo después de ella porque ambos motores coincidieron
+     *   en "centímetros", "cm", etc.
+     */
+    $extraerUnidad = static function (
+        string $texto,
+        int $indice,
+        string $discrepancia
+    ): ?string {
+        $tokens = cmp_tokens(
+            cmp_pre_limpiar($texto)
+        );
+
+        if (!isset($tokens[$indice])) {
             return null;
         }
 
-        return [
-            'accion' => 'resuelto',
-            'elegido' => $rotura['decimal'],
-            'descartado' => $textoRoto
-        ];
+        $cantidadDiscrepancia = count(
+            cmp_tokens(
+                cmp_pre_limpiar($discrepancia)
+            )
+        );
+
+        $fin = min(
+            count($tokens) - 1,
+            $indice + max(1, $cantidadDiscrepancia) + 1
+        );
+
+        for ($i = $indice; $i <= $fin; $i++) {
+            $token = mb_strtolower(
+                trim(
+                    (string)$tokens[$i],
+                    " \t\n\r\0\x0B.,;:"
+                ),
+                'UTF-8'
+            );
+
+            $token = strtr($token, [
+                'á' => 'a',
+                'é' => 'e',
+                'í' => 'i',
+                'ó' => 'o',
+                'ú' => 'u',
+                'ü' => 'u',
+            ]);
+
+            if (preg_match(
+                '/^(?:cm|centimetro|centimetros)$/u',
+                $token
+            )) {
+                return 'cm';
+            }
+
+            if (preg_match(
+                '/^(?:mm|milimetro|milimetros)$/u',
+                $token
+            )) {
+                return 'mm';
+            }
+        }
+
+        return null;
     };
 
-    $roturaA = $extraerRoto($a);
-
-    if ($roturaA !== null) {
-        $resultado = $resolver($a, $b, $roturaA);
-
-        if ($resultado !== null) {
-            return $resultado;
+    /*
+     * Recuperar el último órgano explícito anterior a la medida.
+     *
+     * Esto evita fusionar números pertenecientes claramente
+     * a órganos distintos aunque casualmente tengan el mismo valor.
+     */
+    $extraerOrganoPrevio = static function (
+        string $texto,
+        int $indice
+    ) use ($organos): ?string {
+        if (empty($organos)) {
+            return null;
         }
+
+        $tokens = cmp_tokens(
+            cmp_pre_limpiar($texto)
+        );
+
+        $inicio = max(0, $indice - 35);
+
+        for ($i = $indice - 1; $i >= $inicio; $i--) {
+            $token = org_norm(
+                org_limpia_borde(
+                    (string)($tokens[$i] ?? '')
+                )
+            );
+
+            if (
+                $token !== ''
+                && in_array($token, $organos, true)
+            ) {
+                return $token;
+            }
+        }
+
+        return null;
+    };
+
+    /*
+     * Ancla descriptiva inmediatamente anterior.
+     *
+     * No pretende interpretar el hallazgo: solamente evita declarar
+     * equivalencia cuando las medidas están claramente insertas en
+     * contextos diferentes.
+     */
+    $extraerAnclaPrevia = static function (
+        string $texto,
+        int $indice
+    ): ?string {
+        $tokens = cmp_tokens(
+            cmp_pre_limpiar($texto)
+        );
+
+        $ignorar = [
+            'de', 'del', 'la', 'el', 'los', 'las',
+            'en', 'con', 'a', 'al', 'y',
+            'un', 'una', 'uno',
+        ];
+
+        $inicio = max(0, $indice - 6);
+
+        for ($i = $indice - 1; $i >= $inicio; $i--) {
+            $token = cmp_norm(
+                (string)($tokens[$i] ?? '')
+            );
+
+            if (
+                $token === ''
+                || cmp_es_numero_norm($token)
+                || in_array($token, $ignorar, true)
+            ) {
+                continue;
+            }
+
+            return $token;
+        }
+
+        return null;
+    };
+
+    $valorA = $normalizarValor($a);
+    $valorB = $normalizarValor($b);
+
+    /*
+     * Si alguna alternativa no puede interpretarse de forma
+     * determinista, no intentamos corregirla.
+     */
+    if ($valorA === null || $valorB === null) {
+        return null;
     }
 
-    $roturaB = $extraerRoto($b);
-
-    if ($roturaB !== null) {
-        $resultado = $resolver($b, $a, $roturaB);
-
-        if ($resultado !== null) {
-            return $resultado;
-        }
+    /*
+     * Igualdad EXACTA.
+     *
+     * 0.16 !== 0.17
+     * 51   !== 0.51
+     */
+    if ($valorA !== $valorB) {
+        return null;
     }
 
-    return null;
+    $unidadA = $extraerUnidad(
+        $textoA,
+        $indiceA,
+        $a
+    );
+
+    $unidadB = $extraerUnidad(
+        $textoB,
+        $indiceB,
+        $b
+    );
+
+    /*
+     * No normalizamos "un/uno" ni decimales hablados sin una
+     * medida explícita compatible en ambos motores.
+     */
+    if (
+        $unidadA === null
+        || $unidadB === null
+        || $unidadA !== $unidadB
+    ) {
+        return null;
+    }
+
+    $organoA = $extraerOrganoPrevio(
+        $textoA,
+        $indiceA
+    );
+
+    $organoB = $extraerOrganoPrevio(
+        $textoB,
+        $indiceB
+    );
+
+    /*
+     * Si ambos motores permiten identificar órgano y son distintos,
+     * las medidas NO son equivalentes contextual mente.
+     */
+    if (
+        $organoA !== null
+        && $organoB !== null
+        && $organoA !== $organoB
+    ) {
+        return null;
+    }
+
+    /*
+     * Si solo uno de los motores permite identificar órgano,
+     * preferimos no fusionar automáticamente.
+     */
+    if (
+        ($organoA === null) !== ($organoB === null)
+    ) {
+        return null;
+    }
+
+    $anclaA = $extraerAnclaPrevia(
+        $textoA,
+        $indiceA
+    );
+
+    $anclaB = $extraerAnclaPrevia(
+        $textoB,
+        $indiceB
+    );
+
+    /*
+     * Cuando ambos tienen una referencia descriptiva inmediata,
+     * también debe ser compatible.
+     */
+    if (
+        $anclaA !== null
+        && $anclaB !== null
+        && $anclaA !== $anclaB
+    ) {
+        return null;
+    }
+
+    /*
+     * Preferimos como descartada la forma que no coincide con
+     * la representación canónica. Si ambas difieren visualmente,
+     * conservamos ambas como evidencia.
+     */
+    $aLiteral = str_replace(
+        ',',
+        '.',
+        trim($a, " \t\n\r\0\x0B.,;:")
+    );
+
+    $bLiteral = str_replace(
+        ',',
+        '.',
+        trim($b, " \t\n\r\0\x0B.,;:")
+    );
+
+    if ($aLiteral === $valorA && $bLiteral !== $valorB) {
+        $descartado = $b;
+    } elseif ($bLiteral === $valorB && $aLiteral !== $valorA) {
+        $descartado = $a;
+    } else {
+        $descartado = $a . ' / ' . $b;
+    }
+
+    return [
+        'accion' => 'resuelto',
+        'elegido' => $valorA,
+        'descartado' => $descartado
+    ];
 }
 
 /**
@@ -875,75 +1621,429 @@ function stt_resolver_coincidencias_comunes(
         return count(cmp_tokens($prefijo));
     };
 
-    /**
-     * Vaso -> Bazo
-     *
-     * Solo aceptamos ocurrencias donde "Vaso" inicia una descripción
-     * y dentro del mismo contexto aparece terminología esplénica.
-     *
-     * IMPORTANTE:
-     * devolvemos la posición concreta. No es un alias global.
-     */
-    $patronVasoBazo = '/'
-        . '(?:^|[.!?;]\s+)'
-        . '(?<organo>vaso)\b'
-        . '[^.!?;\r\n]{0,500}?'
-        . '\b(?:'
-        . 'espl[eé]nic[oa]s?'
-        . '|escl[eé]nic[oa]s?'
-        . '|cola\s+espl[eé]nica'
-        . '|cabeza\s+espl[eé]nica'
-        . '|cola\s+escl[eé]nica'
-        . '|cabeza\s+escl[eé]nica'
-        . ')\b'
-        . '/iu';
+    /*
+    * Familia "imagen pélvica":
+    * ambos motores pueden cometer exactamente el mismo error,
+    * por lo que la ocurrencia no aparece como discrepancia A/B.
+    *
+    * Ejemplos:
+    *   pyecta / pyecta
+    *   pelica / pelica
+    *   periférica / periférica
+    *
+    * Solo se resuelve si:
+    * - ambos motores presentan la misma variante;
+    * - la variante pertenece a la familia pélvica conocida;
+    * - ambas ocurrencias tienen contexto renal seguro.
+    *
+    * Nunca es una sustitución global.
+    */
+    $extraerPelvicasContextuales = static function (
+        string $texto
+    ): array {
+        $tokens = cmp_tokens(
+            cmp_pre_limpiar($texto)
+        );
 
-    preg_match_all(
-        $patronVasoBazo,
-        $textoA,
-        $coincidenciasA,
-        PREG_SET_ORDER | PREG_OFFSET_CAPTURE
-    );
+        $resultado = [];
 
-    preg_match_all(
-        $patronVasoBazo,
-        $textoB,
-        $coincidenciasB,
-        PREG_SET_ORDER | PREG_OFFSET_CAPTURE
-    );
+        foreach ($tokens as $indice => $token) {
+            if (!stt_es_variante_pelvica($token)) {
+                continue;
+            }
 
-    $cantidadA = count($coincidenciasA);
-    $cantidadB = count($coincidenciasB);
+            /*
+            * "pélvica" ya correcta no necesita autocorrección.
+            */
+            if (
+                org_norm(org_limpia_borde($token))
+                === 'pelvica'
+            ) {
+                continue;
+            }
 
-    if ($cantidadA === 0 || $cantidadA !== $cantidadB) {
-        $cantidad = 0;
-    } else {
-        $cantidad = $cantidadA;
+            if (!stt_contexto_pelvico_seguro(
+                $texto,
+                (int)$indice
+            )) {
+                continue;
+            }
+
+            $resultado[] = [
+                'valor' => $token,
+                'indice' => (int)$indice,
+            ];
+        }
+
+        return $resultado;
+    };
+
+    $pelvicasA = $extraerPelvicasContextuales($textoA);
+    $pelvicasB = $extraerPelvicasContextuales($textoB);
+
+    /*
+    * Solo emparejamos automáticamente cuando ambos motores
+    * detectaron la misma cantidad de ocurrencias contextuales.
+    *
+    * Si las cantidades no coinciden, no intentamos adivinar
+    * qué ocurrencia corresponde con cuál.
+    */
+    if (
+        count($pelvicasA) > 0
+        && count($pelvicasA) === count($pelvicasB)
+    ) {
+        foreach ($pelvicasA as $i => $pelvicaA) {
+            $pelvicaB = $pelvicasB[$i];
+
+            $valorA = (string)$pelvicaA['valor'];
+            $valorB = (string)$pelvicaB['valor'];
+
+            /*
+            * Este bloque es únicamente para errores iguales
+            * que no llegaron a generar discrepancia.
+            *
+            * Si A y B son variantes diferentes, esa situación
+            * corresponde a concepto_equivalente_contextual().
+            */
+            if (
+                org_norm(org_limpia_borde($valorA))
+                !== org_norm(org_limpia_borde($valorB))
+            ) {
+                continue;
+            }
+
+            $resueltas[] = [
+                'elegido' => 'pélvica',
+                'descartado' => $valorA,
+                'origen' => 'concepto',
+
+                'motor_a' => $valorA,
+                'motor_b' => $valorB,
+
+                'indice_a' => (int)$pelvicaA['indice'],
+                'indice_b' => (int)$pelvicaB['indice'],
+
+                'alcance' => 'coincidencia_comun',
+            ];
+        }
     }
 
-    for ($i = 0; $i < $cantidad; $i++) {
-        $offsetA = (int)$coincidenciasA[$i]['organo'][1];
-        $offsetB = (int)$coincidenciasB[$i]['organo'][1];
+    /**
+     * Familia Yeyuno:
+     * ambos motores pueden cometer exactamente el mismo error,
+     * por lo que no aparecerá una discrepancia A/B.
+     *
+     * Ejemplos:
+     *   Geyuno / Geyuno
+     *   Y 1 / Y 1
+     *   yei 1 / yei 1
+     *   JJ un / JJ un
+     *
+     * También reconocemos "en ayuno" / "de ayuno", pero solo
+     * podrán corregirse si superan el contexto GI fuerte definido
+     * en stt_contexto_yeyuno_seguro().
+     *
+     * Nunca se realiza una sustitución global.
+     */
+    $extraerYeyunosContextuales = static function (
+        string $texto
+    ) use ($indiceTokenDesdeOffset): array {
+        $resultado = [];
 
-        $resueltas[] = [
-            'elegido' => 'Bazo',
-            'descartado' => 'Vaso',
-            'origen' => 'organo',
+        /*
+        * Primero capturamos las variantes completas.
+        *
+        * Las formas de varias palabras deben analizarse como una unidad;
+        * no sirve recorrer token por token para "Y 1", "JJ un", etc.
+        */
+        $patronYeyuno = '/(?<![\p{L}\d])(?:'
+            . 'yejuno'
+            . '|yiyuno'
+            . '|geyuno'
+            . '|digiuno'
+            . '|yei[-\s]+uno'
+            . '|y\s+1'
+            . '|yei\s+1'
+            . '|jj\s+un'
+            . '|en\s+ayuno'
+            . '|de\s+ayuno'
+            . ')(?![\p{L}\d])/iu';
 
-            'motor_a' => (string)$coincidenciasA[$i]['organo'][0],
-            'motor_b' => (string)$coincidenciasB[$i]['organo'][0],
+        preg_match_all(
+            $patronYeyuno,
+            $texto,
+            $coincidencias,
+            PREG_SET_ORDER | PREG_OFFSET_CAPTURE
+        );
 
-            'indice_a' => $indiceTokenDesdeOffset(
-                $textoA,
-                $offsetA
-            ),
-            'indice_b' => $indiceTokenDesdeOffset(
-                $textoB,
-                $offsetB
-            ),
+        foreach ($coincidencias as $match) {
+            $valor = (string)$match[0][0];
+            $offset = (int)$match[0][1];
 
-            'alcance' => 'coincidencia_comun',
-        ];
+            $tipo = stt_tipo_variante_yeyuno($valor);
+
+            if ($tipo === null) {
+                continue;
+            }
+
+            $indice = $indiceTokenDesdeOffset(
+                $texto,
+                $offset
+            );
+
+            /*
+            * La corrección solo existe si ESTA ocurrencia concreta
+            * dispone de contexto gastrointestinal suficiente.
+            */
+            if (!stt_contexto_yeyuno_seguro(
+                $texto,
+                $indice,
+                $tipo
+            )) {
+                continue;
+            }
+
+            $resultado[] = [
+                'valor' => $valor,
+                'tipo' => $tipo,
+                'indice' => $indice,
+            ];
+        }
+
+        return $resultado;
+    };
+
+    $yeyunosA = $extraerYeyunosContextuales($textoA);
+    $yeyunosB = $extraerYeyunosContextuales($textoB);
+
+    /*
+    * Para coincidencias comunes exigimos que ambos motores tengan
+    * la misma cantidad de ocurrencias contextuales.
+    *
+    * Si no, no intentamos emparejar por aproximación.
+    */
+    if (
+        count($yeyunosA) > 0
+        && count($yeyunosA) === count($yeyunosB)
+    ) {
+        foreach ($yeyunosA as $i => $yeyunoA) {
+            $yeyunoB = $yeyunosB[$i];
+
+            $valorA = (string)$yeyunoA['valor'];
+            $valorB = (string)$yeyunoB['valor'];
+
+            /*
+            * Este bloque es únicamente para el MISMO error en ambos STT.
+            *
+            * Variantes distintas:
+            *   Yiyuno / Yejuno
+            *
+            * ya corresponden a concepto_equivalente_contextual().
+            */
+            if (org_norm($valorA) !== org_norm($valorB)) {
+                continue;
+            }
+
+            $resueltas[] = [
+                'elegido' => 'Yeyuno',
+                'descartado' => $valorA,
+                'origen' => 'organo',
+
+                'motor_a' => $valorA,
+                'motor_b' => $valorB,
+
+                'indice_a' => (int)$yeyunoA['indice'],
+                'indice_b' => (int)$yeyunoB['indice'],
+
+                'alcance' => 'coincidencia_comun',
+            ];
+        }
+    }
+
+    /**
+     * Vaso / Vasos -> Bazo
+     *
+     * Esta corrección aplica SOLO cuando ambos motores cometieron
+     * el mismo error y existe contexto esplénico suficientemente fuerte.
+     *
+     * "vaso" es un término clínico válido, por lo que nunca se trata
+     * como alias global de Bazo.
+     */
+    $extraerVasoBazoContextual = static function (
+        string $texto
+    ): array {
+        $resultado = [];
+
+        /*
+        * Solo consideramos "vaso/vasos" cuando inicia un nuevo
+        * segmento clínico. El fragmento termina al cambiar de frase.
+        */
+        $patron = '/'
+            . '(?:^|[.!?;]\s+)'
+            . '(?<organo>vasos?)\b'
+            . '(?<fragmento>[^.!?;\r\n]{0,500})'
+            . '/iu';
+
+        preg_match_all(
+            $patron,
+            $texto,
+            $coincidencias,
+            PREG_SET_ORDER | PREG_OFFSET_CAPTURE
+        );
+
+        foreach ($coincidencias as $match) {
+            $organo = (string)$match['organo'][0];
+            $fragmento = (string)$match['fragmento'][0];
+
+            /*
+            * Protección vascular:
+            * expresiones compatibles con un vaso real NO se corrigen.
+            */
+            if (preg_match(
+                '/\b(?:'
+                . 'sangu[ií]ne[oa]s?'
+                . '|vascular(?:es)?'
+                . '|arteria(?:s)?'
+                . '|vena(?:s)?'
+                . '|flujo'
+                . '|doppler'
+                . ')\b/iu',
+                $fragmento
+            )) {
+                continue;
+            }
+
+            /*
+            * Anclajes esplénicos explícitos.
+            * Uno de estos es suficiente porque identifica directamente
+            * la anatomía esplénica.
+            */
+            $tieneAnclajeEsplenico = preg_match(
+                '/\b(?:'
+                . 'hilio\s+espl[eé]nic[oa]'
+                . '|c[aá]psula\s+espl[eé]nic[oa]'
+                . '|espl[eé]nic[oa]s?'
+                . '|hilio\s+escl[eé]nic[oa]'
+                . '|c[aá]psula\s+escl[eé]nic[oa]'
+                . '|escl[eé]nic[oa]s?'
+                . ')\b/iu',
+                $fragmento
+            ) === 1;
+
+            /*
+            * Si no existe una palabra esplénica explícita, aceptamos
+            * únicamente una combinación fuerte de atributos típicos
+            * de una descripción orgánica esplénica.
+            */
+            $senales = 0;
+
+            if (preg_match(
+                '/\b(?:tamañ[oa]|tamano|aumentad[oa]|conservad[oa])\b/iu',
+                $fragmento
+            )) {
+                $senales++;
+            }
+
+            if (preg_match(
+                '/\bbordes?\s+(?:aguzad[oa]s?|redondead[oa]s?|regular(?:es)?)\b/iu',
+                $fragmento
+            )) {
+                $senales++;
+            }
+
+            if (preg_match(
+                '/\bpar[eé]nquima\b/iu',
+                $fragmento
+            )) {
+                $senales++;
+            }
+
+            if (preg_match(
+                '/\b(?:'
+                . 'ecogenicidad'
+                . '|ecotextura'
+                . '|hipoecoic[oa]'
+                . '|hiperecoic[oa]'
+                . '|homog[eé]ne[oa]'
+                . '|heterog[eé]ne[oa]'
+                . ')\b/iu',
+                $fragmento
+            )) {
+                $senales++;
+            }
+
+            if (preg_match(
+                '/\bc[aá]psula\b/iu',
+                $fragmento
+            )) {
+                $senales++;
+            }
+
+            if (
+                !$tieneAnclajeEsplenico
+                && $senales < 3
+            ) {
+                continue;
+            }
+
+            $resultado[] = [
+                'valor' => $organo,
+                'offset' => (int)$match['organo'][1],
+            ];
+        }
+
+        return $resultado;
+    };
+
+    $vasoBazoA = $extraerVasoBazoContextual($textoA);
+    $vasoBazoB = $extraerVasoBazoContextual($textoB);
+
+    /*
+    * Solo emparejamos automáticamente cuando ambos motores
+    * presentan la misma cantidad de bloques compatibles.
+    */
+    if (
+        count($vasoBazoA) > 0
+        && count($vasoBazoA) === count($vasoBazoB)
+    ) {
+        foreach ($vasoBazoA as $i => $matchA) {
+            $matchB = $vasoBazoB[$i];
+
+            $valorA = (string)$matchA['valor'];
+            $valorB = (string)$matchB['valor'];
+
+            /*
+            * Este bloque cubre coincidencias del mismo error.
+            * Las discrepancias vaso/bazo siguen resolviéndose
+            * por org_validar()/org_validar_inicio_frase().
+            */
+            if (
+                org_norm($valorA)
+                !== org_norm($valorB)
+            ) {
+                continue;
+            }
+
+            $resueltas[] = [
+                'elegido' => 'Bazo',
+                'descartado' => $valorA,
+                'origen' => 'organo',
+
+                'motor_a' => $valorA,
+                'motor_b' => $valorB,
+
+                'indice_a' => $indiceTokenDesdeOffset(
+                    $textoA,
+                    (int)$matchA['offset']
+                ),
+                'indice_b' => $indiceTokenDesdeOffset(
+                    $textoB,
+                    (int)$matchB['offset']
+                ),
+
+                'alcance' => 'coincidencia_comun',
+            ];
+        }
     }
 
     /*
@@ -1168,7 +2268,15 @@ function org_procesar(
         ];
 
         // Resolver primero equivalencias numéricas inequívocas.
-        $n = numero_decimal_equivalente($a, $b);
+        $n = numero_decimal_equivalente(
+            $a,
+            $b,
+            $contextoResolucion['indice_a'],
+            $contextoResolucion['indice_b'],
+            $textoA,
+            $textoB,
+            $organos
+        );
 
         if ($n !== null && $n['accion'] === 'resuelto') {
             $resueltas[] = array_merge([

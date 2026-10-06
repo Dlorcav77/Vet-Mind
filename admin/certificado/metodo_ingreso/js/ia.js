@@ -157,6 +157,10 @@ function ejecutarRevisor(dictado, informeHtml, plantillaBase, observacionesGener
     const $modalBody = $('#revision_ia_modal_body');
     const flujoId = obtenerFlujoIdIA(false);
 
+    const ridGeneracion = String(
+        $('#rid_ia').val() || ''
+    ).trim();
+
     const setEstado = function (texto, clase, disabled) {
         $estado.text(texto);
         $toggle
@@ -176,6 +180,7 @@ function ejecutarRevisor(dictado, informeHtml, plantillaBase, observacionesGener
 
     return $.post('/funciones/GPT/proceso_ia/proceso_revisor.php', {
         flujo_id: flujoId,
+        rid_generacion: ridGeneracion,
         dictado: dictado,
         informe: informeHtml,
         plantilla: plantillaBase

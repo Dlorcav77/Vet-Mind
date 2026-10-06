@@ -843,10 +843,38 @@
                 && revision.flujo_id
                 && informe.flujo_id === revision.flujo_id;
 
-            if (mismoFlujo) {
+            let inputRevision = {};
+
+            try {
+                inputRevision = typeof revision.input_json === 'string'
+                    ? JSON.parse(revision.input_json || '{}')
+                    : (revision.input_json || {});
+            } catch (e) {
+                inputRevision = {};
+            }
+
+            const ridInforme = String(
+                informe && informe.rid || ''
+            ).trim();
+
+            const ridGeneracionRevision = String(
+                inputRevision.rid_generacion || ''
+            ).trim();
+
+            const vinculacionDirecta = (
+                ridInforme !== ''
+                && ridGeneracionRevision !== ''
+                && ridInforme === ridGeneracionRevision
+            );
+
+            /*
+            * Revisiones nuevas:
+            * sabemos exactamente qué generación revisaron.
+            */
+            if (vinculacionDirecta) {
                 bloques.push([
-                    '===== REVISIÓN REGISTRADA EN EL MISMO FLUJO =====',
-                    'Aviso: coincide el flujo, pero no existe una vinculación directa verificada con este RID.',
+                    '===== REVISIÓN VINCULADA DIRECTAMENTE =====',
+                    'RID generación revisada: ' + controlIaValor(ridGeneracionRevision),
                     'RID revisión: ' + controlIaValor(revision.rid),
                     'Fecha: ' + controlIaValor(revision.created_at),
                     'Proveedor: ' + controlIaValor(revision.provider),
@@ -855,6 +883,39 @@
                     '',
                     revision.content_final || ''
                 ].join('\n'));
+
+            /*
+            * Si la revisión declara explícitamente otro RID,
+            * NO mostramos su contenido como si correspondiera
+            * a este informe.
+            */
+            } else if (ridGeneracionRevision !== '') {
+                bloques.push([
+                    '===== REVISIÓN =====',
+                    'Existe una revisión en el grupo, pero está vinculada a otro RID.',
+                    'RID informe actual: ' + controlIaValor(ridInforme),
+                    'RID generación revisada: ' + controlIaValor(ridGeneracionRevision),
+                    'RID revisión: ' + controlIaValor(revision.rid),
+                    'No se incluye su contenido.'
+                ].join('\n'));
+
+            /*
+            * Compatibilidad con revisiones antiguas creadas
+            * antes de guardar rid_generacion.
+            */
+            } else if (mismoFlujo) {
+                bloques.push([
+                    '===== REVISIÓN REGISTRADA EN EL MISMO FLUJO =====',
+                    'Aviso: revisión antigua sin RID de generación; solo se puede verificar que coincide el flujo.',
+                    'RID revisión: ' + controlIaValor(revision.rid),
+                    'Fecha: ' + controlIaValor(revision.created_at),
+                    'Proveedor: ' + controlIaValor(revision.provider),
+                    'Modelo: ' + controlIaValor(revision.model),
+                    'Costo USD: ' + controlIaValor(revision.cost_usd),
+                    '',
+                    revision.content_final || ''
+                ].join('\n'));
+
             } else {
                 bloques.push(
                     '===== REVISIÓN =====\n'
