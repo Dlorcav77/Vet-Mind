@@ -106,7 +106,7 @@ function buildInformeHtml($veterinarioId, $configuracionInformeId, $pacienteId, 
             FROM plantilla_informe pi
             INNER JOIN tipo_examen te ON te.id = pi.tipo_examen_id
             WHERE pi.id = ?
-            AND te.veterinario_id = ?
+            AND pi.veterinario_id = ?
             LIMIT 1
         ");
 

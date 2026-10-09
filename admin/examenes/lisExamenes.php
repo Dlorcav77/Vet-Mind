@@ -8,10 +8,10 @@ $mysqli = conn();
 
 $sel = "SELECT id, nombre, descripcion, estado
         FROM tipo_examen
-        WHERE veterinario_id = ?
-        ORDER BY id DESC";
+        WHERE veterinario_id = 1
+           OR veterinario_id IS NULL
+        ORDER BY nombre ASC, id ASC";
 $stmt = $mysqli->prepare($sel);
-$stmt->bind_param('i', $usuario_id);
 $stmt->execute();
 $res = $stmt->get_result();
 ?>

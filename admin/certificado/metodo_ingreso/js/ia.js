@@ -1109,7 +1109,11 @@ function obtenerContenidoModalIA() {
 function procesarTextoConGPT(texto) {
     let pacienteData = obtenerDatosPaciente();
     if (!pacienteData) {
-        Swal.fire('Datos del paciente requeridos', 'Debes ingresar o seleccionar un paciente con todos los datos completos antes de procesar.', 'warning');
+        Swal.fire(
+            'Datos del paciente requeridos',
+            'Debes ingresar o seleccionar un paciente con todos los datos completos antes de procesar.',
+            'warning'
+        );
         return;
     }
 
@@ -1121,10 +1125,8 @@ function procesarTextoConGPT(texto) {
             didOpen: () => Swal.showLoading()
         });
 
-        let plantillaBase = $('#plantillaBase').val();
-        let plantillaId = $('select[name="plantilla_informe_id"]').val();
-        let pacienteData = obtenerDatosPaciente();
-
+        const plantillaBase = $('#plantillaBase').val();
+        const plantillaId = $('select[name="plantilla_informe_id"]').val();
         const flujoId = obtenerFlujoIdIA(true);
 
         $.post('/funciones/GPT/proceso_gpt.php', {
@@ -1137,15 +1139,106 @@ function procesarTextoConGPT(texto) {
             Swal.close();
 
             if (response.status === 'success') {
-                if (response.rid) { $('#rid_ia').val(response.rid); }
-                mostrarModalIA(response.content);
+                if (response.rid) {
+                    $('#rid_ia').val(response.rid);
+                }
+
+                const informeOriginal = response.content;
+                const informeLimpio = limpiarContenidoInformeIA(informeOriginal);
+
+                const observacionesGenerador = Array.isArray(response.observaciones)
+                    ? response.observaciones
+                    : [];
+
+                const organosOrigen = Array.isArray(response.organos)
+                    ? response.organos
+                    : [];
+
+                audio_manual_setMode('manual');
+                aplicarContenidoInforme(informeLimpio);
+
+                setTimeout(function () {
+                    if (
+                        window.VetmindRevision
+                        && typeof window.VetmindRevision.aplicar === 'function'
+                        && organosOrigen.length
+                    ) {
+                        let revisionActual = null;
+
+                        try {
+                            if (typeof window.VetmindRevision.exportar === 'function') {
+                                revisionActual = window.VetmindRevision.exportar()?.revision || null;
+                            }
+                        } catch (e) {
+                            revisionActual = null;
+                        }
+
+                        const organosPrevios = Array.isArray(revisionActual?.organos)
+                            ? revisionActual.organos
+                            : [];
+
+                        const normalizarOrgano = function (valor) {
+                            return String(valor || '').trim().toLowerCase();
+                        };
+
+                        window.VetmindRevision.aplicar({
+                            organos: organosOrigen.map(function (organo) {
+                                const previo = organosPrevios.find(function (item) {
+                                    return normalizarOrgano(item.organo) === normalizarOrgano(organo.organo);
+                                });
+
+                                return {
+                                    organo: organo.organo,
+                                    atributos: Array.isArray(organo.atributos)
+                                        ? organo.atributos
+                                        : [],
+                                    alertas: Array.isArray(organo.alertas)
+                                        ? organo.alertas
+                                        : (Array.isArray(previo?.alertas) ? previo.alertas : []),
+                                    dudasTranscripcion: Array.isArray(organo.dudasTranscripcion)
+                                        ? organo.dudasTranscripcion
+                                        : (Array.isArray(previo?.dudasTranscripcion)
+                                            ? previo.dudasTranscripcion
+                                            : [])
+                                };
+                            })
+                        });
+                    }
+                }, 0);
+
+                $('#revision_ia_bloque').show();
+                $('#revision_ia_leyenda').show();
+                $('#revision_ia_estado').text('Revisión IA · Revisando…');
+                $('#revision_ia_toggle')
+                    .removeClass('vm-revision-status-warning vm-revision-status-ok vm-revision-status-error')
+                    .addClass('vm-revision-status-pending')
+                    .prop('disabled', true);
+                $('#revision_ia_modal_body').empty();
+
+                setTimeout(function () {
+                    ejecutarRevisor(
+                        texto,
+                        informeOriginal,
+                        plantillaBase,
+                        observacionesGenerador,
+                        organosOrigen
+                    );
+                }, 100);
+
                 resolve(response);
             } else if (response.status === 'dry_run') {
-                const html = response.debug_html || response.content_demo || '<p><strong>DEBUG:</strong> Dry-run activo.</p>';
+                const html = response.debug_html
+                    || response.content_demo
+                    || '<p><strong>DEBUG:</strong> Dry-run activo.</p>';
+
                 mostrarModalDebug(html);
                 resolve(response);
             } else {
-                Swal.fire('Error', response.message || 'Fallo al procesar.', 'error');
+                Swal.fire(
+                    'Error',
+                    response.message || 'Fallo al procesar.',
+                    'error'
+                );
                 reject(response);
             }
         }, 'json')
@@ -1156,7 +1249,11 @@ function procesarTextoConGPT(texto) {
                 // console.log("Respuesta cruda:", xhr.responseText);
             }
 
-            Swal.fire('Error', 'No se pudo conectar al servicio GPT.', 'error');
+            Swal.fire(
+                'Error',
+                'No se pudo conectar al servicio GPT.',
+                'error'
+            );
             reject(error);
         });
     });

@@ -30,15 +30,30 @@ if ($action == "modificar") {
     ];
 }
 
-// Cargar tipos de examen para el select
+// Catálogo central provisional + tipo actual durante la transición
 $tipos_examen = [];
-$stmt = $mysqli->prepare("SELECT id, nombre FROM tipo_examen WHERE estado = 'activo' AND veterinario_id = ?");
-$stmt->bind_param('i', $usuario_id);
+$tipoActualId = (int)($fila['tipo_examen_id'] ?? 0);
+
+$stmt = $mysqli->prepare("
+    SELECT id, nombre
+    FROM tipo_examen
+    WHERE estado = 'activo'
+      AND (
+          veterinario_id IS NULL
+          OR veterinario_id = 1
+          OR id = ?
+      )
+    ORDER BY nombre ASC, id ASC
+");
+
+$stmt->bind_param('i', $tipoActualId);
 $stmt->execute();
 $result = $stmt->get_result();
+
 while ($row = $result->fetch_assoc()) {
     $tipos_examen[] = $row;
 }
+
 $stmt->close();
 
 $contenidoPlantilla = isset($fila['contenido']) ? (string)$fila['contenido'] : '';

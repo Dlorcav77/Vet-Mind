@@ -479,10 +479,12 @@ if (!function_exists('certificado_get_form_data')) {
             }
         }
 
-        $recinto_visible_plantilla = in_array('recinto', $campos_visibles_actuales, true);
-        $recinto_pide_siempre = (!$recinto_visible_plantilla && trim($recinto_default) === '');
-
-        if ($recinto_pide_siempre && !$recinto_visible_plantilla) {
+        if (trim($recinto_default) !== '') {
+            $campos_visibles_actuales = array_values(array_filter(
+                $campos_visibles_actuales,
+                static fn($campo) => $campo !== 'recinto'
+            ));
+        } elseif (!in_array('recinto', $campos_visibles_actuales, true)) {
             $campos_visibles_actuales[] = 'recinto';
         }
 

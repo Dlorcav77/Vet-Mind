@@ -520,9 +520,23 @@ function stt_tipo_variante_yeyuno(string $valor): ?string
     ];
 
     static $ambiguas = [
-        'y1',       // Y 1
-        'yei1',     // yei 1
-        'jjun',     // JJ un
+        'y1',        // Y 1
+        'yei1',      // yei 1
+        'jjun',      // JJ un
+
+        /*
+         * Variantes observadas clínicamente, pero demasiado
+         * ambiguas para corregirse sin contexto GI fuerte.
+         *
+         * "Guillén" puede ser un nombre/apellido válido.
+         * "y hay 1" es una frase normal del idioma.
+         *
+         * Por eso NO pertenecen a $foneticas.
+         */
+        'guillen',    // Guillén
+        'guilleno',   // Guilleno
+        'yeignum',    // yeignum
+        'yhay1',      // y hay 1
     ];
 
     static $frasesValidas = [
@@ -598,6 +612,20 @@ function stt_contexto_yeyuno_seguro(
 
     if (preg_match(
         '/\bestratificaci[oó]n\b/iu',
+        $contexto
+    )) {
+        $senalesFuertes++;
+    }
+
+        /*
+     * Descripción explícita de capas intestinales.
+     *
+     * Es una señal GI fuerte cuando aparece dentro de esta
+     * ventana contextual, pero nunca autoriza por sí sola
+     * una corrección de Yeyuno.
+     */
+    if (preg_match(
+        '/\bcapas?\b/iu',
         $contexto
     )) {
         $senalesFuertes++;
@@ -705,6 +733,401 @@ function stt_contexto_yeyuno_seguro(
     }
 
     return false;
+}
+
+/**
+ * Resuelve únicamente la omisión unilateral del nombre "Yeyuno".
+ *
+ * Caso esperado:
+ *
+ * Motor A:
+ *   Duodeno...
+ *   aumentado 0.31 cm, patrón mucoso,
+ *   estratificación..., capas...
+ *
+ * Motor B:
+ *   Duodeno...
+ *   Yeyuno aumentado 0.31 cm, patrón mucoso,
+ *   estratificación..., capas...
+ *
+ * No basta con que un motor diga Yeyuno.
+ * El lado que omitió el nombre debe contener un bloque GI
+ * fuertemente concordante y anatómicamente compatible.
+ */
+function stt_resolver_omision_yeyuno(
+    string $a,
+    string $b,
+    ?int $indiceA,
+    ?int $indiceB,
+    string $textoA,
+    string $textoB
+): ?array {
+    $aVacio = trim($a) === '';
+    $bVacio = trim($b) === '';
+
+    /*
+     * Esta función SOLO sirve para una omisión unilateral.
+     */
+    if ($aVacio === $bVacio) {
+        return null;
+    }
+
+    if ($aVacio) {
+        $valorExplicito = $b;
+        $indiceExplicito = $indiceB;
+        $textoExplicito = $textoB;
+        $textoOmitido = $textoA;
+    } else {
+        $valorExplicito = $a;
+        $indiceExplicito = $indiceA;
+        $textoExplicito = $textoA;
+        $textoOmitido = $textoB;
+    }
+
+    /*
+     * El lado presente debe decir literalmente Yeyuno.
+     *
+     * No usamos aquí variantes fonéticas:
+     * esas ya se resuelven por la lógica contextual normal.
+     */
+    if (
+        org_norm(
+            org_limpia_borde($valorExplicito)
+        ) !== 'yeyuno'
+        || $indiceExplicito === null
+    ) {
+        return null;
+    }
+
+    /*
+     * Incluso el lado explícito debe estar dentro de un
+     * contexto GI fuerte. Usamos el nivel "ambigua"
+     * deliberadamente para exigir más evidencia.
+     */
+    if (!stt_contexto_yeyuno_seguro(
+        $textoExplicito,
+        $indiceExplicito,
+        'ambigua'
+    )) {
+        return null;
+    }
+
+    /*
+     * Extrae una firma clínica local.
+     *
+     * Para confirmar una omisión exigiremos:
+     *
+     * - secuencia GI compatible;
+     * - pared/grosor o estado + medida compatible con grosor;
+     * - patrón mucoso/gaseoso;
+     * - estratificación;
+     * - capas;
+     * - medida explícita.
+     */
+    $extraerFirma = static function (
+        string $texto,
+        int $indice,
+        bool $tieneYeyunoExplicito
+    ): ?array {
+        $tokens = cmp_tokens(
+            cmp_pre_limpiar($texto)
+        );
+
+        if (!isset($tokens[$indice])) {
+            return null;
+        }
+
+        $inicioPrevio = max(
+            0,
+            $indice - 8
+        );
+
+        $previo = implode(
+            ' ',
+            array_slice(
+                $tokens,
+                $inicioPrevio,
+                $indice - $inicioPrevio
+            )
+        );
+
+        /*
+         * En el motor explícito saltamos el token "Yeyuno".
+         * En el motor que lo omitió, el índice candidato apunta
+         * directamente al comienzo del descriptor.
+         */
+        $inicioPosterior = $tieneYeyunoExplicito
+            ? $indice + 1
+            : $indice;
+
+        $posterior = implode(
+            ' ',
+            array_slice(
+                $tokens,
+                $inicioPosterior,
+                20
+            )
+        );
+
+        /*
+         * Secuencia anatómica.
+         *
+         * Es apoyo obligatorio para ESTA regla de omisión,
+         * pero nunca es evidencia suficiente por sí sola.
+         */
+        $tieneSecuencia =
+            preg_match(
+                '/\bduodeno\b/iu',
+                $previo
+            ) === 1
+            ||
+            preg_match(
+                '/\b(?:[ií]leon|ciego|colon|col[oó]n)\b/iu',
+                $posterior
+            ) === 1;
+
+        /*
+         * Grosor o pared explícitos.
+         *
+         * También aceptamos:
+         *
+         * "aumentado 0.31 cm"
+         *
+         * porque en un bloque intestinal esa construcción puede
+         * representar directamente el grosor sin repetir "pared".
+         */
+        $tieneGrosor = preg_match(
+            '/\b(?:pared|grosor)\b/iu',
+            $posterior
+        ) === 1;
+
+        $tieneEstadoConMedida = preg_match(
+            '/\b(?:aumentad[oa]|conservad[oa]|disminuid[oa])\b'
+            . '[^.!?;]{0,30}'
+            . '\b\d+(?:[.,]\d+)?\s*'
+            . '(?:cm|mm|cent[ií]metros?|mil[ií]metros?)\b/iu',
+            $posterior
+        ) === 1;
+
+        $tieneGrosorCompatible =
+            $tieneGrosor
+            || $tieneEstadoConMedida;
+
+        $patron = null;
+
+        if (preg_match(
+            '/\bpatr[oó]n\s+(mucoso|gaseoso)\b/iu',
+            $posterior,
+            $mPatron
+        )) {
+            $patron = org_norm(
+                (string)$mPatron[1]
+            );
+        }
+
+        $tieneEstratificacion = preg_match(
+            '/\bestratificaci[oó]n\b/iu',
+            $posterior
+        ) === 1;
+
+        $tieneCapas = preg_match(
+            '/\bcapas?\b/iu',
+            $posterior
+        ) === 1;
+
+        /*
+         * Medida exacta.
+         *
+         * No existe tolerancia matemática.
+         */
+        $medida = null;
+
+        if (preg_match(
+            '/\b(\d+(?:[.,]\d+)?)\s*'
+            . '(cm|mm|cent[ií]metros?|mil[ií]metros?)\b/iu',
+            $posterior,
+            $mMedida
+        )) {
+            $valor = str_replace(
+                ',',
+                '.',
+                (string)$mMedida[1]
+            );
+
+            $unidadRaw = org_norm(
+                (string)$mMedida[2]
+            );
+
+            if (
+                $unidadRaw === 'cm'
+                || str_starts_with(
+                    $unidadRaw,
+                    'centimetro'
+                )
+            ) {
+                $unidad = 'cm';
+            } elseif (
+                $unidadRaw === 'mm'
+                || str_starts_with(
+                    $unidadRaw,
+                    'milimetro'
+                )
+            ) {
+                $unidad = 'mm';
+            } else {
+                $unidad = null;
+            }
+
+            if ($unidad !== null) {
+                $medida = $valor . ' ' . $unidad;
+            }
+        }
+
+        /*
+         * Estado general del segmento.
+         * Si ambos motores lo entregan, también deberá concordar.
+         */
+        $estado = null;
+
+        if (preg_match(
+            '/\b(aumentad[oa]|conservad[oa]|disminuid[oa])\b/iu',
+            $posterior,
+            $mEstado
+        )) {
+            $estado = org_norm(
+                (string)$mEstado[1]
+            );
+        }
+
+        /*
+         * Para una omisión NO aceptamos contexto parcial.
+         */
+        if (
+            !$tieneSecuencia
+            || !$tieneGrosorCompatible
+            || $patron === null
+            || !$tieneEstratificacion
+            || !$tieneCapas
+            || $medida === null
+        ) {
+            return null;
+        }
+
+        return [
+            'patron' => $patron,
+            'medida' => $medida,
+            'estado' => $estado,
+        ];
+    };
+
+    $firmaExplicita = $extraerFirma(
+        $textoExplicito,
+        $indiceExplicito,
+        true
+    );
+
+    if ($firmaExplicita === null) {
+        return null;
+    }
+
+    $tokensOmitido = cmp_tokens(
+        cmp_pre_limpiar($textoOmitido)
+    );
+
+    if (empty($tokensOmitido)) {
+        return null;
+    }
+
+    /*
+     * Como cmp_comparar() deja null el índice del lado ausente,
+     * buscamos el comienzo equivalente del descriptor solamente
+     * en una ventana pequeña alrededor de la posición del otro motor.
+     *
+     * No buscamos por todo el informe.
+     */
+    $base = min(
+        count($tokensOmitido) - 1,
+        max(0, $indiceExplicito)
+    );
+
+    $desde = max(
+        0,
+        $base - 6
+    );
+
+    $hasta = min(
+        count($tokensOmitido) - 1,
+        $base + 6
+    );
+
+    for ($indiceCandidato = $desde;
+         $indiceCandidato <= $hasta;
+         $indiceCandidato++) {
+
+        /*
+         * Reutilizamos también la regla contextual Yeyuno existente.
+         * Nivel "ambigua" = contexto GI fuerte.
+         */
+        if (!stt_contexto_yeyuno_seguro(
+            $textoOmitido,
+            $indiceCandidato,
+            'ambigua'
+        )) {
+            continue;
+        }
+
+        $firmaOmitida = $extraerFirma(
+            $textoOmitido,
+            $indiceCandidato,
+            false
+        );
+
+        if ($firmaOmitida === null) {
+            continue;
+        }
+
+        /*
+         * Concordancia clínica obligatoria.
+         */
+        if (
+            $firmaExplicita['patron']
+            !== $firmaOmitida['patron']
+        ) {
+            continue;
+        }
+
+        /*
+         * Medida EXACTA.
+         *
+         * 0.31 != 0.32
+         */
+        if (
+            $firmaExplicita['medida']
+            !== $firmaOmitida['medida']
+        ) {
+            continue;
+        }
+
+        /*
+         * Si ambos describen estado, también debe concordar.
+         */
+        if (
+            $firmaExplicita['estado'] !== null
+            && $firmaOmitida['estado'] !== null
+            && $firmaExplicita['estado']
+                !== $firmaOmitida['estado']
+        ) {
+            continue;
+        }
+
+        return [
+            'accion' => 'resuelto',
+            'elegido' => 'Yeyuno',
+            'descartado' => 'omisión de Yeyuno',
+        ];
+    }
+
+    return null;
 }
 
 function concepto_equivalente_contextual(
@@ -1313,6 +1736,113 @@ function numero_decimal_equivalente(
         return null;
     };
 
+        /*
+     * Normaliza una unidad de longitud sin considerar diferencias
+     * gramaticales irrelevantes de singular/plural.
+     *
+     *   centímetro  -> cm
+     *   centímetros -> cm
+     *   cm          -> cm
+     *   milímetro   -> mm
+     *   milímetros  -> mm
+     *   mm          -> mm
+     */
+    $normalizarUnidad = static function (string $unidad): ?string {
+        $unidad = mb_strtolower(
+            trim($unidad, " \t\n\r\0\x0B.,;:"),
+            'UTF-8'
+        );
+
+        $unidad = strtr($unidad, [
+            'á' => 'a',
+            'é' => 'e',
+            'í' => 'i',
+            'ó' => 'o',
+            'ú' => 'u',
+            'ü' => 'u',
+        ]);
+
+        if (preg_match(
+            '/^(?:cm|centimetros?)$/u',
+            $unidad
+        )) {
+            return 'cm';
+        }
+
+        if (preg_match(
+            '/^(?:mm|milimetros?)$/u',
+            $unidad
+        )) {
+            return 'mm';
+        }
+
+        return null;
+    };
+
+    /*
+     * Algunas discrepancias contienen el valor Y la unidad porque
+     * ambos motores difieren también en singular/plural:
+     *
+     *   "un centímetros" / "1 centímetro"
+     *
+     * En ese caso cmp_comparar() agrupa toda la expresión dentro
+     * de la discrepancia y $normalizarValor() por sí sola no basta.
+     *
+     * Extraemos ambos componentes y los normalizamos por separado.
+     */
+    $extraerMedidaDiscrepancia = static function (
+        string $texto
+    ) use (
+        $normalizarValor,
+        $normalizarUnidad
+    ): ?array {
+        $texto = mb_strtolower(
+            trim($texto, " \t\n\r\0\x0B.,;:"),
+            'UTF-8'
+        );
+
+        $texto = strtr($texto, [
+            'á' => 'a',
+            'é' => 'e',
+            'í' => 'i',
+            'ó' => 'o',
+            'ú' => 'u',
+            'ü' => 'u',
+        ]);
+
+        $texto = preg_replace(
+            '/\s+/u',
+            ' ',
+            $texto
+        ) ?? $texto;
+
+        if (!preg_match(
+            '/^(?<valor>.+?)\s+'
+            . '(?<unidad>cm|centimetros?|mm|milimetros?)$/u',
+            $texto,
+            $m
+        )) {
+            return null;
+        }
+
+        $valor = $normalizarValor(
+            (string)$m['valor']
+        );
+
+        $unidad = $normalizarUnidad(
+            (string)$m['unidad']
+        );
+
+        if ($valor === null || $unidad === null) {
+            return null;
+        }
+
+        return [
+            'valor' => $valor,
+            'unidad' => $unidad,
+        ];
+    };
+
     /*
      * Normalizar unidad únicamente cuando está asociada
      * inmediatamente a ESTA discrepancia.
@@ -1462,8 +1992,24 @@ function numero_decimal_equivalente(
         return null;
     };
 
-    $valorA = $normalizarValor($a);
-    $valorB = $normalizarValor($b);
+    /*
+     * Primero intentamos interpretar la discrepancia completa
+     * como valor + unidad.
+     *
+     * Esto cubre:
+     *   "un centímetros" / "1 centímetro"
+     *
+     * Si la unidad quedó fuera de la discrepancia porque ambos
+     * motores coincidieron en ella, usamos el camino histórico.
+     */
+    $medidaA = $extraerMedidaDiscrepancia($a);
+    $medidaB = $extraerMedidaDiscrepancia($b);
+
+    $valorA = $medidaA['valor']
+        ?? $normalizarValor($a);
+
+    $valorB = $medidaB['valor']
+        ?? $normalizarValor($b);
 
     /*
      * Si alguna alternativa no puede interpretarse de forma
@@ -1476,24 +2022,28 @@ function numero_decimal_equivalente(
     /*
      * Igualdad EXACTA.
      *
-     * 0.16 !== 0.17
-     * 51   !== 0.51
+     * No existe ninguna tolerancia:
+     *
+     *   0.16 !== 0.17
+     *   51   !== 0.51
      */
     if ($valorA !== $valorB) {
         return null;
     }
 
-    $unidadA = $extraerUnidad(
-        $textoA,
-        $indiceA,
-        $a
-    );
+    $unidadA = $medidaA['unidad']
+        ?? $extraerUnidad(
+            $textoA,
+            $indiceA,
+            $a
+        );
 
-    $unidadB = $extraerUnidad(
-        $textoB,
-        $indiceB,
-        $b
-    );
+    $unidadB = $medidaB['unidad']
+        ?? $extraerUnidad(
+            $textoB,
+            $indiceB,
+            $b
+        );
 
     /*
      * No normalizamos "un/uno" ni decimales hablados sin una
@@ -1586,9 +2136,24 @@ function numero_decimal_equivalente(
         $descartado = $a . ' / ' . $b;
     }
 
+    /*
+     * Si la propia discrepancia incluía la unidad, conservarla
+     * también en la representación canónica.
+     *
+     * Usamos cm/mm para evitar que diferencias gramaticales
+     * singular/plural sobrevivan a la normalización.
+     */
+    $incluyeUnidadEnDiscrepancia =
+        $medidaA !== null
+        || $medidaB !== null;
+
+    $elegido = $incluyeUnidadEnDiscrepancia
+        ? $valorA . ' ' . $unidadA
+        : $valorA;
+
     return [
         'accion' => 'resuelto',
-        'elegido' => $valorA,
+        'elegido' => $elegido,
         'descartado' => $descartado
     ];
 }
@@ -1761,10 +2326,14 @@ function stt_resolver_coincidencias_comunes(
             . '|yiyuno'
             . '|geyuno'
             . '|digiuno'
+            . '|yeignum'
+            . '|guill[eé]n'
+            . '|guilleno'
             . '|yei[-\s]+uno'
             . '|y\s+1'
             . '|yei\s+1'
             . '|jj\s+un'
+            . '|y\s+hay\s+1'
             . '|en\s+ayuno'
             . '|de\s+ayuno'
             . ')(?![\p{L}\d])/iu';
@@ -2266,6 +2835,36 @@ function org_procesar(
                     : null,
             'alcance' => 'discrepancia',
         ];
+
+        /*
+         * Yeyuno omitido por uno de los motores.
+         *
+         * Se resuelve únicamente cuando el otro motor dice
+         * explícitamente "Yeyuno" y ambos conservan un bloque GI
+         * fuertemente concordante.
+         */
+        $yeyunoOmitido = stt_resolver_omision_yeyuno(
+            $a,
+            $b,
+            $contextoResolucion['indice_a'],
+            $contextoResolucion['indice_b'],
+            $textoA,
+            $textoB
+        );
+
+        if (
+            ($yeyunoOmitido['accion'] ?? '')
+            === 'resuelto'
+        ) {
+            $resueltas[] = array_merge([
+                'elegido' => $yeyunoOmitido['elegido'],
+                'descartado' => $yeyunoOmitido['descartado'],
+                'origen' => 'organo',
+            ], $contextoResolucion);
+
+            continue;
+        }
+
 
         // Resolver primero equivalencias numéricas inequívocas.
         $n = numero_decimal_equivalente(

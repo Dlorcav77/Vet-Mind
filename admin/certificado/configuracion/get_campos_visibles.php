@@ -194,15 +194,20 @@ while ($row = $res->fetch_assoc()) {
 $stmt->close();
 
 $recinto_default = trim((string)($config['recinto_default'] ?? ''));
-$recinto_visible = in_array('recinto', $campos, true);
 
-if (!$recinto_visible && $recinto_default === '') {
+if ($recinto_default !== '') {
+    $campos = array_values(array_filter(
+        $campos,
+        static fn($campo) => $campo !== 'recinto'
+    ));
+} elseif (!in_array('recinto', $campos, true)) {
     $campos[] = 'recinto';
 }
 
 echo json_encode([
     'status' => 'success',
-    'campos' => $campos
+    'campos' => $campos,
+    'recinto_default' => $recinto_default
 ], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
 
 exit;

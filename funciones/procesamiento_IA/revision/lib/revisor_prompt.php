@@ -311,33 +311,76 @@ La ausencia de un atributo en el dictado NO significa que deba eliminarse de la 
 Ejemplo:
 
 PLANTILLA:
-"Vejiga urinaria distendida por contenido anecoico, homogéneo, con sedimento urinario aglomerado"
+"Vejiga urinaria distendida por contenido anecoico, homogéneo"
 
 EVIDENCIA:
 "Vejiga urinaria distendida por contenido anecoico, con sedimento urinario aglomerado"
 
-INFORME INCORRECTO:
+INFORME CORRECTO:
 "Vejiga urinaria distendida por contenido anecoico, con sedimento urinario aglomerado"
 
-Debe reportarse la pérdida de "homogéneo", porque corresponde a un atributo independiente no modificado por la evidencia.
+NO debe reportarse la pérdida de "homogéneo" en este caso.
 
-Regla especial para atributos independientes:
+Regla especial para contenido luminal:
+
+Cuando "homogéneo" describe el contenido luminal de un órgano hueco, especialmente vejiga urinaria o vesícula biliar, NO lo consideres un atributo omitido si la evidencia describe explícitamente material intraluminal ecogénico.
+
+Considera evidencia suficiente:
+
+- sedimento urinario o biliar;
+- barro biliar;
+- material ecogénico;
+- contenido ecogénico;
+- sedimento ecogénico;
+- estructuras ecogénicas o hiperecoicas intraluminales;
+- partículas, material o estructuras ecogénicas suspendidas en el lumen.
+
+En estos casos:
+
+- es correcto conservar "anecoico" si está respaldado por la evidencia;
+- es correcto retirar "homogéneo" heredado desde la plantilla;
+- NO es obligatorio reemplazarlo por "heterogéneo";
+- NO reportes "atributo_plantilla_omitido" únicamente porque desapareció "homogéneo".
+
+Ejemplo:
+
+PLANTILLA:
+"contenido anecoico, homogéneo"
+
+EVIDENCIA:
+"contenido anecoico, con contenido ecogénico moderado y múltiples estructuras hiperecoicas"
+
+INFORME CORRECTO:
+"contenido anecoico, con contenido ecogénico moderado y múltiples estructuras hiperecoicas"
+
+No reportes la pérdida de "homogéneo".
+
+IMPORTANTE:
+Esta excepción aplica al contenido luminal de órganos huecos.
+
+NO extrapoles esta regla a la homogeneidad global del parénquima de órganos sólidos.
+
+Una lesión focal o estructura localizada en hígado, bazo, riñón, páncreas u otro órgano sólido NO elimina automáticamente "homogéneo" del parénquima global.
+
+Fuera de esta excepción luminal, sigue aplicando la regla general:
 
 No asumas que la aparición de un hallazgo adicional elimina automáticamente un atributo previo de la plantilla.
 
-Ejemplo importante:
-- "contenido anecoico, homogéneo" + "sedimento urinario en leve cantidad"
-  NO implica automáticamente eliminar "homogéneo".
-- La presencia de sedimento puede coexistir con la descripción global del contenido.
-- Solo considera reemplazado "homogéneo" si la evidencia describe explícitamente heterogeneidad, contenido no homogéneo, o existe una contradicción clínica directa e inequívoca.
+Solo considera legítima la eliminación de un atributo si:
 
-Por lo tanto, si la plantilla contiene "homogéneo", el dictado agrega sedimento y el informe elimina "homogéneo" sin otra evidencia que lo contradiga, reporta:
+- el dictado reemplazó explícitamente ese mismo atributo;
+- existe un hallazgo incompatible que obliga a retirarlo;
+- el atributo pertenece al mismo valor compuesto que fue redefinido por el dictado;
+- o aplica la excepción de contenido luminal descrita anteriormente.
+
+Si ninguna de estas condiciones se cumple y un atributo de la plantilla desaparece silenciosamente, reporta:
 tipo = "atributo_plantilla_omitido".
 
 NO reportes si:
 - el dictado reemplazó explícitamente ese mismo atributo;
 - existe un hallazgo incompatible que obliga a retirarlo;
-- el atributo pertenece al mismo valor compuesto que fue redefinido por el dictado.
+- el atributo pertenece al mismo valor compuesto que fue redefinido por el dictado;
+- aplica la excepción de contenido luminal con material ecogénico explícito.
 
 3. atributo_no_reemplazado
 
@@ -616,10 +659,12 @@ realiza obligatoriamente estas comprobaciones:
 1. Recorre todos los hallazgos alterados de la interpretación y comprueba que no terminaron normales en el informe.
 
 2. Compara la PLANTILLA BASE contra la evidencia y el INFORME FINAL:
-   - confirma que los atributos explícitamente modificados reemplazaron correctamente el valor anterior;
-   - confirma que los atributos independientes NO modificados ni contradichos permanecieron en el informe;
-   - no consideres eliminado un atributo solo porque apareció otro hallazgo adicional;
-   - presta especial atención a atributos normales de plantilla que desaparecieron silenciosamente, como homogeneidad, bordes, forma, ecogenicidad, relaciones, límites, estratificación o vasculatura.
+    - confirma que los atributos explícitamente modificados reemplazaron correctamente el valor anterior;
+    - confirma que los atributos independientes NO modificados ni contradichos permanecieron en el informe;
+    - no consideres eliminado un atributo solo porque apareció otro hallazgo adicional;
+    - presta especial atención a atributos normales de plantilla que desaparecieron silenciosamente, como homogeneidad, bordes, forma, ecogenicidad, relaciones, límites, estratificación o vasculatura;
+    - excepción: no marques como omisión la pérdida de "homogéneo" del contenido luminal de vejiga o vesícula biliar cuando la evidencia describe sedimento, barro, contenido/material ecogénico o estructuras ecogénicas/hiperecoicas intraluminales;
+    - esta excepción NO aplica a la homogeneidad global del parénquima de órganos sólidos.
 
 3. Comprueba todas las medidas y lateralidades.
 
@@ -628,10 +673,10 @@ realiza obligatoriamente estas comprobaciones:
 5. Revisa las discrepancias STT clínicamente relevantes.
 
 7. COHERENCIA CON FLAGS DEL GENERADOR:
-   - para cada observación del generador, verifica que el contenido clínico asociado del informe sea compatible con la duda expresada;
-   - un flag correctamente existente no suprime una discrepancia si el cuerpo afirma algo que la propia observación deja sin resolver;
-   - si el cuerpo confirma una de dos alternativas mientras la observación mantiene incertidumbre, repórtalo;
-   - si el cuerpo afirma presencia o ausencia mientras la observación mantiene duda entre ambas, repórtalo.
+    - para cada observación del generador, verifica que el contenido clínico asociado del informe sea compatible con la duda expresada;
+    - un flag correctamente existente no suprime una discrepancia si el cuerpo afirma algo que la propia observación deja sin resolver;
+    - si el cuerpo confirma una de dos alternativas mientras la observación mantiene incertidumbre, repórtalo;
+    - si el cuerpo afirma presencia o ausencia mientras la observación mantiene duda entre ambas, repórtalo.
 
 Si después de estas comprobaciones no existe ninguna discrepancia real, devuelve items vacío.
 SYS;

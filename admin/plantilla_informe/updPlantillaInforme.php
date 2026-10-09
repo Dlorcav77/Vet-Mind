@@ -94,6 +94,48 @@ try {
         jexit('error', 'Tipo de examen inválido.');
     }
 
+    $tipoExamenPermitido = false;
+
+    if ($action === 'modificar' && $id > 0) {
+        $stmt = $mysqli->prepare(
+            "SELECT 1
+             FROM plantilla_informe pi
+             INNER JOIN tipo_examen te
+                 ON te.id = ?
+             WHERE pi.id = ?
+               AND pi.veterinario_id = ?
+               AND (
+                   te.veterinario_id IS NULL
+                   OR te.veterinario_id = 1
+                   OR pi.tipo_examen_id = te.id
+               )
+             LIMIT 1"
+        );
+        $stmt->bind_param('iii', $tipoExamenId, $id, $veterinarioId);
+        $stmt->execute();
+        $tipoExamenPermitido = $stmt->get_result()->num_rows > 0;
+        $stmt->close();
+    } else {
+        $stmt = $mysqli->prepare(
+            "SELECT id
+             FROM tipo_examen
+             WHERE id = ?
+               AND (
+                   veterinario_id IS NULL
+                   OR veterinario_id = 1
+               )
+             LIMIT 1"
+        );
+        $stmt->bind_param('i', $tipoExamenId);
+        $stmt->execute();
+        $tipoExamenPermitido = $stmt->get_result()->num_rows > 0;
+        $stmt->close();
+    }
+
+    if (!$tipoExamenPermitido) {
+        jexit('error', 'El tipo de examen no está disponible.');
+    }
+
     if ($action === 'modificar') {
         if ($id <= 0) {
             jexit('error', 'Plantilla inválida.');

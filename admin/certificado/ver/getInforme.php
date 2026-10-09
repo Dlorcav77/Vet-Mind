@@ -108,7 +108,6 @@ $stmt = $mysqli->prepare("
 
     LEFT JOIN tipo_examen te
         ON te.id = pi.tipo_examen_id
-        AND te.veterinario_id = c.veterinario_id
 
     LEFT JOIN certificado_compartidos cc
         ON cc.certificado_id = c.id

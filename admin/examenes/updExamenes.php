@@ -18,10 +18,13 @@ function examen_pertenece_al_veterinario(mysqli $db, int $id, int $veterinarioId
         "SELECT id
          FROM tipo_examen
          WHERE id = ?
-           AND veterinario_id = ?
+           AND (
+               veterinario_id = 1
+               OR veterinario_id IS NULL
+           )
          LIMIT 1"
     );
-    $stmt->bind_param('ii', $id, $veterinarioId);
+    $stmt->bind_param('i', $id);
     $stmt->execute();
     $res = $stmt->get_result();
     $stmt->close();
@@ -69,9 +72,12 @@ try {
         $stmt = $mysqli->prepare(
             "DELETE FROM tipo_examen
              WHERE id = ?
-               AND veterinario_id = ?"
+               AND (
+                   veterinario_id = 1
+                   OR veterinario_id IS NULL
+               )"
         );
-        $stmt->bind_param('ii', $id, $veterinarioId);
+        $stmt->bind_param('i', $id);
         $stmt->execute();
         $stmt->close();
 
@@ -101,10 +107,13 @@ try {
              FROM tipo_examen
              WHERE nombre = ?
                AND id != ?
-               AND veterinario_id = ?
+               AND (
+                   veterinario_id = 1
+                   OR veterinario_id IS NULL
+               )
              LIMIT 1"
         );
-        $stmt->bind_param('sii', $nombre, $id, $veterinarioId);
+        $stmt->bind_param('si', $nombre, $id);
         $stmt->execute();
         $res = $stmt->get_result();
         $stmt->close();
@@ -117,9 +126,12 @@ try {
             "UPDATE tipo_examen
              SET nombre = ?, descripcion = ?, estado = ?, updated_at = NOW()
              WHERE id = ?
-               AND veterinario_id = ?"
+               AND (
+                   veterinario_id = 1
+                   OR veterinario_id IS NULL
+               )"
         );
-        $stmt->bind_param('sssii', $nombre, $descripcion, $estado, $id, $veterinarioId);
+        $stmt->bind_param('sssi', $nombre, $descripcion, $estado, $id);
         $stmt->execute();
         $stmt->close();
 
@@ -132,10 +144,13 @@ try {
             "SELECT id
              FROM tipo_examen
              WHERE nombre = ?
-               AND veterinario_id = ?
+               AND (
+                   veterinario_id = 1
+                   OR veterinario_id IS NULL
+               )
              LIMIT 1"
         );
-        $stmt->bind_param('si', $nombre, $veterinarioId);
+        $stmt->bind_param('s', $nombre);
         $stmt->execute();
         $res = $stmt->get_result();
         $stmt->close();
@@ -144,12 +159,14 @@ try {
             jexit('error', 'Ya existe un tipo de examen con este nombre.');
         }
 
+        $veterinarioCentralId = 1;
+
         $stmt = $mysqli->prepare(
             "INSERT INTO tipo_examen
                 (veterinario_id, nombre, descripcion, estado, created_at, updated_at)
              VALUES (?, ?, ?, ?, NOW(), NOW())"
         );
-        $stmt->bind_param('isss', $veterinarioId, $nombre, $descripcion, $estado);
+        $stmt->bind_param('isss', $veterinarioCentralId, $nombre, $descripcion, $estado);
         $stmt->execute();
         $stmt->close();
 

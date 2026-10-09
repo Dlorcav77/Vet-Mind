@@ -185,7 +185,12 @@ $tipo_estudio       = intval($_POST['tipo_estudio']) ?: null;
 if ($tipo_estudio !== null) {
     $stmtTipo = $mysqli->prepare(
         "SELECT id FROM tipo_examen
-         WHERE id = ? AND veterinario_id = ?
+         WHERE id = ?
+           AND (
+               veterinario_id = ?
+               OR veterinario_id = 1
+               OR veterinario_id IS NULL
+           )
          LIMIT 1"
     );
 
@@ -210,7 +215,7 @@ if ($tipo_estudio !== null) {
     if (!$existeTipo) {
         echo json_encode([
             'status' => 'error',
-            'message' => 'El tipo de estudio no existe o no pertenece al veterinario actual.'
+            'message' => 'El tipo de estudio no existe o no está disponible.'
         ]);
         exit;
     }

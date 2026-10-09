@@ -5,7 +5,7 @@ window.__vmPlantillaContenidoAplicada = window.__vmPlantillaContenidoAplicada ||
     html: ''
 };
 
-function cargarCamposVisiblesPorConfiguracion(configuracionInformeId) {
+function cargarCamposVisiblesPorConfiguracion(configuracionInformeId, aplicarRecintoDefault = true) {
     if (!configuracionInformeId) {
         if (typeof aplicarCamposVisiblesFormulario === 'function') {
             aplicarCamposVisiblesFormulario([]);
@@ -22,11 +22,18 @@ function cargarCamposVisiblesPorConfiguracion(configuracionInformeId) {
             certificado_id: parseInt($('input[name="id"]').val(), 10) || 0
         },
         success: function (res) {
-            // console.log('get_campos_visibles response:', res);
-
             if (res && res.status === 'success') {
                 if (typeof aplicarCamposVisiblesFormulario === 'function') {
                     aplicarCamposVisiblesFormulario(res.campos || []);
+                }
+
+                if (aplicarRecintoDefault) {
+                    const recintoDefault = (res.recinto_default || '').trim();
+                    const $recinto = $('#recinto');
+
+                    if ($recinto.length) {
+                        $recinto.val(recintoDefault).trigger('change');
+                    }
                 }
 
                 setTimeout(vmAjustarLayoutCamposGenerales, 0);
@@ -364,12 +371,23 @@ $(function () {
         }
     })();
 
-    $('#configuracion_informe_id')
+    const $configuracionInforme = $('#configuracion_informe_id');
+
+    $configuracionInforme
         .off('change.certCamposVisibles')
         .on('change.certCamposVisibles', function () {
             const configuracionInformeId = $(this).val() || '';
-            cargarCamposVisiblesPorConfiguracion(configuracionInformeId);
+            cargarCamposVisiblesPorConfiguracion(configuracionInformeId, true);
         });
+
+    const configuracionInformeInicial = $configuracionInforme.val() || '';
+
+    if (configuracionInformeInicial) {
+        cargarCamposVisiblesPorConfiguracion(
+            configuracionInformeInicial,
+            !window.ES_MODIFICAR
+        );
+    }
 
     $('#btnUsarPlantillaContenido')
         .off('click.usarPlantillaContenido')

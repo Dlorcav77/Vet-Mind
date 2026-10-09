@@ -12,17 +12,6 @@
 
 if (!isset($tipos_estudio)) {
     $tipos_estudio = [];
-    $query = "
-        SELECT te.id AS tipo_id, te.nombre AS tipo_nombre, pi.id AS plantilla_id, pi.nombre AS plantilla_nombre
-        FROM tipo_examen te
-        LEFT JOIN plantilla_informe pi 
-            ON pi.tipo_examen_id = te.id
-           AND pi.estado = 'activo'
-           AND pi.deleted_at IS NULL
-        WHERE te.veterinario_id = ?
-        ORDER BY te.nombre ASC, pi.nombre ASC
-    ";
-    $stmt = $mysqli->prepare($query);
 
     $veterinarioTipoExamen = (
         isset($veterinario_contexto) &&
@@ -31,13 +20,30 @@ if (!isset($tipos_estudio)) {
         ? (int)$veterinario_contexto
         : (int)$usuario_id;
 
+    $query = "
+        SELECT
+            te.id AS tipo_id,
+            te.nombre AS tipo_nombre,
+            pi.id AS plantilla_id,
+            pi.nombre AS plantilla_nombre
+        FROM plantilla_informe pi
+        INNER JOIN tipo_examen te
+            ON te.id = pi.tipo_examen_id
+        WHERE pi.veterinario_id = ?
+          AND pi.estado = 'activo'
+          AND pi.deleted_at IS NULL
+          AND te.estado = 'activo'
+        ORDER BY te.nombre ASC, pi.nombre ASC
+    ";
+
+    $stmt = $mysqli->prepare($query);
     $stmt->bind_param("i", $veterinarioTipoExamen);
     $stmt->execute();
     $res = $stmt->get_result();
 
     while ($row = $res->fetch_assoc()) {
-        $tipo_id = $row['tipo_id'];
-        $tipo_nombre = $row['tipo_nombre'];
+        $tipo_id = (int)$row['tipo_id'];
+        $tipo_nombre = (string)$row['tipo_nombre'];
 
         if (!isset($tipos_estudio[$tipo_id])) {
             $tipos_estudio[$tipo_id] = [
@@ -46,12 +52,10 @@ if (!isset($tipos_estudio)) {
             ];
         }
 
-        if (!empty($row['plantilla_id'])) {
-            $tipos_estudio[$tipo_id]['plantillas'][] = [
-                'id' => $row['plantilla_id'],
-                'nombre' => $row['plantilla_nombre']
-            ];
-        }
+        $tipos_estudio[$tipo_id]['plantillas'][] = [
+            'id' => (int)$row['plantilla_id'],
+            'nombre' => (string)$row['plantilla_nombre']
+        ];
     }
 }
 

@@ -524,24 +524,60 @@ No elimines uno de estos atributos solamente porque el dictado agregó otro desc
 
 "Homogéneo", "heterogéneo" y equivalentes describen un atributo propio.
 
-Si la plantilla contiene "homogéneo", consérvalo mientras la evidencia no modifique específicamente la homogeneidad.
+Si la plantilla contiene "homogéneo", consérvalo mientras la evidencia no modifique específicamente la homogeneidad, SALVO la excepción de contenido luminal descrita a continuación.
 
-La presencia de sedimento, material intraluminal, una estructura focal o una lesión localizada NO implica automáticamente que el contenido o parénquima global sea heterogéneo ni obliga a eliminar "homogéneo".
+EXCEPCIÓN — CONTENIDO LUMINAL DE ÓRGANOS HUECOS:
+
+Cuando "homogéneo" describe el contenido luminal de un órgano hueco, especialmente vejiga urinaria o vesícula biliar, NO lo heredes automáticamente desde la plantilla si la evidencia describe explícitamente material intraluminal ecogénico.
+
+Considera evidencia suficiente para eliminar únicamente el atributo "homogéneo" del contenido cuando se describa, en ese mismo contenido luminal, cualquiera de los siguientes:
+
+- sedimento urinario o biliar;
+- barro biliar;
+- material ecogénico;
+- contenido ecogénico;
+- sedimento ecogénico;
+- estructuras ecogénicas o hiperecoicas intraluminales;
+- partículas, material o estructuras ecogénicas suspendidas dentro del lumen.
+
+Esta excepción modifica únicamente la conservación de "homogéneo".
+
+NO conviertas automáticamente el contenido en "heterogéneo".
+NO elimines "anecoico" si "anecoico" está explícitamente respaldado por la evidencia.
+Conserva los demás atributos independientes que no hayan sido modificados.
 
 Ejemplo:
 
 PLANTILLA:
 "contenido anecoico, homogéneo"
 
-DICTADO:
+EVIDENCIA:
 "contenido anecoico, con sedimento urinario en leve cantidad"
 
-RESULTADO:
-conserva "homogéneo" y agrega el sedimento, porque el dictado no modificó explícitamente la homogeneidad.
+RESULTADO CORRECTO:
+"contenido anecoico, con sedimento urinario en leve cantidad"
 
-Solo reemplaza o elimina "homogéneo" cuando:
+RESULTADO INCORRECTO:
+"contenido anecoico, homogéneo, con sedimento urinario en leve cantidad"
+
+Otro ejemplo:
+
+PLANTILLA:
+"contenido anecoico, homogéneo"
+
+EVIDENCIA:
+"contenido anecoico, con contenido ecogénico moderado y múltiples estructuras hiperecoicas"
+
+RESULTADO:
+conserva "anecoico", incorpora el material ecogénico descrito y NO heredes "homogéneo".
+
+Esta excepción se aplica al CONTENIDO LUMINAL, no a la homogeneidad global de órganos sólidos.
+
+Una estructura focal o lesión localizada en hígado, bazo, riñón, páncreas u otro órgano sólido NO obliga por sí sola a eliminar "homogéneo" del parénquima global.
+
+Fuera de la excepción luminal anterior, solo reemplaza o elimina "homogéneo" cuando:
 - la evidencia diga explícitamente "heterogéneo", "no homogéneo" o equivalente;
-- la evidencia entregue un nuevo valor para ese mismo atributo;
+- la evidencia entregue un nuevo valor explícito para ese mismo atributo;
 - exista una incompatibilidad directa e inequívoca que afecte específicamente la homogeneidad global.
 
 No inventes "heterogéneo" para reemplazar "homogéneo" si ninguna fuente lo sustenta.
