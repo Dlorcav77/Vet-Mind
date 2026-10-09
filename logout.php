@@ -1,5 +1,6 @@
 <?php
 
+require_once __DIR__ . '/funciones/conn/conn.php';
 require_once __DIR__ . '/funciones/session/funcionesSesion.php';
 
 iniciarSesionSegura();

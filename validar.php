@@ -175,6 +175,38 @@ $_SESSION['usuario_email']  = $email;
 $_SESSION['perfil_id']      = $perfil_id;
 $_SESSION['ultimo_uso']     = time();
 
+$sessionId = session_id();
+$ip = trim((string)($_SERVER['REMOTE_ADDR'] ?? ''));
+$userAgent = trim((string)($_SERVER['HTTP_USER_AGENT'] ?? ''));
+
+$stmtSesion = $mysqli->prepare(
+    "INSERT INTO usuario_sesiones (
+        usuario_id,
+        session_id,
+        ip,
+        user_agent,
+        iniciada_en,
+        ultima_actividad,
+        cerrada_en
+    ) VALUES (?, ?, ?, ?, NOW(), NOW(), NULL)
+    ON DUPLICATE KEY UPDATE
+        ip = VALUES(ip),
+        user_agent = VALUES(user_agent),
+        ultima_actividad = NOW(),
+        cerrada_en = NULL"
+);
+
+$stmtSesion->bind_param(
+    'isss',
+    $id,
+    $sessionId,
+    $ip,
+    $userAgent
+);
+
+$stmtSesion->execute();
+$stmtSesion->close();
+
 
 // Registrar login en log
 $descripcion_movimiento =

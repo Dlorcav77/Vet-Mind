@@ -67,13 +67,18 @@ try {
     $nombreClinica = trim((string)($_POST['nombre_clinica'] ?? ''));
     $correo = trim((string)($_POST['correo'] ?? ''));
     $correoDb = $correo !== '' ? $correo : null;
+
     $telefono = trim((string)($_POST['telefono'] ?? ''));
+    $telefonoDb = $telefono !== '' ? $telefono : null;
 
     validar_length("Nombre de la clínica", $nombreClinica, 150);
-    validar_length("Teléfono", $telefono, 50, true);
+
+    if ($telefono !== '') {
+        validar_length("Teléfono", $telefono, 30);
+    }
 
     if ($correo !== '') {
-        validar_length("Correo", $correo, 255);
+        validar_length("Correo", $correo, 150);
 
         if (!filter_var($correo, FILTER_VALIDATE_EMAIL)) {
             jexit('error', 'El correo no es válido.');
@@ -110,7 +115,7 @@ try {
              WHERE id = ?
                AND veterinario_id = ?"
         );
-        $stmt->bind_param('sssii', $nombreClinica, $correoDb, $telefono, $id, $veterinarioId);
+        $stmt->bind_param('sssii', $nombreClinica, $correoDb, $telefonoDb, $id, $veterinarioId);
         $stmt->execute();
 
         if ($stmt->affected_rows === 0) {
@@ -163,7 +168,7 @@ try {
                 (veterinario_id, nombre_clinica, correo, telefono, created_at)
              VALUES (?, ?, ?, ?, NOW())"
         );
-        $stmt->bind_param('isss', $veterinarioId, $nombreClinica, $correoDb, $telefono);
+        $stmt->bind_param('isss', $veterinarioId, $nombreClinica, $correoDb, $telefonoDb);
         $stmt->execute();
 
         $newId = (int)$stmt->insert_id;

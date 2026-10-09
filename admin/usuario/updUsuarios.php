@@ -64,13 +64,14 @@ try {
     $email = trim((string)($_POST['email'] ?? ''));
     $estado = trim((string)($_POST['estado'] ?? ''));
     $telefono = trim((string)($_POST['telefono'] ?? ''));
+    $telefonoDb = $telefono !== '' ? $telefono : null;
     $passwordPlano = (string)($_POST['password'] ?? '');
 
     if ($rut !== '') validar_length("Rut", $rut, 12);
     validar_length("Estado", $estado, 50);
     validar_length("Nombres", $nombres, 255);
     validar_length("Apellidos", $apellidos, 255);
-    validar_length("Teléfono", $telefono, 20);
+    if ($telefono !== '') validar_length("Teléfono", $telefono, 20);
     validar_length("email", $email, 255);
 
     if ($action === 'modificar') {
@@ -110,14 +111,14 @@ try {
                  SET rut = ?, nombres = ?, apellidos = ?, email = ?, estado = ?, telefono = ?, password = ?, updated_at = NOW()
                  WHERE id = ?"
             );
-            $stmt->bind_param('sssssssi', $rutDb, $nombres, $apellidos, $email, $estado, $telefono, $password, $id);
+            $stmt->bind_param('sssssssi', $rutDb, $nombres, $apellidos, $email, $estado, $telefonoDb, $password, $id);
         } else {
             $stmt = $mysqli->prepare(
                 "UPDATE usuarios
                  SET rut = ?, nombres = ?, apellidos = ?, email = ?, estado = ?, telefono = ?, updated_at = NOW()
                  WHERE id = ?"
             );
-            $stmt->bind_param('ssssssi', $rutDb, $nombres, $apellidos, $email, $estado, $telefono, $id);
+            $stmt->bind_param('ssssssi', $rutDb, $nombres, $apellidos, $email, $estado, $telefonoDb, $id);
         }
 
         $stmt->execute();
@@ -156,7 +157,7 @@ try {
                          SET estado = ?, nombres = ?, apellidos = ?, telefono = ?, email = ?, password = ?, deleted_at = NULL, updated_at = NOW()
                          WHERE id = ?"
                     );
-                    $stmt->bind_param('ssssssi', $estado, $nombres, $apellidos, $telefono, $email, $password, $id);
+                    $stmt->bind_param('ssssssi', $estado, $nombres, $apellidos, $telefonoDb, $email, $password, $id);
                     $stmt->execute();
                     $stmt->close();
 
@@ -172,7 +173,7 @@ try {
             "INSERT INTO usuarios (rut, estado, nombres, apellidos, telefono, email, password)
              VALUES (?, ?, ?, ?, ?, ?, ?)"
         );
-        $stmt->bind_param('sssssss', $rutDb, $estado, $nombres, $apellidos, $telefono, $email, $password);
+        $stmt->bind_param('sssssss', $rutDb, $estado, $nombres, $apellidos, $telefonoDb, $email, $password);
         $stmt->execute();
         $stmt->close();
 

@@ -103,6 +103,44 @@ function solicitudAjaxSesion(): bool
 
 function cerrarSesionActual(): void
 {
+    $usuarioId = (int)($_SESSION['usuario_id'] ?? 0);
+    $sessionId = session_id();
+
+    if (
+        $usuarioId > 0
+        && $sessionId !== ''
+        && function_exists('conn')
+    ) {
+        try {
+            $mysqli = conn();
+
+            $stmt = $mysqli->prepare(
+                "UPDATE usuario_sesiones
+                 SET cerrada_en = NOW(),
+                     ultima_actividad = NOW()
+                 WHERE usuario_id = ?
+                   AND session_id = ?
+                   AND cerrada_en IS NULL"
+            );
+
+            if ($stmt) {
+                $stmt->bind_param(
+                    'is',
+                    $usuarioId,
+                    $sessionId
+                );
+
+                $stmt->execute();
+                $stmt->close();
+            }
+        } catch (Throwable $e) {
+            error_log(
+                '[cerrarSesionActual] No se pudo cerrar usuario_sesiones: '
+                . $e->getMessage()
+            );
+        }
+    }
+
     $_SESSION = [];
 
     if (ini_get('session.use_cookies')) {

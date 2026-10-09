@@ -8,10 +8,36 @@ credenciales('usuario', 'listar');
 $mysqli = conn();
 global $id_usu, $codsede, $acceso_aplicaciones;
 
-$sel = "SELECT id, rut, nombres, apellidos, email, telefono, estado
-        FROM usuarios 
-        WHERE deleted_at IS NULL 
-        ORDER BY id DESC";
+$sel = "SELECT
+            u.id,
+            u.rut,
+            u.nombres,
+            u.apellidos,
+            u.email,
+            u.telefono,
+            u.estado,
+            MAX(us.ultima_actividad) AS ultima_actividad,
+            SUM(
+                CASE
+                    WHEN us.cerrada_en IS NULL
+                     AND us.ultima_actividad >= (NOW() - INTERVAL 2 MINUTE)
+                    THEN 1
+                    ELSE 0
+                END
+            ) AS conexiones_activas
+        FROM usuarios u
+        LEFT JOIN usuario_sesiones us
+            ON us.usuario_id = u.id
+        WHERE u.deleted_at IS NULL
+        GROUP BY
+            u.id,
+            u.rut,
+            u.nombres,
+            u.apellidos,
+            u.email,
+            u.telefono,
+            u.estado
+        ORDER BY u.id DESC";
 
 
 $stmt = $mysqli->prepare($sel);
@@ -46,6 +72,7 @@ $res = $stmt->get_result();
                   <th>Email</th>
                   <th>Telefono</th>
                   <th>Estado</th>
+                  <th>Conexión</th>
                   <?php if (array_intersect(['modificar', 'eliminar'], $acceso_aplicaciones['usuario'] ?? [])): ?>
                     <th>Acciones</th>
                   <?php endif; ?>
@@ -62,7 +89,11 @@ $res = $stmt->get_result();
                 $apellidos  = $fila['apellidos'];
                 $email      = $fila['email'];
                 $telefono   = $fila['telefono'];
-                $estado     = $fila['estado'];
+                $estado              = $fila['estado'];
+                $ultimaActividad     = $fila['ultima_actividad'] ?? null;
+                $conexionesActivas   = (int)($fila['conexiones_activas'] ?? 0);
+                $estaEnLinea         = $conexionesActivas > 0;
+
                 $cargo      = $fila['cargo'] ?? 'Sin ingresar';
                 $razon_social = $fila['razon_social'] ?? 'Sin ingresar';
                 
@@ -76,6 +107,29 @@ $res = $stmt->get_result();
                   <td><?php print "$email"?></td>
                   <td><?php print $telefono?></td>
                   <td><?php print "$estado"?></td>
+                  <td>
+                    <div class="d-flex align-items-center gap-2">
+                      <?php if ($estaEnLinea): ?>
+                        <span class="badge bg-success">
+                          En línea<?= $conexionesActivas > 1 ? ' · ' . $conexionesActivas : '' ?>
+                        </span>
+                      <?php else: ?>
+                        <span class="badge bg-secondary">
+                          Desconectado
+                        </span>
+                      <?php endif; ?>
+
+                      <button
+                        type="button"
+                        class="btn btn-sm btn-outline-info"
+                        onclick="verActividadUsuario(<?= (int)$id ?>)"
+                        title="Ver actividad"
+                        aria-label="Ver actividad"
+                      >
+                        <i class="fas fa-chart-line"></i>
+                      </button>
+                    </div>
+                  </td>
                   <?php if (array_intersect(['modificar', 'eliminar'], $acceso_aplicaciones['usuario'] ?? [])): ?>
                     <td align='center' ><div class="dropdown position-relative">
                       <button  class="btn btn-outline-info dropdown-toggle" type="button" data-bs-toggle="dropdown" aria-expanded="false">
@@ -104,7 +158,55 @@ $res = $stmt->get_result();
     </div>
   </div>
 </div>
+
+<div class="modal fade" id="modalActividadUsuario" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-xl modal-dialog-scrollable">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title">Actividad de Usuario</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Cerrar"></button>
+      </div>
+
+      <div class="modal-body" id="modalActividadUsuarioBody">
+        <div class="text-center py-4 text-muted">
+          Cargando actividad...
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
 <script>
+function verActividadUsuario(id) {
+  const modalEl = document.getElementById('modalActividadUsuario');
+  const body = document.getElementById('modalActividadUsuarioBody');
+
+  body.innerHTML = `
+    <div class="text-center py-4 text-muted">
+      Cargando actividad...
+    </div>
+  `;
+
+  const modal = bootstrap.Modal.getOrCreateInstance(modalEl);
+  modal.show();
+
+  $.ajax({
+    url: 'usuario/actividad/actividad_modal.php',
+    type: 'GET',
+    data: { id: id },
+    success: function(html) {
+      body.innerHTML = html;
+    },
+    error: function() {
+      body.innerHTML = `
+        <div class="alert alert-danger mb-0">
+          No se pudo cargar la actividad del usuario.
+        </div>
+      `;
+    }
+  });
+}
+
 function confirmDelete(id) {
   Swal.fire({
     title: '¿Estás seguro?',

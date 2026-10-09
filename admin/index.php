@@ -134,6 +134,21 @@ const VETMIND_CSRF_TOKEN = <?= json_encode(
 
 $(document).ready(function() {
 
+    function vetmindHeartbeat() {
+        $.ajax({
+            url: 'usuario/actividad/heartbeat.php',
+            method: 'POST',
+            cache: false
+        });
+    }
+
+    vetmindHeartbeat();
+
+    setInterval(
+        vetmindHeartbeat,
+        45000
+    );
+
     const RUTA_INICIAL = <?= json_encode(
         $rutaInicial,
         JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE

@@ -62,7 +62,7 @@ if($action == "modificar"){
           </div>
           <div class="col-md-6 mb-2">
             <label for="contacto" class="form-label">Telefono</label>
-            <input type="text" class="form-control" id="telefono" name="telefono" maxlength="100" value="<?php echo $fila['telefono']; ?>" required>
+            <input type="text" class="form-control" id="telefono" name="telefono" maxlength="20" value="<?php echo $fila['telefono']; ?>">
           </div>
 
           <div class="col-md-6 mb-2">
