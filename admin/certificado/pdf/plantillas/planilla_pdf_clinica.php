@@ -899,7 +899,7 @@ $filas_campos_clinica = agruparCamposPdfClinicaPorOrden($campos);
             <?= $descripcion ?>
 
             <!-- <div class="saludo">
-                Saluda atentamente a usted.
+                <span style="display:block; margin-top: 16px;">Saluda atentamente a usted.</span>
             </div> -->
         </div>
 

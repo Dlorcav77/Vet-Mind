@@ -27,6 +27,37 @@ $sel = "SELECT
         c.tipo_ingreso,
         c.es_destacado,
         c.destacado_titulo,
+        EXISTS (
+            SELECT 1
+            FROM certificado_compartidos cc_out
+            WHERE cc_out.certificado_id = c.id
+              AND cc_out.tipo_solicitud = 'compartir'
+              AND cc_out.estado = 'pendiente'
+        ) AS tiene_compartir_pendiente,
+
+        EXISTS (
+            SELECT 1
+            FROM certificado_compartidos cc_out
+            WHERE cc_out.certificado_id = c.id
+              AND cc_out.tipo_solicitud = 'compartir'
+              AND cc_out.estado = 'activo'
+        ) AS tiene_compartir_activo,
+
+        EXISTS (
+            SELECT 1
+            FROM certificado_compartidos cc_out
+            WHERE cc_out.certificado_id = c.id
+              AND cc_out.tipo_solicitud = 'clonar'
+              AND cc_out.estado = 'pendiente'
+        ) AS tiene_clonar_pendiente,
+
+        EXISTS (
+            SELECT 1
+            FROM certificado_compartidos cc_out
+            WHERE cc_out.certificado_id = c.id
+              AND cc_out.tipo_solicitud = 'clonar'
+              AND cc_out.estado = 'clonado'
+        ) AS tiene_clonado,
         CASE
             WHEN c.veterinario_id = ? THEN 0
             ELSE 1
@@ -63,6 +94,70 @@ $stmt->bind_param(
 );
 $stmt->execute();
 $res = $stmt->get_result();
+
+/*
+ * Solicitudes pendientes de informes compartidos.
+ * Todavía no forman parte del listado normal hasta ser aceptadas.
+ */
+$stmtPendientes = $mysqli->prepare("
+    SELECT
+        cc.id AS compartido_id,
+        cc.certificado_id,
+        cc.tipo_solicitud,
+        cc.incluir_comentarios,
+        cc.puede_editar,
+        cc.created_at AS compartido_en,
+
+        c.fecha_examen,
+        c.manual_data,
+
+        p.nombre AS paciente,
+        t.nombre_completo AS propietario,
+
+        pi.nombre AS tipo_examen,
+
+        u.nombres AS compartido_por_nombres,
+        u.apellidos AS compartido_por_apellidos,
+        u.email AS compartido_por_email
+
+    FROM certificado_compartidos cc
+
+    INNER JOIN certificados c
+        ON c.id = cc.certificado_id
+       AND c.deleted_at IS NULL
+
+    LEFT JOIN pacientes p
+        ON p.id = c.paciente_id
+
+    LEFT JOIN tutores t
+        ON t.id = p.tutor_id
+
+    LEFT JOIN plantilla_informe pi
+        ON pi.id = c.tipo_estudio
+
+    INNER JOIN usuarios u
+        ON u.id = cc.compartido_por_id
+
+    WHERE cc.usuario_id = ?
+      AND cc.estado = 'pendiente'
+
+    ORDER BY cc.created_at DESC, cc.id DESC
+");
+
+$solicitudesPendientes = [];
+
+if ($stmtPendientes) {
+    $stmtPendientes->bind_param('i', $usuario_id);
+    $stmtPendientes->execute();
+
+    $resPendientes = $stmtPendientes->get_result();
+
+    while ($rowPendiente = $resPendientes->fetch_assoc()) {
+        $solicitudesPendientes[] = $rowPendiente;
+    }
+
+    $stmtPendientes->close();
+}
 ?>
 <link rel="stylesheet" href="certificado/ver/css/ver.css?v=<?= vetmind_asset_version() ?>">
 <link rel="stylesheet" href="certificado/ver/css/notas.css?v=<?= vetmind_asset_version() ?>">
@@ -218,10 +313,199 @@ $res = $stmt->get_result();
         margin-left: 2px;
     }
 
+    .cert-compartido-dot {
+        display: inline-block;
+        width: 7px;
+        height: 7px;
+        margin-left: 5px;
+        border-radius: 50%;
+        vertical-align: middle;
+        cursor: help;
+    }
+
+    .cert-compartido-dot-recibido {
+        background-color: #17a2b8;
+    }
+
+    .cert-compartido-dot-enviado {
+        background-color: #20c997;
+    }
+
+    .cert-compartido-dot-pendiente {
+        background-color: #ffc107;
+    }
+
+    .cert-compartido-dot-clonar-pendiente {
+        background-color: #b58cff;
+    }
+
+    .cert-compartido-dot-clonado {
+        background-color: #6f42c1;
+    }
+
 </style>
 
 <div id="certificado" data-page-id="certificado">
   <h1 class="h3 mb-3"><strong>Informes Generados</strong></h1>
+
+  <?php if (!empty($solicitudesPendientes)): ?>
+    <div class="card border-info mb-3" id="solicitudesCompartidasPendientes">
+      <div class="card-header bg-light">
+        <div class="d-flex align-items-center justify-content-between">
+          <div>
+            <strong>
+              <i class="fas fa-user-friends text-info me-2"></i>
+              Solicitudes de informes
+            </strong>
+
+            <span class="badge bg-info ms-1">
+              <?= count($solicitudesPendientes) ?>
+            </span>
+          </div>
+        </div>
+      </div>
+
+      <div class="card-body py-2">
+
+        <?php foreach ($solicitudesPendientes as $solicitud): ?>
+          <?php
+              $manualPendiente = [];
+
+              if (!empty($solicitud['manual_data'])) {
+                  $manualTmp = json_decode(
+                      (string)$solicitud['manual_data'],
+                      true
+                  );
+
+                  if (is_array($manualTmp)) {
+                      $manualPendiente = $manualTmp;
+                  }
+              }
+
+              $pacientePendiente = trim(
+                  (string)($solicitud['paciente'] ?? '')
+              );
+
+              if ($pacientePendiente === '') {
+                  $pacientePendiente = trim(
+                      (string)($manualPendiente['paciente'] ?? '')
+                  );
+              }
+
+              if ($pacientePendiente === '') {
+                  $pacientePendiente = 'Sin nombre';
+              }
+
+              $propietarioPendiente = trim(
+                  (string)($solicitud['propietario'] ?? '')
+              );
+
+              if ($propietarioPendiente === '') {
+                  $propietarioPendiente = trim(
+                      (string)($manualPendiente['propietario'] ?? '')
+                  );
+              }
+
+              $compartidoPor = trim(
+                  (string)($solicitud['compartido_por_nombres'] ?? '') .
+                  ' ' .
+                  (string)($solicitud['compartido_por_apellidos'] ?? '')
+              );
+
+              if ($compartidoPor === '') {
+                  $compartidoPor =
+                      (string)($solicitud['compartido_por_email'] ?? '');
+              }
+
+              $esSolicitudClonar =
+                  ($solicitud['tipo_solicitud'] ?? 'compartir') === 'clonar';
+          ?>
+
+          <div
+            class="d-flex flex-column flex-md-row align-items-md-center justify-content-between gap-2 py-2 border-bottom solicitud-compartida-pendiente"
+            data-certificado-id="<?= (int)$solicitud['certificado_id'] ?>"
+          >
+            <div>
+              <div class="fw-semibold">
+                <?= htmlspecialchars($pacientePendiente) ?>
+
+                <?php if ($esSolicitudClonar): ?>
+                  <span class="badge bg-info text-dark ms-1">
+                    Clonación pendiente
+                  </span>
+                <?php else: ?>
+                  <span class="badge bg-warning text-dark ms-1">
+                    Compartir pendiente
+                  </span>
+                <?php endif; ?>
+              </div>
+
+              <div class="small text-muted">
+                <?= htmlspecialchars(
+                    $solicitud['tipo_examen'] ?? 'Informe'
+                ) ?>
+
+                <?php if (!empty($solicitud['fecha_examen'])): ?>
+                  · <?= htmlspecialchars(
+                      date(
+                          'd-m-Y',
+                          strtotime($solicitud['fecha_examen'])
+                      )
+                  ) ?>
+                <?php endif; ?>
+
+                <?php if ($propietarioPendiente !== ''): ?>
+                  · <?= htmlspecialchars($propietarioPendiente) ?>
+                <?php endif; ?>
+              </div>
+
+              <div class="small mt-1">
+                <?php if ($esSolicitudClonar): ?>
+                  Solicitud de clonación enviada por
+                  <strong><?= htmlspecialchars($compartidoPor) ?></strong>
+
+                  <?php if ((int)($solicitud['incluir_comentarios'] ?? 0) === 1): ?>
+                    · <span class="text-info">incluye comentarios</span>
+                  <?php endif; ?>
+                <?php else: ?>
+                  Compartido por
+                  <strong><?= htmlspecialchars($compartidoPor) ?></strong>
+
+                  <?php if ((int)$solicitud['puede_editar'] === 1): ?>
+                    · <span class="text-primary">con permiso de edición</span>
+                  <?php endif; ?>
+                <?php endif; ?>
+              </div>
+            </div>
+
+            <div class="d-flex gap-2 flex-shrink-0">
+              <button
+                type="button"
+                class="btn btn-sm btn-outline-danger btn-rechazar-compartido"
+                data-id="<?= (int)$solicitud['certificado_id'] ?>"
+                data-tipo="<?= $esSolicitudClonar ? 'clonar' : 'compartir' ?>"
+              >
+                <i class="fas fa-times me-1"></i>
+                Rechazar
+              </button>
+
+              <button
+                type="button"
+                class="btn btn-sm btn-success btn-aceptar-compartido"
+                data-id="<?= (int)$solicitud['certificado_id'] ?>"
+                data-tipo="<?= $esSolicitudClonar ? 'clonar' : 'compartir' ?>"
+              >
+                <i class="fas fa-check me-1"></i>
+                <?= $esSolicitudClonar ? 'Clonar' : 'Aceptar' ?>
+              </button>
+            </div>
+          </div>
+
+        <?php endforeach; ?>
+
+      </div>
+    </div>
+  <?php endif; ?>
 
   <div class="card">
     <div class="card-header">
@@ -294,7 +578,27 @@ $res = $stmt->get_result();
                     $esCompartido = (
                         isset($fila['es_compartido']) &&
                         (int)$fila['es_compartido'] === 1
-                        );
+                    );
+
+                    $tieneCompartirPendiente = (
+                        !$esCompartido &&
+                        (int)($fila['tiene_compartir_pendiente'] ?? 0) === 1
+                    );
+
+                    $tieneCompartirActivo = (
+                        !$esCompartido &&
+                        (int)($fila['tiene_compartir_activo'] ?? 0) === 1
+                    );
+
+                    $tieneClonarPendiente = (
+                        !$esCompartido &&
+                        (int)($fila['tiene_clonar_pendiente'] ?? 0) === 1
+                    );
+
+                    $tieneClonado = (
+                        !$esCompartido &&
+                        (int)($fila['tiene_clonado'] ?? 0) === 1
+                    );
 
                     $puedeEditarCompartido = (
                         !$esCompartido ||
@@ -371,18 +675,48 @@ $res = $stmt->get_result();
                             <?= htmlspecialchars($paciente) ?>
 
                             <?php if ($esCompartido): ?>
+
                                 <span
-                                    class="badge bg-light text-info border ms-1"
+                                    class="cert-compartido-dot cert-compartido-dot-recibido"
                                     title="<?= htmlspecialchars(
                                         $nombrePropietarioInforme !== ''
-                                            ? 'Compartido por ' . $nombrePropietarioInforme
-                                            : 'Informe compartido',
+                                            ? 'Compartido contigo por ' . $nombrePropietarioInforme
+                                            : 'Informe compartido contigo',
                                         ENT_QUOTES,
                                         'UTF-8'
                                     ) ?>"
-                                >
-                                    Compartido
-                                </span>
+                                ></span>
+
+                            <?php else: ?>
+
+                                <?php if ($tieneCompartirPendiente): ?>
+                                    <span
+                                        class="cert-compartido-dot cert-compartido-dot-pendiente"
+                                        title="Compartir pendiente de aceptación"
+                                    ></span>
+                                <?php endif; ?>
+
+                                <?php if ($tieneCompartirActivo): ?>
+                                    <span
+                                        class="cert-compartido-dot cert-compartido-dot-enviado"
+                                        title="Compartido con otro usuario"
+                                    ></span>
+                                <?php endif; ?>
+
+                                <?php if ($tieneClonarPendiente): ?>
+                                    <span
+                                        class="cert-compartido-dot cert-compartido-dot-clonar-pendiente"
+                                        title="Clonación pendiente de aceptación"
+                                    ></span>
+                                <?php endif; ?>
+
+                                <?php if ($tieneClonado): ?>
+                                    <span
+                                        class="cert-compartido-dot cert-compartido-dot-clonado"
+                                        title="Este informe fue clonado a otro usuario"
+                                    ></span>
+                                <?php endif; ?>
+
                             <?php endif; ?>
                         </span>
                         <?php if (!empty($fila['codigo_paciente'])): ?>

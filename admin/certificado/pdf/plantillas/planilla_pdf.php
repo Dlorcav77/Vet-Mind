@@ -383,7 +383,7 @@ function calcularEdadPdfClasico($fechaNacimientoValor) {
         }
 
         .marca-agua {
-            position: absolute;
+            position: fixed;
             opacity: 0.05;
             width: <?= $marca_width ?>;
             top: 50%;
@@ -395,6 +395,10 @@ function calcularEdadPdfClasico($fechaNacimientoValor) {
     </style>
 </head>
 <body>
+<?php if (!empty($config['marca_agua_url']) && $config['mostrar_marca_agua']): ?>
+    <img src="<?= base64Image($config['marca_agua_url']) ?>" class="marca-agua">
+<?php endif; ?>
+
 <?php if (!empty($config['footer_texto'])): ?>
     <div class="footer-text">
         <?= nl2br(htmlspecialchars($config['footer_texto'])) ?>
@@ -402,10 +406,6 @@ function calcularEdadPdfClasico($fechaNacimientoValor) {
 <?php endif; ?>
 
 <div class="contenido-principal">
-    <?php if (!empty($config['marca_agua_url']) && $config['mostrar_marca_agua']): ?>
-        <img src="<?= base64Image($config['marca_agua_url']) ?>" class="marca-agua">
-    <?php endif; ?>
-
     <div class="header">
         <?php if (!empty($config['logo_url'])): ?>
             <img src="<?= base64Image($config['logo_url']) ?>" alt="Logo">
@@ -466,8 +466,18 @@ function calcularEdadPdfClasico($fechaNacimientoValor) {
         <?php endif; ?>
         <div class="descripcion">
             <?= $descripcion ?>
-            <div style="margin-top: 10px;">Saluda atentamente a usted.</div>
         </div>
+
+        <table style="width:100%; border-collapse:collapse; margin:0; padding:0;">
+            <tr>
+                <td style="height:100px; border:0; padding:0; font-size:1px; line-height:1px;">&nbsp;</td>
+            </tr>
+            <tr>
+                <td style="border:0; padding:0; font-size:13px; line-height:1.15;">
+                    Saluda atentamente a usted.
+                </td>
+            </tr>
+        </table>
     </div>
 
     <div class="firma">
