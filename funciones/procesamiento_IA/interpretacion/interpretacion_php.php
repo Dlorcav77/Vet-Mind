@@ -42,6 +42,18 @@ function interpretacion_procesar_php(string $textoRecibido, ?array $origen = nul
     $correccionesOrganoContextoA = [];
     $correccionesOrganoContextoB = [];
 
+    /*
+     * Fronteras anatómicas dudosas.
+     *
+     * Una discrepancia puede contener un órgano válido en Motor B,
+     * pero una forma corrupta todavía no resuelta en Motor A.
+     *
+     * En ese caso NO elegimos el órgano desde PHP.
+     * Solo impedimos que el fragmento quede absorbido por el órgano
+     * activo anterior.
+     */
+    $fronterasOrganoDudosas = [];
+
     $normalizarClaveAlias = static function (string $valor): string {
         $valor = mb_strtolower(trim($valor), 'UTF-8');
 
@@ -67,10 +79,6 @@ function interpretacion_procesar_php(string $textoRecibido, ?array $origen = nul
             continue;
         }
 
-        if (($correccion['origen'] ?? '') !== 'organo') {
-            continue;
-        }
-
         $elegido = trim(
             (string)($correccion['elegido'] ?? '')
         );
@@ -80,6 +88,30 @@ function interpretacion_procesar_php(string $textoRecibido, ?array $origen = nul
         );
 
         if ($elegido === '' || $descartado === '') {
+            continue;
+        }
+
+        /*
+         * Una corrección STT puede haberse resuelto por la familia
+         * "organo" o por la familia "concepto".
+         *
+         * No confiamos únicamente en esa etiqueta interna:
+         * si el término ELEGIDO corresponde exactamente a un órgano
+         * reconocido por el catálogo anatómico, puede participar en
+         * la segmentación anatómica.
+         *
+         * Esto permite, por ejemplo:
+         *   "y el guion" -> "Yeyuno"
+         * aunque el validador la haya marcado como origen "concepto".
+         *
+         * Una corrección conceptual no anatómica sigue quedando fuera.
+         */
+        $esCorreccionAnatomica = preg_match(
+            '/^(?:' . $patronOrgano . ')$/iu',
+            $elegido
+        ) === 1;
+
+        if (!$esCorreccionAnatomica) {
             continue;
         }
 
@@ -157,6 +189,91 @@ function interpretacion_procesar_php(string $textoRecibido, ?array $origen = nul
         }
     }
 
+        /*
+     * Detectar discrepancias pendientes donde Motor B contiene
+     * inequívocamente un órgano reconocido, mientras Motor A no.
+     *
+     * Ejemplos:
+     *   yeignum        / Yeyuno
+     *   2 deno         / Duodeno
+     *   Riña derecha   / Riñón derecho
+     *   Adrenalina     / Adrenal
+     *
+     * Esto NO resuelve la discrepancia.
+     * Solo crea una frontera estructural en Motor A.
+     */
+    $extraerOrganoAlternativa = static function (
+        string $valor
+    ) use ($patronOrgano): ?string {
+        $valor = trim($valor);
+
+        if ($valor === '') {
+            return null;
+        }
+
+        if (!preg_match(
+            '/^(?:(?:el|la|los|las)\s+)?'
+            . '(' . $patronOrgano . ')'
+            . '(?:\s+(?:izquierd[oa]|derech[oa]))?'
+            . '[\s,.;:]*$/iu',
+            $valor,
+            $m
+        )) {
+            return null;
+        }
+
+        return $m[1] ?? null;
+    };
+
+    foreach (($origen['discrepancias'] ?? []) as $discrepancia) {
+        if (!is_array($discrepancia)) {
+            continue;
+        }
+
+        $indiceA = (
+            array_key_exists('indice_a', $discrepancia)
+            && $discrepancia['indice_a'] !== null
+        )
+            ? (int)$discrepancia['indice_a']
+            : null;
+
+        if ($indiceA === null) {
+            continue;
+        }
+
+        $alternativaA = trim(
+            (string)($discrepancia['a'] ?? '')
+        );
+
+        $alternativaB = trim(
+            (string)($discrepancia['b'] ?? '')
+        );
+
+        if ($alternativaA === '' || $alternativaB === '') {
+            continue;
+        }
+
+        $organoA = $extraerOrganoAlternativa($alternativaA);
+        $organoB = $extraerOrganoAlternativa($alternativaB);
+
+        /*
+         * Solo necesitamos esta frontera cuando Motor A NO reconoce
+         * el órgano y Motor B sí.
+         *
+         * Si Motor A ya contiene un órgano válido, la segmentación
+         * normal puede detectarlo.
+         */
+        if ($organoA !== null || $organoB === null) {
+            continue;
+        }
+
+        $fronterasOrganoDudosas[] = [
+            'indice_a' => $indiceA,
+            'texto_a' => $alternativaA,
+            'organo_alternativo' => $organoB,
+        ];
+    }
+
     $normalizarOrganoDetectado = static function (
         ?string $organo
     ) use ($aliasesOrgano): ?string {
@@ -210,22 +327,70 @@ function interpretacion_procesar_php(string $textoRecibido, ?array $origen = nul
                 continue;
             }
 
-            $token = (string)$tokensAnalisis[0][$indice][0];
-            $offset = (int)$tokensAnalisis[0][$indice][1];
+            /*
+             * La discrepancia resuelta puede ocupar uno o varios tokens.
+             *
+             * Ejemplos:
+             *   "Vaso"       -> Bazo
+             *   "y el guion" -> Yeyuno
+             *
+             * indice_a apunta al PRIMER token de la discrepancia.
+             * Validamos el tramo completo antes de insertar la marca.
+             */
+            $descartadoLocal = trim(
+                (string)($correccionLocal['descartado'] ?? '')
+            );
+
+            if ($descartadoLocal === '') {
+                continue;
+            }
+
+            preg_match_all(
+                '/\S+/u',
+                $descartadoLocal,
+                $tokensDescartadoLocal
+            );
+
+            $cantidadTokensDescartado = count(
+                $tokensDescartadoLocal[0] ?? []
+            );
+
+            if ($cantidadTokensDescartado < 1) {
+                continue;
+            }
+
+            $ultimoIndiceDescartado =
+                $indice + $cantidadTokensDescartado - 1;
+
+            if (!isset($tokensAnalisis[0][$ultimoIndiceDescartado])) {
+                continue;
+            }
+
+            $tramoTokens = [];
+
+            for (
+                $i = $indice;
+                $i <= $ultimoIndiceDescartado;
+                $i++
+            ) {
+                $tramoTokens[] =
+                    (string)$tokensAnalisis[0][$i][0];
+            }
+
+            $tramoTexto = implode(' ', $tramoTokens);
 
             /*
-             * Validación de seguridad:
-             * el token situado en indice_a debe ser realmente
-             * el término descartado.
+             * Seguridad: el tramo situado desde indice_a debe corresponder
+             * exactamente al término descartado de esta corrección.
              */
             if (
-                $normalizarClaveAlias($token)
-                !== $normalizarClaveAlias(
-                    $correccionLocal['descartado']
-                )
+                $normalizarClaveAlias($tramoTexto)
+                !== $normalizarClaveAlias($descartadoLocal)
             ) {
                 continue;
             }
+
+            $offset = (int)$tokensAnalisis[0][$indice][1];
 
             $idMarca = count($marcasOrganoLocales);
 
@@ -258,6 +423,135 @@ function interpretacion_procesar_php(string $textoRecibido, ?array $origen = nul
                 . substr($textoAnalisis, $offset);
         }
     }
+
+        /*
+     * Aplicar fronteras anatómicas pendientes.
+     *
+     * Solo insertamos un salto de línea.
+     * No añadimos __VMORG porque el órgano todavía no fue resuelto.
+     */
+    if (!empty($fronterasOrganoDudosas)) {
+        preg_match_all(
+            '/\S+/u',
+            $textoAnalisis,
+            $tokensFrontera,
+            PREG_OFFSET_CAPTURE
+        );
+
+        $insercionesFrontera = [];
+
+        foreach ($fronterasOrganoDudosas as $frontera) {
+            $indice = $frontera['indice_a'];
+
+            if (!isset($tokensFrontera[0][$indice])) {
+                continue;
+            }
+
+            $textoAlternativa = trim(
+                (string)$frontera['texto_a']
+            );
+
+            preg_match_all(
+                '/\S+/u',
+                $textoAlternativa,
+                $tokensAlternativa
+            );
+
+            $cantidadTokens = count(
+                $tokensAlternativa[0] ?? []
+            );
+
+            if ($cantidadTokens < 1) {
+                continue;
+            }
+
+            $ultimoIndice =
+                $indice + $cantidadTokens - 1;
+
+            if (!isset($tokensFrontera[0][$ultimoIndice])) {
+                continue;
+            }
+
+            $tramo = [];
+
+            for ($i = $indice; $i <= $ultimoIndice; $i++) {
+                $tramo[] =
+                    (string)$tokensFrontera[0][$i][0];
+            }
+
+            if (
+                $normalizarClaveAlias(implode(' ', $tramo))
+                !== $normalizarClaveAlias($textoAlternativa)
+            ) {
+                continue;
+            }
+
+            /*
+             * Un órgano mencionado como complemento o referencia
+             * no representa necesariamente el inicio de un nuevo bloque.
+             *
+             * Ejemplos:
+             *   "proceso ... del linfonódulo"
+             *   "compatible con linfonódulo"
+             *   "respecto al bazo"
+             *
+             * En esos casos conservamos la frase completa.
+             */
+            $tokenAnterior = '';
+
+            if (
+                $indice > 0
+                && isset($tokensFrontera[0][$indice - 1])
+            ) {
+                $tokenAnterior = $normalizarClaveAlias(
+                    (string)$tokensFrontera[0][$indice - 1][0]
+                );
+            }
+
+            if (
+                in_array(
+                    $tokenAnterior,
+                    [
+                        'de',
+                        'del',
+                        'al',
+                        'con',
+                        'respecto',
+                        'hacia',
+                        'sobre',
+                    ],
+                    true
+                )
+            ) {
+                continue;
+            }
+
+            $insercionesFrontera[] =
+                (int)$tokensFrontera[0][$indice][1];
+        }
+
+        rsort($insercionesFrontera);
+
+        foreach ($insercionesFrontera as $offset) {
+            $textoAnalisis =
+                substr($textoAnalisis, 0, $offset)
+                . "\n"
+                . substr($textoAnalisis, $offset);
+        }
+    }
+
+    /*
+     * "vaso conservado" puede corresponder a una estructura independiente
+     * o a una deformación STT todavía no resuelta.
+     *
+     * No debe heredarse automáticamente por el órgano anterior.
+     * Aquí solo creamos una frontera; NO lo convertimos en Bazo.
+     */
+    $textoAnalisis = preg_replace(
+        '/,\s*(?=vasos?\s+conservad[oa]s?\b)/iu',
+        ",\n",
+        $textoAnalisis
+    ) ?? $textoAnalisis;
 
     // Identificar comienzos de órgano después de una coma.
     // No dividir las comas de los números decimales.
@@ -351,6 +645,7 @@ function interpretacion_procesar_php(string $textoRecibido, ?array $origen = nul
             . '|ur[eé]ter\b'
             . '|se\s+observan?\b'
             . '|estratificaci[oó]n\b'
+            . '|patr[oó]n\s+(?:mucoso|gaseoso|l[ií]quido|alimenticio)\b'
             . '|ecogenicidad\b'
             . '|ecotextura\b'
             . '|pared\b'
@@ -365,6 +660,8 @@ function interpretacion_procesar_php(string $textoRecibido, ?array $origen = nul
             . '|par[eé]nquima\b'
             . '|c[aá]psula\b'
             . '|motilidad\b'
+            . '|polo\s+(?:craneal|caudal)\b'
+            . '|lesi[oó]n(?:es)?\s+renal(?:es)?\b'
             . '|(?:la\s+)?capa\s+(?:muscular|submucosa|mucosa)\b'
             . '|con\s+predominio\s+de\s+la\s+capa\b'
             . '|(?:y\s+)?la\s+(?:segunda|tercera|cuarta)\s+estructura\b'
@@ -372,6 +669,129 @@ function interpretacion_procesar_php(string $textoRecibido, ?array $origen = nul
             . ')/iu',
             $fragmento
         );
+    };
+
+    /*
+     * Una frase puede parecer sintácticamente una continuación,
+     * pero contener evidencia fuerte incompatible con el órgano activo.
+     *
+     * Esta función NO intenta descubrir el órgano correcto.
+     * Solo evita herencias anatómicas evidentemente inseguras.
+     *
+     * Ante incompatibilidad se prefiere dejar el fragmento sin asignar.
+     */
+    $esContinuacionCompatibleConOrgano = static function (
+        ?string $organo,
+        string $fragmento
+    ): bool {
+        if ($organo === null || trim($organo) === '') {
+            return false;
+        }
+
+        $fragmento = trim($fragmento);
+        $organoNormalizado = mb_strtolower(
+            trim($organo),
+            'UTF-8'
+        );
+
+        /*
+         * Familias mínimas.
+         *
+         * No se pretende construir aquí una ontología clínica.
+         * Solo distinguir contextos con marcadores suficientemente fuertes.
+         */
+        $esGastrointestinal = preg_match(
+            '/(?:'
+            . 'est[oó]mago'
+            . '|duodeno'
+            . '|yeyuno'
+            . '|[ií]leon'
+            . '|ciego'
+            . '|col[oó]n'
+            . ')/iu',
+            $organoNormalizado
+        ) === 1;
+
+        $esRenal = preg_match(
+            '/ri(?:ñ|n)[oó]n/iu',
+            $organoNormalizado
+        ) === 1;
+
+        $esLinfonodal = preg_match(
+            '/linfon/iu',
+            $organoNormalizado
+        ) === 1;
+
+        /*
+         * Marcadores gastrointestinales fuertes.
+         *
+         * "pared", "grosor" y "contenido" NO se incluyen porque pueden
+         * describir otras estructuras y no bastan para cortar contexto.
+         */
+        $hayContextoGastrointestinalFuerte = preg_match(
+            '/(?:'
+            . '\bmotilidad\b'
+            . '|\bestratificaci[oó]n\b'
+            . '|\bpatr[oó]n\s+(?:mucoso|gaseoso|l[ií]quido|alimenticio)\b'
+            . '|\b(?:la\s+)?capa\s+(?:muscular|submucosa|mucosa)\b'
+            . '|\bcon\s+predominio\s+de\s+la\s+capa\b'
+            . ')/iu',
+            $fragmento
+        ) === 1;
+
+        if (
+            $hayContextoGastrointestinalFuerte
+            && !$esGastrointestinal
+        ) {
+            return false;
+        }
+
+        /*
+         * Marcadores renales suficientemente específicos.
+         *
+         * No usamos palabras genéricas como "medular" o "cortical"
+         * aisladas.
+         */
+        $hayContextoRenalFuerte = preg_match(
+            '/(?:'
+            . '\bpelvis(?:\s+renal)?\b'
+            . '|\b(?:l[ií]mite|relaci[oó]n)\s+'
+            . 'c[oó]rtico[\s-]*medular\b'
+            . '|\blesi[oó]n(?:es)?\s+renal(?:es)?\b'
+            . ')/iu',
+            $fragmento
+        ) === 1;
+
+        if (
+            $hayContextoRenalFuerte
+            && !$esRenal
+        ) {
+            return false;
+        }
+
+        /*
+         * Una lesión descrita explícitamente como compatible con
+         * linfonódulo no debe quedar pegada automáticamente al órgano
+         * anterior.
+         */
+        $hayContextoLinfonodalFuerte = preg_match(
+            '/\bcompatible\s+con\s+'
+            . '(?:(?:un|una)\s+)?'
+            . 'linfon[oó]dul[oa]|'
+            . '\bcompatible\s+con\s+'
+            . '(?:(?:un|una)\s+)?'
+            . 'linfonod[oa]\b/iu',
+            $fragmento
+        ) === 1;
+
+        if (
+            $hayContextoLinfonodalFuerte
+            && !$esLinfonodal
+        ) {
+            return false;
+        }
+
+        return true;
     };
 
     foreach ($fragmentos as $fragmento) {
@@ -599,6 +1019,10 @@ function interpretacion_procesar_php(string $textoRecibido, ?array $origen = nul
             && $cantidadContextosOrgano === 0
             && !$esHallazgoCavitarioIndependiente($fragmento)
             && $esContinuacionContextual($fragmento)
+            && $esContinuacionCompatibleConOrgano(
+                $organoActivo,
+                $fragmento
+            )
         ) {
             $organo = $organoActivo;
             $lateralidad = $lateralidadActiva;
@@ -1795,7 +2219,8 @@ function interpretacion_procesar_php(string $textoRecibido, ?array $origen = nul
         $normalizarOrganoDetectado,
         $normalizarClaveAlias,
         $esHallazgoCavitarioIndependiente,
-        $esContinuacionContextual
+        $esContinuacionContextual,
+        $esContinuacionCompatibleConOrgano
     ): array {
         $termino = trim($termino, " \t\n\r\0\x0B.,;:");
 
@@ -2066,17 +2491,49 @@ function interpretacion_procesar_php(string $textoRecibido, ?array $origen = nul
                 continue;
             }
 
-            $tokenLocal = (string)$tokensTrabajo[0][$indiceLocal][0];
+            $descartadoLocal = trim(
+                (string)($correccionLocal['descartado'] ?? '')
+            );
 
-            /*
-            * Seguridad: la corrección solo vale si en esa posición
-            * realmente está el término descartado.
-            */
+            if ($descartadoLocal === '') {
+                continue;
+            }
+
+            preg_match_all(
+                '/\S+/u',
+                $descartadoLocal,
+                $tokensDescartadoLocal
+            );
+
+            $cantidadTokensDescartadoLocal = count(
+                $tokensDescartadoLocal[0] ?? []
+            );
+
+            if ($cantidadTokensDescartadoLocal < 1) {
+                continue;
+            }
+
+            $ultimoIndiceLocal =
+                $indiceLocal + $cantidadTokensDescartadoLocal - 1;
+
+            if (!isset($tokensTrabajo[0][$ultimoIndiceLocal])) {
+                continue;
+            }
+
+            $tramoLocal = [];
+
+            for (
+                $i = $indiceLocal;
+                $i <= $ultimoIndiceLocal;
+                $i++
+            ) {
+                $tramoLocal[] =
+                    (string)$tokensTrabajo[0][$i][0];
+            }
+
             if (
-                $normalizarClaveAlias($tokenLocal)
-                !== $normalizarClaveAlias(
-                    (string)($correccionLocal['descartado'] ?? '')
-                )
+                $normalizarClaveAlias(implode(' ', $tramoLocal))
+                !== $normalizarClaveAlias($descartadoLocal)
             ) {
                 continue;
             }
@@ -2126,9 +2583,12 @@ function interpretacion_procesar_php(string $textoRecibido, ?array $origen = nul
             * Si la lateralidad viene inmediatamente después
             * del término corregido, conservarla.
             */
-            if (isset($tokensTrabajo[0][$indiceLocal + 1])) {
+            $indiceDespuesCorreccion =
+                $indiceLocal + $cantidadTokensDescartadoLocal;
+
+            if (isset($tokensTrabajo[0][$indiceDespuesCorreccion])) {
                 $tokenSiguiente = trim(
-                    (string)$tokensTrabajo[0][$indiceLocal + 1][0],
+                    (string)$tokensTrabajo[0][$indiceDespuesCorreccion][0],
                     " .,;:"
                 );
 
@@ -2169,6 +2629,58 @@ function interpretacion_procesar_php(string $textoRecibido, ?array $origen = nul
             $lateralidadFinal = $lateralidadRaw;
             $posOrganoFinal = $posOrganoRaw;
         }
+
+                /*
+         * Incluso dentro del mismo segmento, un descriptor fuertemente
+         * incompatible invalida la herencia anatómica.
+         *
+         * Ejemplo:
+         *
+         *   "Adrenal derecha ... 0.4 cm, ... 0.37 cm
+         *    con patrón mucoso, estratificación..."
+         *
+         * Aunque no exista un punto entre ambos bloques, una discrepancia
+         * situada en el segundo no debe heredarse como Adrenal.
+         */
+        $segmentoCompatibilidad = preg_split(
+            '/[.!?;]/u',
+            $desdePosicion,
+            2
+        )[0] ?? $desdePosicion;
+
+        if (
+            $organoFinal !== null
+            && !$esContinuacionCompatibleConOrgano(
+                $organoFinal,
+                $segmentoCompatibilidad
+            )
+        ) {
+            return [
+                'organo' => null,
+                'lateralidad' => null,
+                'distancia_organo' => null,
+                'tipo_contexto' => 'corte_estructural',
+                'contexto' => trim(mb_substr(
+                    $textoTrabajo,
+                    max(0, $pos - 90),
+                    220,
+                    'UTF-8'
+                )),
+                'previo' => trim(mb_substr(
+                    $textoTrabajo,
+                    max(0, $pos - 60),
+                    min(60, $pos),
+                    'UTF-8'
+                )),
+                'continuacion' => mb_substr(
+                    $textoTrabajo,
+                    $pos,
+                    60,
+                    'UTF-8'
+                )
+            ];
+        }
+
 
         /*
         * No permitir que una discrepancia herede un órgano situado

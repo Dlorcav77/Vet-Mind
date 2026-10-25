@@ -928,7 +928,7 @@ if ($action === 'listado') {
     $reqs = [];
     $r = $mysqli->query("
         SELECT id, rid, tipo, certificado_id, flujo_id, plantilla_id, provider, model,
-               total_tokens, cost_usd, created_at
+            input_json, total_tokens, cost_usd, created_at
         FROM ia_requests
         $where
         ORDER BY created_at DESC
@@ -961,9 +961,11 @@ if ($action === 'listado') {
             $grupos[$key] = [
                 'grupo_key'          => $key,
                 'tipo_agrupacion'    => $tipoAgrupacion,
-                'certificado_id'     => $certificadoId,
-                'flujo_id'           => $flujoId,
-                'tiene_transcripcion'=> false,
+                'certificado_id'      => $certificadoId,
+                'flujo_id'            => $flujoId,
+                'paciente_nombre'     => '',
+                'paciente_codigo'     => '',
+                'tiene_transcripcion' => false,
                 'tiene_informe'      => false,
                 'tiene_revision'     => false,
                 'plantilla_id'       => null,
@@ -983,6 +985,27 @@ if ($action === 'listado') {
         $cid = $rq['certificado_id'] !== null ? (int)$rq['certificado_id'] : 0;
         $fid = trim((string)($rq['flujo_id'] ?? ''));
 
+        $pacienteNombreRq = '';
+        $pacienteCodigoRq = '';
+
+        if (!empty($rq['input_json'])) {
+            $inputRq = json_decode((string)$rq['input_json'], true);
+
+            if (is_array($inputRq)) {
+                $pacienteNombreRq = trim(
+                    (string)($inputRq['paciente'] ?? '')
+                );
+
+                $pacienteCodigoRq = trim(
+                    (string)(
+                        $inputRq['codigo_paciente']
+                        ?? $inputRq['cod_paciente']
+                        ?? ''
+                    )
+                );
+            }
+        }
+
         if ($cid > 0) {
             $key = 'cert_' . $cid;
             $crearGrupo($grupos, $key, 'certificado', $cid, $fid !== '' ? $fid : null, $rq['created_at']);
@@ -991,11 +1014,13 @@ if ($action === 'listado') {
             $crearGrupo($grupos, $key, 'flujo', null, $fid, $rq['created_at']);
         } else {
             $sueltos[] = [
-                'grupo'          => 'request',
-                'op_id'          => (int)$rq['id'],
-                'certificado_id' => null,
-                'flujo_id'       => null,
-                'tipo'           => $rq['tipo'],
+                'grupo'           => 'request',
+                'op_id'           => (int)$rq['id'],
+                'certificado_id'  => null,
+                'flujo_id'        => null,
+                'paciente_nombre' => $pacienteNombreRq,
+                'paciente_codigo' => $pacienteCodigoRq,
+                'tipo'            => $rq['tipo'],
                 'detalle'        => trim(($rq['provider'] ?? '').' ('.($rq['model'] ?? '').')'),
                 'plantilla_id'   => $rq['plantilla_id'] !== null ? (int)$rq['plantilla_id'] : null,
                 'tokens'         => (int)$rq['total_tokens'],
@@ -1003,6 +1028,20 @@ if ($action === 'listado') {
                 'created_at'     => $rq['created_at'],
             ];
             continue;
+        }
+
+        if (
+            $grupos[$key]['paciente_nombre'] === ''
+            && $pacienteNombreRq !== ''
+        ) {
+            $grupos[$key]['paciente_nombre'] = $pacienteNombreRq;
+        }
+
+        if (
+            $grupos[$key]['paciente_codigo'] === ''
+            && $pacienteCodigoRq !== ''
+        ) {
+            $grupos[$key]['paciente_codigo'] = $pacienteCodigoRq;
         }
 
         if ($rq['tipo'] === 'informe') {
@@ -1054,6 +1093,112 @@ if ($action === 'listado') {
         $grupos[$key]['tiene_transcripcion'] = true;
         $grupos[$key]['costo'] += (float)$tr['cost_total'];
     }
+
+    /*
+    * Completar paciente desde el certificado cuando exista.
+    * El dato oficial del certificado tiene prioridad sobre input_json.
+    */
+    $certificadosIds = [];
+
+    foreach ($grupos as $g) {
+        $cidGrupo = (int)($g['certificado_id'] ?? 0);
+
+        if ($cidGrupo > 0) {
+            $certificadosIds[$cidGrupo] = true;
+        }
+    }
+
+    $pacientesPorCertificado = [];
+
+    if (!empty($certificadosIds)) {
+        $idsSql = implode(
+            ',',
+            array_map('intval', array_keys($certificadosIds))
+        );
+
+        $resPacientes = $mysqli->query("
+            SELECT
+                c.id AS certificado_id,
+                c.paciente_id,
+                c.manual_data,
+                p.nombre AS paciente_nombre,
+                p.codigo_paciente AS paciente_codigo
+            FROM certificados c
+            LEFT JOIN pacientes p
+                ON p.id = c.paciente_id
+            WHERE c.id IN ($idsSql)
+        ");
+
+        if ($resPacientes) {
+            while ($rowPaciente = $resPacientes->fetch_assoc()) {
+                $certId = (int)$rowPaciente['certificado_id'];
+
+                $pacienteNombre = trim(
+                    (string)($rowPaciente['paciente_nombre'] ?? '')
+                );
+
+                $pacienteCodigo = trim(
+                    (string)($rowPaciente['paciente_codigo'] ?? '')
+                );
+
+                /*
+                * Informes manuales pueden no tener paciente_id,
+                * pero sí conservar el nombre en manual_data.
+                */
+                if (!empty($rowPaciente['manual_data'])) {
+                    $manual = json_decode(
+                        (string)$rowPaciente['manual_data'],
+                        true
+                    );
+
+                    if (is_array($manual)) {
+                        if ($pacienteNombre === '') {
+                            $pacienteNombre = trim(
+                                (string)($manual['paciente'] ?? '')
+                            );
+                        }
+
+                        if ($pacienteCodigo === '') {
+                            $pacienteCodigo = trim(
+                                (string)(
+                                    $manual['codigo_paciente']
+                                    ?? $manual['cod_paciente']
+                                    ?? ''
+                                )
+                            );
+                        }
+                    }
+                }
+
+                $pacientesPorCertificado[$certId] = [
+                    'paciente_nombre' => $pacienteNombre,
+                    'paciente_codigo' => $pacienteCodigo,
+                ];
+            }
+        }
+    }
+
+    foreach ($grupos as &$grupoPaciente) {
+        $certId = (int)($grupoPaciente['certificado_id'] ?? 0);
+
+        if (
+            $certId > 0
+            && isset($pacientesPorCertificado[$certId])
+        ) {
+            $datosPaciente = $pacientesPorCertificado[$certId];
+
+            if ($datosPaciente['paciente_nombre'] !== '') {
+                $grupoPaciente['paciente_nombre'] =
+                    $datosPaciente['paciente_nombre'];
+            }
+
+            if ($datosPaciente['paciente_codigo'] !== '') {
+                $grupoPaciente['paciente_codigo'] =
+                    $datosPaciente['paciente_codigo'];
+            }
+        }
+    }
+    unset($grupoPaciente);
 
     $filas = [];
     foreach ($grupos as $g) {

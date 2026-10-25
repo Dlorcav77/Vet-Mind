@@ -105,6 +105,7 @@ $stmtPendientes = $mysqli->prepare("
         cc.certificado_id,
         cc.tipo_solicitud,
         cc.incluir_comentarios,
+        cc.incluir_alertas,
         cc.puede_editar,
         cc.created_at AS compartido_en,
 
@@ -466,6 +467,10 @@ if ($stmtPendientes) {
 
                   <?php if ((int)($solicitud['incluir_comentarios'] ?? 0) === 1): ?>
                     · <span class="text-info">incluye comentarios</span>
+                  <?php endif; ?>
+
+                  <?php if ((int)($solicitud['incluir_alertas'] ?? 0) === 1): ?>
+                    · <span class="text-info">incluye alertas</span>
                   <?php endif; ?>
                 <?php else: ?>
                   Compartido por

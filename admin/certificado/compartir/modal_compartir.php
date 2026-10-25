@@ -180,6 +180,21 @@
                                     >
                                         Incluir comentarios
                                     </label>
+
+                                    <div class="form-check mt-2">
+                                        <input
+                                            class="form-check-input"
+                                            type="checkbox"
+                                            id="compartir_copia_alertas"
+                                            checked
+                                        >
+                                        <label
+                                            class="form-check-label"
+                                            for="compartir_copia_alertas"
+                                        >
+                                            Incluir alertas
+                                        </label>
+                                    </div>
                                 </div>
                             </div>
                         </div>

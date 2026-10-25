@@ -142,7 +142,7 @@
         destruirDT();
 
         $('#tablaControlIaHead').html('');
-        $('#tablaControlIaBody').html('<tr><td colspan="9" class="text-center py-4"><div class="spinner-border text-info"></div></td></tr>');
+        $('#tablaControlIaBody').html('<tr><td colspan="8" class="text-center py-4"><div class="spinner-border text-info"></div></td></tr>');
 
         $.post(URL, { action: 'listado', modo: modo, rango: rangoActual }, null, 'json')
             .done(function (resp) {
@@ -151,7 +151,7 @@
                 }
 
                 if (!resp || resp.status !== 'success') {
-                    $('#tablaControlIaBody').html('<tr><td colspan="9" class="text-center text-muted py-4">Error al cargar.</td></tr>');
+                    $('#tablaControlIaBody').html('<tr><td colspan="8" class="text-center text-muted py-4">Error al cargar.</td></tr>');
                     return;
                 }
 
@@ -172,7 +172,7 @@
                     return;
                 }
 
-                $('#tablaControlIaBody').html('<tr><td colspan="9" class="text-center text-muted py-4">No se pudo conectar.</td></tr>');
+                $('#tablaControlIaBody').html('<tr><td colspan="8" class="text-center text-muted py-4">No se pudo conectar.</td></tr>');
             });
     }
 
@@ -208,6 +208,31 @@
         return btns;
     }
 
+    function labelPaciente(r) {
+        const nombre = String(r.paciente_nombre || '').trim();
+        const codigo = String(r.paciente_codigo || '').trim();
+
+        if (!nombre && !codigo) {
+            return '<span class="text-muted">—</span>';
+        }
+
+        let html = '';
+
+        if (nombre) {
+            html += '<strong>' + esc(nombre);
+
+            if (codigo) {
+                html += ' <small class="text-muted">' + esc(codigo) + '</small>';
+            }
+
+            html += '</strong>';
+        } else if (codigo) {
+            html += '<small class="text-muted">' + esc(codigo) + '</small>';
+        }
+
+        return html;
+    }
+
     function labelGrupo(g) {
         if (g.certificado_id) {
             return '<strong>#' + esc(g.certificado_id) + '</strong>';
@@ -231,7 +256,7 @@
     // ---------- AGRUPADO ----------
     function pintarAgrupado(grupos, sueltos) {
         const head = '<tr>'
-            + '<th>N</th><th>Certificado</th><th>Contenido</th><th>Plantilla</th>'
+            + '<th>N</th><th>Paciente</th><th>Contenido</th>'
             + '<th>Proveedores</th><th>Tokens</th><th>Costo (USD)</th><th>Fecha</th><th>Acciones</th>'
             + '</tr>';
 
@@ -275,9 +300,8 @@
 
                 filas += '<tr>'
                     + '<td>' + i + '</td>'
-                    + '<td>' + labelGrupo(g) + '</td>'
+                    + '<td>' + labelPaciente(g) + '</td>'
                     + '<td>' + contenido + '</td>'
-                    + '<td>' + (g.plantilla_id != null ? esc(g.plantilla_id) : '-') + '</td>'
                     + '<td>' + esc(provs) + '</td>'
                     + '<td>' + fmtNum(g.tokens) + '</td>'
                     + '<td>' + fmtUsd(g.costo) + '</td>'
@@ -297,9 +321,8 @@
 
             filas += '<tr>'
                 + '<td>' + i + '</td>'
-                + '<td><span class="text-muted">—</span></td>'
+                + '<td>' + labelPaciente(s) + '</td>'
                 + '<td><span class="badge-tipo badge-sininf">Sin informe</span> ' + tipoBadge + '</td>'
-                + '<td>' + (s.plantilla_id != null ? esc(s.plantilla_id) : '-') + '</td>'
                 + '<td>' + esc(s.detalle || '-') + '</td>'
                 + '<td>' + fmtNum(s.tokens) + '</td>'
                 + '<td>' + fmtUsd(s.costo) + '</td>'

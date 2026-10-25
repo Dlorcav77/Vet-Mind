@@ -513,6 +513,7 @@ function stt_tipo_variante_yeyuno(string $valor): ?string
     static $foneticas = [
         'yeyuno',
         'yejuno',
+        'jejuno',
         'yiyuno',
         'geyuno',
         'yeiuno',   // yei-uno
@@ -520,9 +521,11 @@ function stt_tipo_variante_yeyuno(string $valor): ?string
     ];
 
     static $ambiguas = [
-        'y1',        // Y 1
-        'yei1',      // yei 1
-        'jjun',      // JJ un
+        'y1',         // Y 1
+        'yei1',       // yei 1
+        'jjun',       // JJ un
+        'gy1',        // G y 1
+        'yelguion',   // y el guion
 
         /*
          * Variantes observadas clínicamente, pero demasiado
@@ -533,10 +536,20 @@ function stt_tipo_variante_yeyuno(string $valor): ?string
          *
          * Por eso NO pertenecen a $foneticas.
          */
-        'guillen',    // Guillén
-        'guilleno',   // Guilleno
-        'yeignum',    // yeignum
-        'yhay1',      // y hay 1
+        'guillen',     // Guillén
+        'guilleno',    // Guilleno
+        'yeignum',     // yeignum
+        'yhay1',       // y hay 1
+    ];
+
+    /*
+     * "1" aislado es especialmente peligroso.
+     *
+     * Solo puede interpretarse como Yeyuno cuando el OTRO motor
+     * dice literalmente "Yeyuno" y existe contexto GI muy fuerte.
+     */
+    static $muyAmbiguas = [
+        '1',
     ];
 
     static $frasesValidas = [
@@ -550,6 +563,10 @@ function stt_tipo_variante_yeyuno(string $valor): ?string
 
     if (in_array($normalizado, $ambiguas, true)) {
         return 'ambigua';
+    }
+
+    if (in_array($normalizado, $muyAmbiguas, true)) {
+        return 'muy_ambigua';
     }
 
     if (in_array($normalizado, $frasesValidas, true)) {
@@ -632,7 +649,7 @@ function stt_contexto_yeyuno_seguro(
     }
 
     if (preg_match(
-        '/\bpatr[oó]n\s+(?:mucoso|gaseoso)\b/iu',
+        '/\bpatr[oó]n\s+(?:mucoso|gaseoso|l[ií]quido|alimenticio)\b/iu',
         $contexto
     )) {
         $senalesFuertes++;
@@ -646,7 +663,7 @@ function stt_contexto_yeyuno_seguro(
     }
 
     if (preg_match(
-        '/\b(?:duodeno|[ií]leon|colon|col[oó]n)\b/iu',
+        '/\b(?:duodeno|[ií]leon|ciego|colon|col[oó]n)\b/iu',
         $contexto
     )) {
         $senalesFuertes++;
@@ -701,6 +718,19 @@ function stt_contexto_yeyuno_seguro(
         return (
             $senalesFuertes >= 1
             || $tieneMedida
+        );
+    }
+
+    /*
+     * Un "1" aislado requiere evidencia excepcionalmente fuerte.
+     *
+     * Nunca debe convertirse en Yeyuno por una medida aislada
+     * ni por una única palabra gastrointestinal.
+     */
+    if ($tipoVariante === 'muy_ambigua') {
+        return (
+            $senalesFuertes >= 3
+            && $tieneMedida
         );
     }
 
@@ -1185,14 +1215,51 @@ function concepto_equivalente_contextual(
     $tipoYeyunoA = stt_tipo_variante_yeyuno($a);
     $tipoYeyunoB = stt_tipo_variante_yeyuno($b);
 
+    $aEsCanonicoYeyuno = $aNorm === 'yeyuno';
+    $bEsCanonicoYeyuno = $bNorm === 'yeyuno';
+
+    /*
+     * Protección especial para "1".
+     *
+     * No permitimos:
+     *
+     *   1 / yeignum
+     *   1 / y 1
+     *   1 / otra deformación
+     *
+     * Solo:
+     *
+     *   1 / Yeyuno
+     *   Yeyuno / 1
+     */
+    if (
+        $tipoYeyunoA === 'muy_ambigua'
+        || $tipoYeyunoB === 'muy_ambigua'
+    ) {
+        $muyAmbiguaConCanonico =
+            (
+                $tipoYeyunoA === 'muy_ambigua'
+                && $bEsCanonicoYeyuno
+            )
+            ||
+            (
+                $tipoYeyunoB === 'muy_ambigua'
+                && $aEsCanonicoYeyuno
+            );
+
+        if (!$muyAmbiguaConCanonico) {
+            return null;
+        }
+    }
+
     $esFamiliaYeyuno =
         $tipoYeyunoA !== null
         && $tipoYeyunoB !== null
         && $aNorm !== $bNorm;
 
     if ($esFamiliaYeyuno) {
-        $aEsCanonico = $aNorm === 'yeyuno';
-        $bEsCanonico = $bNorm === 'yeyuno';
+        $aEsCanonico = $aEsCanonicoYeyuno;
+        $bEsCanonico = $bEsCanonicoYeyuno;
 
         /*
         * Caso de máxima confianza:
@@ -2323,6 +2390,7 @@ function stt_resolver_coincidencias_comunes(
         */
         $patronYeyuno = '/(?<![\p{L}\d])(?:'
             . 'yejuno'
+            . '|jejuno'
             . '|yiyuno'
             . '|geyuno'
             . '|digiuno'
@@ -2331,9 +2399,11 @@ function stt_resolver_coincidencias_comunes(
             . '|guilleno'
             . '|yei[-\s]+uno'
             . '|y\s+1'
+            . '|g\s+y\s+1'
             . '|yei\s+1'
             . '|jj\s+un'
             . '|y\s+hay\s+1'
+            . '|y\s+el\s+gui[oó]n'
             . '|en\s+ayuno'
             . '|de\s+ayuno'
             . ')(?![\p{L}\d])/iu';

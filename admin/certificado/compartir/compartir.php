@@ -456,6 +456,9 @@ if ($accion === 'guardar') {
     $incluirComentarios =
         !empty($_POST['incluir_comentarios']) ? 1 : 0;
 
+    $incluirAlertas =
+        !empty($_POST['incluir_alertas']) ? 1 : 0;
+
     $marcarFavorito =
         !empty($_POST['favorito']) ? 1 : 0;
 
@@ -509,17 +512,19 @@ if ($accion === 'guardar') {
             puede_ver,
             puede_editar,
             incluir_comentarios,
+            incluir_alertas,
             estado,
             created_at,
             updated_at
         )
-        VALUES (?, ?, ?, ?, 1, ?, ?, 'pendiente', NOW(), NOW())
+        VALUES (?, ?, ?, ?, 1, ?, ?, ?, 'pendiente', NOW(), NOW())
         ON DUPLICATE KEY UPDATE
             compartido_por_id = VALUES(compartido_por_id),
             tipo_solicitud = VALUES(tipo_solicitud),
             puede_ver = 1,
             puede_editar = VALUES(puede_editar),
             incluir_comentarios = VALUES(incluir_comentarios),
+            incluir_alertas = VALUES(incluir_alertas),
             estado = CASE
                 WHEN estado = 'activo'
                      AND tipo_solicitud = 'compartir'
@@ -535,13 +540,14 @@ if ($accion === 'guardar') {
     }
 
     $stmtCompartir->bind_param(
-        "iiisii",
+        "iiisiii",
         $certificadoId,
         $usuarioDestinoId,
         $usuarioId,
         $tipoSolicitud,
         $puedeEditar,
-        $incluirComentarios
+        $incluirComentarios,
+        $incluirAlertas
     );
 
     if (!$stmtCompartir->execute()) {
@@ -679,6 +685,7 @@ if ($accion === 'aceptar' || $accion === 'rechazar') {
             cc.id,
             cc.tipo_solicitud,
             cc.incluir_comentarios,
+            cc.incluir_alertas,
             cc.estado,
 
             c.id AS certificado_origen_id,
@@ -1235,6 +1242,68 @@ if ($accion === 'aceptar' || $accion === 'rechazar') {
             }
 
             $stmtNotas->close();
+        }
+
+        /*
+         * Las alertas visuales se copian de forma independiente
+         * al nuevo certificado cuando el emisor lo solicitó.
+         */
+        if (
+            (int)($solicitud['incluir_alertas'] ?? 0) === 1
+        ) {
+            $stmtAlertas = $mysqli->prepare("
+                INSERT INTO certificado_alertas
+                (
+                    certificado_id,
+                    usuario_id,
+                    organo_clave,
+                    organo_nombre,
+                    alerta_orden,
+                    alerta_json,
+                    created_at,
+                    updated_at
+                )
+                SELECT
+                    ?,
+                    ?,
+                    organo_clave,
+                    organo_nombre,
+                    alerta_orden,
+                    alerta_json,
+                    NOW(),
+                    NOW()
+                FROM certificado_alertas
+                WHERE certificado_id = ?
+                  AND usuario_id = ?
+            ");
+
+            if (!$stmtAlertas) {
+                throw new RuntimeException(
+                    'No se pudieron preparar las alertas.'
+                );
+            }
+
+            $certificadoOrigenId =
+                (int)$solicitud['certificado_origen_id'];
+
+            $propietarioOrigenId =
+                (int)$solicitud['propietario_origen_id'];
+
+            $stmtAlertas->bind_param(
+                'iiii',
+                $nuevoCertificadoId,
+                $usuarioId,
+                $certificadoOrigenId,
+                $propietarioOrigenId
+            );
+
+            if (!$stmtAlertas->execute()) {
+                throw new RuntimeException(
+                    'No se pudieron copiar las alertas.'
+                );
+            }
+
+            $stmtAlertas->close();
         }
 
         $stmtFinal = $mysqli->prepare("

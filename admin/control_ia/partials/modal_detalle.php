@@ -69,7 +69,7 @@
                 </span>
                 <span class="dpill dpill-plantilla">
                   <i class="fas fa-file-alt"></i>
-                  <span class="dpill-k">Plantilla</span><span id="d_plantilla" class="dpill-v">-</span>
+                  <span class="dpill-k">Plantilla-</span><span id="d_plantilla" class="dpill-v">-</span>
                 </span>
                 <span class="dpill dpill-tokens">
                   <i class="fas fa-coins"></i>

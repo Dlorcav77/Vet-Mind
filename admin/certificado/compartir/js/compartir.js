@@ -35,6 +35,9 @@
         $('#compartir_copia_comentarios')
             .prop('checked', true);
 
+        $('#compartir_copia_alertas')
+            .prop('checked', true);
+
         $('#compartir_clonar_comentarios_wrap')
             .addClass('d-none');
 
@@ -763,6 +766,8 @@
                         $('#compartir_puede_editar').is(':checked') ? 1 : 0,
                     incluir_comentarios:
                         $('#compartir_copia_comentarios').is(':checked') ? 1 : 0,
+                    incluir_alertas:
+                        $('#compartir_copia_alertas').is(':checked') ? 1 : 0,
                     favorito:
                         $('#compartir_agregar_usuario').is(':checked') ? 1 : 0
                 },
