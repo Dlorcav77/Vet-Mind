@@ -540,6 +540,9 @@ function stt_tipo_variante_yeyuno(string $valor): ?string
         'guilleno',    // Guilleno
         'yeignum',     // yeignum
         'yhay1',       // y hay 1
+        'hay1',        // hay 1 (la "y" puede quedar fuera de la discrepancia)
+        'yhayuna',     // y hay una
+        'hayuna',      // hay una (la "y" puede quedar fuera de la discrepancia)
     ];
 
     /*
@@ -1298,6 +1301,58 @@ function concepto_equivalente_contextual(
         }
 
         /*
+         * Caso canónico + variante ambigua.
+         *
+         * Si un motor dice literalmente Yeyuno, ambos índices están
+         * alineados y el lado canónico tiene contexto GI fuerte,
+         * permitimos que el lado ambiguo use el umbral de una variante
+         * fonética. Esto evita exigir que un STT corrupto repita todos
+         * los descriptores GI correctamente.
+         */
+        if (
+            abs($indiceA - $indiceB) <= 2
+            && (
+                ($aEsCanonico && $tipoYeyunoB === 'ambigua')
+                || ($bEsCanonico && $tipoYeyunoA === 'ambigua')
+            )
+        ) {
+            $contextoCanonicoSeguro = $aEsCanonico
+                ? stt_contexto_yeyuno_seguro(
+                    $textoA,
+                    $indiceA,
+                    'ambigua'
+                )
+                : stt_contexto_yeyuno_seguro(
+                    $textoB,
+                    $indiceB,
+                    'ambigua'
+                );
+
+            $contextoAmbiguoCompatible = $aEsCanonico
+                ? stt_contexto_yeyuno_seguro(
+                    $textoB,
+                    $indiceB,
+                    'fonetica'
+                )
+                : stt_contexto_yeyuno_seguro(
+                    $textoA,
+                    $indiceA,
+                    'fonetica'
+                );
+
+            if (
+                $contextoCanonicoSeguro
+                && $contextoAmbiguoCompatible
+            ) {
+                return [
+                    'accion' => 'resuelto',
+                    'elegido' => $aEsCanonico ? $a : $b,
+                    'descartado' => $aEsCanonico ? $b : $a
+                ];
+            }
+        }
+
+        /*
         * Para variantes ambiguas o cuando ambos motores están
         * corruptos exigimos contexto GI suficiente en AMBAS
         * transcripciones.
@@ -1668,6 +1723,152 @@ function concepto_validar(
     }
 
     return ['accion' => 'pasa'];
+}
+
+/**
+ * Resuelve exclusivamente "por" <-> "x" cuando ambos motores
+ * describen exactamente la misma medida multidimensional.
+ *
+ * Ejemplos seguros:
+ *   0.38 por 0.18 cm <-> 0.38 x 0.18 cm
+ *   1 cm por 1.2 cm  <-> 1 cm x 1.2 cm
+ *
+ * No se aplica fuera de una estructura numérica de medida.
+ */
+function separador_medida_equivalente(
+    string $a,
+    string $b,
+    ?int $indiceA,
+    ?int $indiceB,
+    string $textoA,
+    string $textoB
+): ?array {
+    if ($indiceA === null || $indiceB === null) {
+        return null;
+    }
+
+    $aNorm = cmp_norm($a);
+    $bNorm = cmp_norm($b);
+
+    $par = [$aNorm, $bNorm];
+    sort($par);
+
+    if ($par !== ['por', 'x']) {
+        return null;
+    }
+
+    $normalizarNumero = static function (string $token): ?string {
+        $token = cmp_norm($token);
+
+        if (in_array($token, ['un', 'una', 'uno'], true)) {
+            return '1';
+        }
+
+        return cmp_es_numero_norm($token)
+            ? $token
+            : null;
+    };
+
+    $normalizarUnidad = static function (string $token): ?string {
+        $token = cmp_norm($token);
+
+        if (in_array(
+            $token,
+            ['cm', 'centimetro', 'centimetros'],
+            true
+        )) {
+            return 'cm';
+        }
+
+        if (in_array(
+            $token,
+            ['mm', 'milimetro', 'milimetros'],
+            true
+        )) {
+            return 'mm';
+        }
+
+        return null;
+    };
+
+    $extraerFirma = static function (
+        string $texto,
+        int $indice
+    ) use (
+        $normalizarNumero,
+        $normalizarUnidad
+    ): ?array {
+        $tokens = cmp_tokens(
+            cmp_pre_limpiar($texto)
+        );
+
+        if (!isset($tokens[$indice])) {
+            return null;
+        }
+
+        /*
+         * Componente derecho:
+         *   por 0.18 cm
+         */
+        $derecha = isset($tokens[$indice + 1])
+            ? $normalizarNumero($tokens[$indice + 1])
+            : null;
+
+        $unidadDerecha = isset($tokens[$indice + 2])
+            ? $normalizarUnidad($tokens[$indice + 2])
+            : null;
+
+        if ($derecha === null || $unidadDerecha === null) {
+            return null;
+        }
+
+        /*
+         * Componente izquierdo:
+         *
+         *   0.38 por
+         *   1 cm por
+         */
+        $izquierda = $indice >= 1
+            ? $normalizarNumero($tokens[$indice - 1])
+            : null;
+
+        if (
+            $izquierda === null
+            && $indice >= 2
+            && $normalizarUnidad($tokens[$indice - 1]) !== null
+        ) {
+            $izquierda = $normalizarNumero(
+                $tokens[$indice - 2]
+            );
+        }
+
+        if ($izquierda === null) {
+            return null;
+        }
+
+        return [
+            'izquierda' => $izquierda,
+            'derecha' => $derecha,
+            'unidad' => $unidadDerecha,
+        ];
+    };
+
+    $firmaA = $extraerFirma($textoA, $indiceA);
+    $firmaB = $extraerFirma($textoB, $indiceB);
+
+    if (
+        $firmaA === null
+        || $firmaB === null
+        || $firmaA !== $firmaB
+    ) {
+        return null;
+    }
+
+    return [
+        'accion' => 'resuelto',
+        'elegido' => $aNorm === 'x' ? $a : $b,
+        'descartado' => $aNorm === 'por' ? $a : $b,
+    ];
 }
 
 /**
@@ -2403,6 +2604,9 @@ function stt_resolver_coincidencias_comunes(
             . '|yei\s+1'
             . '|jj\s+un'
             . '|y\s+hay\s+1'
+            . '|hay\s+1'
+            . '|y\s+hay\s+una'
+            . '|hay\s+una'
             . '|y\s+el\s+gui[oó]n'
             . '|en\s+ayuno'
             . '|de\s+ayuno'
@@ -2951,6 +3155,29 @@ function org_procesar(
             $resueltas[] = array_merge([
                 'elegido' => $n['elegido'],
                 'descartado' => $n['descartado'],
+                'origen' => 'numero',
+            ], $contextoResolucion);
+
+            continue;
+        }
+
+        // Resolver separador multidimensional "por" <-> "x".
+        $separadorMedida = separador_medida_equivalente(
+            $a,
+            $b,
+            $contextoResolucion['indice_a'],
+            $contextoResolucion['indice_b'],
+            $textoA,
+            $textoB
+        );
+
+        if (
+            $separadorMedida !== null
+            && $separadorMedida['accion'] === 'resuelto'
+        ) {
+            $resueltas[] = array_merge([
+                'elegido' => $separadorMedida['elegido'],
+                'descartado' => $separadorMedida['descartado'],
                 'origen' => 'numero',
             ], $contextoResolucion);
 

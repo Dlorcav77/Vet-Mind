@@ -1,5 +1,7 @@
 <?php
 require_once("../../config.php");
+require_once(__DIR__ . "/../../../vendor/autoload.php");
+require_once(__DIR__ . "/../pdf/funcionesCertificado.php");
 
 header('Content-Type: application/json; charset=utf-8');
 
@@ -112,6 +114,150 @@ function copiarArchivoClonSeguro(
         $nombreNuevo;
 }
 
+function generarPdfClonDesdeDatos(
+    array $solicitud,
+    ?string $imagenesJson,
+    int $usuarioDestinoId,
+    array &$archivosCreados
+): string {
+    $raiz = realpath(__DIR__ . '/../../../');
+
+    if ($raiz === false) {
+        throw new RuntimeException(
+            'No se pudo resolver la raíz para regenerar el PDF.'
+        );
+    }
+
+    $directorioRelativo =
+        'uploads/certificados/informes';
+
+    $directorioFisico =
+        $raiz . '/' . $directorioRelativo;
+
+    if (!is_dir($directorioFisico)) {
+        throw new RuntimeException(
+            'No existe el directorio de informes.'
+        );
+    }
+
+    if (!is_writable($directorioFisico)) {
+        throw new RuntimeException(
+            'El directorio de informes no permite escritura.'
+        );
+    }
+
+    $imagenes = [];
+
+    if ($imagenesJson !== null && trim($imagenesJson) !== '') {
+        $tmp = json_decode($imagenesJson, true);
+
+        if (is_array($tmp)) {
+            $imagenes = $tmp;
+        }
+    }
+
+    $propietarioOrigenId =
+        (int)$solicitud['propietario_origen_id'];
+
+    $pacienteOrigenId =
+        !empty($solicitud['paciente_id'])
+            ? (int)$solicitud['paciente_id']
+            : null;
+
+    $configuracionId =
+        $solicitud['configuracion_informe_id'] !== null
+            ? (int)$solicitud['configuracion_informe_id']
+            : null;
+
+    $fechaExamen =
+        (string)($solicitud['fecha_examen'] ?? '');
+
+    $motivo =
+        (string)($solicitud['motivo'] ?? '');
+
+    $contenidoHtml =
+        (string)($solicitud['contenido_html'] ?? '');
+
+    $recinto =
+        (string)($solicitud['recinto'] ?? '');
+
+    $medicoSolicitante =
+        (string)($solicitud['medico_solicitante'] ?? '');
+
+    $manualData =
+        $solicitud['manual_data'] !== null
+            ? (string)$solicitud['manual_data']
+            : null;
+
+    $tipoEstudio =
+        $solicitud['tipo_estudio'] !== null
+            ? (string)$solicitud['tipo_estudio']
+            : null;
+
+    $html = buildInformeHtml(
+        $propietarioOrigenId,
+        $configuracionId,
+        $pacienteOrigenId,
+        $fechaExamen,
+        $motivo,
+        $contenidoHtml,
+        $imagenes,
+        $recinto,
+        $medicoSolicitante,
+        $manualData,
+        $tipoEstudio
+    );
+
+    $pdf = new \Dompdf\Dompdf();
+
+    $options = $pdf->getOptions();
+    $options->set('isRemoteEnabled', false);
+    $pdf->setOptions($options);
+
+    $pdf->loadHtml($html);
+    $pdf->setPaper('A4', 'portrait');
+    $pdf->render();
+
+    $contenidoPdf = $pdf->output();
+
+    if ($contenidoPdf === '') {
+        throw new RuntimeException(
+            'No se pudo regenerar el PDF del informe.'
+        );
+    }
+
+    $nombre =
+        'cert_' .
+        $usuarioDestinoId .
+        '_' .
+        bin2hex(random_bytes(12)) .
+        '.pdf';
+
+    $rutaFisica =
+        $directorioFisico . '/' . $nombre;
+
+    if (
+        file_put_contents(
+            $rutaFisica,
+            $contenidoPdf,
+            LOCK_EX
+        ) === false
+    ) {
+        throw new RuntimeException(
+            'No se pudo guardar el PDF regenerado.'
+        );
+    }
+
+    @chmod($rutaFisica, 0644);
+
+    $rutaRelativa =
+        $directorioRelativo . '/' . $nombre;
+
+    $archivosCreados[] = $rutaRelativa;
+
+    return $rutaRelativa;
+}
+
 function copiarImagenesClonSeguro(
     ?string $imagenesJson,
     int $usuarioDestinoId,
@@ -136,15 +282,23 @@ function copiarImagenesClonSeguro(
             continue;
         }
 
-        $nueva = copiarArchivoClonSeguro(
-            $imagen,
-            'uploads/certificados/img',
-            'clon_' . $usuarioDestinoId . '_'
-        );
+        try {
+            $nueva = copiarArchivoClonSeguro(
+                $imagen,
+                'uploads/certificados/img',
+                'clon_' . $usuarioDestinoId . '_'
+            );
 
-        if ($nueva !== null) {
-            $nuevas[] = $nueva;
-            $archivosCreados[] = $nueva;
+            if ($nueva !== null) {
+                $nuevas[] = $nueva;
+                $archivosCreados[] = $nueva;
+            }
+
+        } catch (RuntimeException $e) {
+            error_log(
+                '[certificado_compartir][clonar][imagen_omitida] ' .
+                $imagen . ' - ' . $e->getMessage()
+            );
         }
     }
 
@@ -1041,24 +1195,9 @@ if ($accion === 'aceptar' || $accion === 'rechazar') {
         }
 
         /*
-         * Copia física independiente del PDF.
-         */
-        $nuevoPdf = null;
-
-        if (!empty($solicitud['archivo_pdf'])) {
-            $nuevoPdf = copiarArchivoClonSeguro(
-                (string)$solicitud['archivo_pdf'],
-                'uploads/certificados/informes',
-                'cert_' . $usuarioId . '_'
-            );
-
-            if ($nuevoPdf !== null) {
-                $archivosCreados[] = $nuevoPdf;
-            }
-        }
-
-        /*
-         * Copia física independiente de imágenes.
+         * Primero copiamos las imágenes disponibles.
+         * Si alguna no existe en este ambiente se omite,
+         * pero la clonación puede continuar.
          */
         $nuevasImagenesJson =
             copiarImagenesClonSeguro(
@@ -1068,6 +1207,43 @@ if ($accion === 'aceptar' || $accion === 'rechazar') {
                 $usuarioId,
                 $archivosCreados
             );
+
+        /*
+         * PDF independiente:
+         *
+         * 1. Si existe físicamente en este ambiente, lo copiamos.
+         * 2. Si no existe, lo regeneramos desde los datos guardados.
+         */
+        $nuevoPdf = null;
+
+        if (!empty($solicitud['archivo_pdf'])) {
+            try {
+                $nuevoPdf = copiarArchivoClonSeguro(
+                    (string)$solicitud['archivo_pdf'],
+                    'uploads/certificados/informes',
+                    'cert_' . $usuarioId . '_'
+                );
+
+                if ($nuevoPdf !== null) {
+                    $archivosCreados[] = $nuevoPdf;
+                }
+
+            } catch (RuntimeException $e) {
+                error_log(
+                    '[certificado_compartir][clonar][pdf_fallback] ' .
+                    $e->getMessage()
+                );
+            }
+        }
+
+        if ($nuevoPdf === null) {
+            $nuevoPdf = generarPdfClonDesdeDatos(
+                $solicitud,
+                $nuevasImagenesJson,
+                $usuarioId,
+                $archivosCreados
+            );
+        }
 
         $stmtCertificado = $mysqli->prepare("
             INSERT INTO certificados
