@@ -19,6 +19,10 @@ function gpt_postprocess_html(string $html, bool $incluir_conclusion, array $ctx
     // 1) Sanitizar: sacar lo que nunca debe llegar al visor del veterinario.
     $html = gpt_sanitizar_html($html);
 
+    // Limpiezas determinísticas de presentación.
+    $html = gpt_eliminar_paciente_inicial($html);
+    $html = gpt_normalizar_cortico_medular($html);
+
     // 2) Quitar conclusión si no venía en el dictado.
     if (!$incluir_conclusion) {
         $html = preg_replace('#<p>\s*<strong>\s*CONCLUSI(Ó|O)N:\s*</strong>\s*<br>\s*.*?</p>#is', '', $html);
@@ -29,6 +33,9 @@ function gpt_postprocess_html(string $html, bool $incluir_conclusion, array $ctx
 
     // 2.5) Marcar los XX sueltos (medidas no dictadas que quedaron en la plantilla).
     $html = gpt_marcar_xx_faltantes($html);
+
+    // Un XX normal de plantilla no constituye una duda clínica.
+    $html = gpt_eliminar_flags_valor_faltante($html);
 
     // 3+4) Renumerar flags y reconstruir observaciones de forma COORDINADA,
     //       emparejando cada flag con la observación del modelo por su número viejo.
@@ -64,6 +71,55 @@ function gpt_sanitizar_html(string $html): string
  *
  * No modifica contenido clínico: solo el tag visual del nombre inicial.
  */
+function gpt_eliminar_paciente_inicial(string $html): string
+{
+    $resultado = preg_replace_callback(
+        '#^\s*(<p\b[^>]*>.*?</p>)#is',
+        static function (array $m): string {
+            $texto = html_entity_decode(
+                strip_tags((string)$m[1]),
+                ENT_QUOTES | ENT_HTML5,
+                'UTF-8'
+            );
+
+            $texto = trim(
+                preg_replace('/\s+/u', ' ', $texto) ?? $texto
+            );
+
+            if (preg_match('/^Paciente\s*:\s*.+$/iu', $texto)) {
+                return '';
+            }
+
+            return (string)$m[1];
+        },
+        $html,
+        1
+    );
+
+    return trim($resultado ?? $html);
+}
+
+function gpt_normalizar_cortico_medular(string $html): string
+{
+    return preg_replace(
+        '/(?<!\p{L})corticomedular(?!\p{L})/iu',
+        'cortico medular',
+        $html
+    ) ?? $html;
+}
+
+function gpt_eliminar_flags_valor_faltante(string $html): string
+{
+    return preg_replace(
+        '#<sup\b'
+        . '(?=[^>]*class=["\'][^"\']*\bflag\b[^"\']*["\'])'
+        . '(?=[^>]*data-tipo=["\']valor_faltante["\'])'
+        . '[^>]*>.*?</sup>#is',
+        '',
+        $html
+    ) ?? $html;
+}
+
 function gpt_normalizar_formato_gastro(string $html): string
 {
     $resultado = preg_replace_callback(
@@ -104,6 +160,25 @@ function gpt_normalizar_formato_gastro(string $html): string
  *      usa la observación del modelo que tenía ese número viejo; si no existe,
  *      genera un placeholder según el tipo.
  */
+function gpt_normalizar_tipo_flag(string $tipo): string
+{
+    $tipo = strtolower(trim($tipo));
+
+    static $permitidos = [
+        'valor_sospechoso',
+        'falta_unidad',
+        'termino_confuso',
+        'incongruencia',
+        'medida_ilegible',
+    ];
+
+    if (in_array($tipo, $permitidos, true)) {
+        return $tipo;
+    }
+
+    return 'termino_confuso';
+}
+
 function gpt_renumerar_y_reparar(string $html): string
 {
     // --- 1) Capturar observaciones del modelo, indexadas por número viejo ---
@@ -133,7 +208,9 @@ function gpt_renumerar_y_reparar(string $html): string
 
             $tipo = 'valor_sospechoso';
             if (preg_match('/data-tipo=["\']([^"\']+)["\']/i', $m[0], $mt)) {
-                $tipo = strtolower($mt[1]);
+                $tipo = gpt_normalizar_tipo_flag(
+                    (string)$mt[1]
+                );
             }
 
             $viejo = 0;
@@ -193,7 +270,9 @@ function gpt_renumerar_flags(string $html): string
             $seq++;
             $tipo = 'valor_sospechoso';
             if (preg_match('/data-tipo=["\']([^"\']+)["\']/i', $m[0], $mt)) {
-                $tipo = $mt[1];
+                $tipo = gpt_normalizar_tipo_flag(
+                    (string)$mt[1]
+                );
             }
             return "<sup class=\"flag\" data-flag=\"{$seq}\" data-tipo=\"{$tipo}\">({$seq})</sup>";
         },
@@ -219,7 +298,9 @@ function gpt_reparar_observaciones(string $html): string
             $n = (int)$f[1];
             $tipo = 'valor_sospechoso';
             if (preg_match('/data-tipo=["\']([^"\']+)["\']/i', $f[0], $mt)) {
-                $tipo = strtolower($mt[1]);
+                $tipo = gpt_normalizar_tipo_flag(
+                    (string)$mt[1]
+                );
             }
             $flags[$n] = $tipo;
         }
@@ -502,7 +583,6 @@ function gpt_placeholder_observacion(int $n, string $tipo): string
         'termino_confuso'  => 'término marcado como posible error de dictado; confirmar.',
         'incongruencia'    => 'posible contradicción en el informe; revisar.',
         'medida_ilegible'  => 'el dictado traía una medida que no se pudo descifrar; revisar el audio original.',
-        'valor_faltante'   => 'el dictado no mencionó esta medida; completar si corresponde.',
     ];
     $txt = $glos[$tipo] ?? 'punto marcado para revisión.';
     return "({$n}) {$tipo} → {$txt}";
@@ -518,19 +598,22 @@ function gpt_placeholder_observacion(int $n, string $tipo): string
  */
 function gpt_marcar_xx_faltantes(string $html): string
 {
-    // 1) XX suelto: viene de la plantilla y no tiene flag.
-    //    Lo resaltamos y creamos valor_faltante.
-    $html = preg_replace_callback(
+    /*
+     * XX de plantilla:
+     * solo resaltado visual; NO genera flag.
+     *
+     * Si el modelo ya puso un flag clínico válido junto al XX,
+     * ese flag se conserva.
+     */
+
+    // XX suelto.
+    $html = preg_replace(
         '/\bXX\b(?!\s*<sup\b[^>]*class=["\']flag)/i',
-        function () {
-            return '<mark class="xx-faltante">XX</mark>'
-                 . '<sup class="flag" data-flag="0" data-tipo="valor_faltante">(0)</sup>';
-        },
+        '<mark class="xx-faltante">XX</mark>',
         $html
     ) ?? $html;
 
-    // 2) XX que YA tiene un flag del modelo (por ejemplo medida_ilegible):
-    //    conserva exactamente ese flag; solo agrega el resaltado visual.
+    // XX con flag existente.
     $html = preg_replace(
         '/\bXX\b(?=\s*<sup\b[^>]*class=["\']flag)/i',
         '<mark class="xx-faltante">XX</mark>',
@@ -539,3 +622,4 @@ function gpt_marcar_xx_faltantes(string $html): string
 
     return $html;
 }
+

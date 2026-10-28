@@ -195,6 +195,182 @@ function org_norm(string $w): string {
 function org_es_organo(string $tok, array $lista): bool { return in_array(org_norm($tok), $lista, true); }
 function org_limpia_borde(string $tok): string { return trim($tok, " .,;:"); }
 
+/**
+ * Resuelve Vaso -> Bazo exclusivamente por ocurrencia y con contexto
+ * esplénico suficiente.
+ *
+ * Un motor debe decir Bazo y el otro Vaso en una posición alineada.
+ * Nunca usa orden de plantilla.
+ */
+function stt_resolver_vaso_bazo_contextual(
+    string $a,
+    string $b,
+    ?int $indiceA,
+    ?int $indiceB,
+    string $textoA,
+    string $textoB
+): ?array {
+    if ($indiceA === null || $indiceB === null) {
+        return null;
+    }
+
+    if (abs($indiceA - $indiceB) > 2) {
+        return null;
+    }
+
+    $extraerInicio = static function (string $valor): ?array {
+        if (!preg_match(
+            '/^\s*(?:el\s+|la\s+)?(vaso|bazo)\b/iu',
+            $valor,
+            $m
+        )) {
+            return null;
+        }
+
+        return [
+            'original' => (string)$m[1],
+            'norm' => org_norm((string)$m[1]),
+        ];
+    };
+
+    $inicioA = $extraerInicio($a);
+    $inicioB = $extraerInicio($b);
+
+    if ($inicioA === null || $inicioB === null) {
+        return null;
+    }
+
+    $par = [$inicioA['norm'], $inicioB['norm']];
+    sort($par);
+
+    if ($par !== ['bazo', 'vaso']) {
+        return null;
+    }
+
+    $contextoEsplenicoSeguro = static function (
+        string $texto,
+        int $indice
+    ): bool {
+        $tokens = cmp_tokens(
+            cmp_pre_limpiar($texto)
+        );
+
+        if (!isset($tokens[$indice])) {
+            return false;
+        }
+
+        /*
+         * Solo miramos hacia adelante desde ESTA ocurrencia.
+         * No heredamos atributos del órgano anterior.
+         */
+        $contexto = implode(
+            ' ',
+            array_slice($tokens, $indice, 18)
+        );
+
+        /*
+         * Protección vascular: "vaso" puede ser clínicamente correcto.
+         */
+        if (preg_match(
+            '/\b(?:'
+            . 'vasos?\s+sangu[ií]neos?'
+            . '|arterias?'
+            . '|venas?'
+            . '|flujo\s+(?:sangu[ií]neo|vascular)'
+            . '|doppler'
+            . ')\b/iu',
+            $contexto
+        )) {
+            return false;
+        }
+
+        /*
+         * Una referencia esplénica explícita basta.
+         */
+        if (preg_match(
+            '/\b(?:'
+            . 'espl[eé]nic[oa]s?'
+            . '|hilio\s+espl[eé]nic[oa]'
+            . '|cola\s+espl[eé]nic[oa]'
+            . '|c[aá]psula\s+espl[eé]nic[oa]'
+            . ')\b/iu',
+            $contexto
+        )) {
+            return true;
+        }
+
+        /*
+         * Sin referencia explícita exigimos al menos dos familias
+         * descriptivas compatibles con un bloque esplénico.
+         */
+        $senales = 0;
+
+        if (preg_match('/\bpar[eé]nquima\b/iu', $contexto)) {
+            $senales++;
+        }
+
+        if (preg_match(
+            '/\bbordes?\s+(?:'
+            . 'aguzad[oa]s?'
+            . '|redondead[oa]s?'
+            . '|regular(?:es)?'
+            . ')\b/iu',
+            $contexto
+        )) {
+            $senales++;
+        }
+
+        if (preg_match(
+            '/\b(?:tamañ[oa]|tamano|aumentad[oa]|conservad[oa])\b/iu',
+            $contexto
+        )) {
+            $senales++;
+        }
+
+        if (preg_match('/\bc[aá]psula\b/iu', $contexto)) {
+            $senales++;
+        }
+
+        if (preg_match(
+            '/\b(?:'
+            . 'ecogenicidad'
+            . '|ecotextura'
+            . '|homog[eé]ne[oa]'
+            . '|heterog[eé]ne[oa]'
+            . '|hipoecoic[oa]'
+            . '|hiperecoic[oa]'
+            . ')\b/iu',
+            $contexto
+        )) {
+            $senales++;
+        }
+
+        if (preg_match(
+            '/\b(?:lesi[oó]n|lesiones|n[oó]dulo|n[oó]dulos)\b/iu',
+            $contexto
+        )) {
+            $senales++;
+        }
+
+        return $senales >= 2;
+    };
+
+    if (
+        !$contextoEsplenicoSeguro($textoA, $indiceA)
+        || !$contextoEsplenicoSeguro($textoB, $indiceB)
+    ) {
+        return null;
+    }
+
+    return [
+        'accion' => 'resuelto',
+        'elegido' => 'Bazo',
+        'descartado' => $inicioA['norm'] === 'vaso'
+            ? $inicioA['original']
+            : $inicioB['original'],
+    ];
+}
+
 function org_validar(
     string $a,
     string $b,
@@ -235,6 +411,17 @@ function org_validar(
     $otroNorm = org_norm($otro);
 
     if ($organoNorm === '' || $otroNorm === '') {
+        return ['accion' => 'pasa'];
+    }
+
+    $parOrgano = [$organoNorm, $otroNorm];
+    sort($parOrgano);
+
+    /*
+     * Vaso/Bazo requiere contexto esplénico.
+     * Nunca se resuelve por similitud léxica genérica.
+     */
+    if ($parOrgano === ['bazo', 'vaso']) {
         return ['accion' => 'pasa'];
     }
 
@@ -308,17 +495,19 @@ function org_validar_inicio_frase(
     $par = [$organoNorm, $otroNorm];
     sort($par);
 
-    $equivalenciaConocida = $par === ['bazo', 'vaso'];
+    /*
+     * Vaso/Bazo solo puede resolverlo la regla contextual específica.
+     */
+    if ($par === ['bazo', 'vaso']) {
+        return ['accion' => 'pasa'];
+    }
 
     $umbralOrgano = max(
         1,
         (int)floor(strlen($organoNorm) / 3)
     );
 
-    if (
-        !$equivalenciaConocida
-        && levenshtein($organoNorm, $otroNorm) > $umbralOrgano
-    ) {
+    if (levenshtein($organoNorm, $otroNorm) > $umbralOrgano) {
         return ['accion' => 'pasa'];
     }
 
@@ -525,7 +714,9 @@ function stt_tipo_variante_yeyuno(string $valor): ?string
         'yei1',       // yei 1
         'jjun',       // JJ un
         'gy1',        // G y 1
+        'gei1',       // GEI1
         'yelguion',   // y el guion
+        'yhilano',    // y hilano
 
         /*
          * Variantes observadas clínicamente, pero demasiado
@@ -1206,6 +1397,67 @@ function concepto_equivalente_contextual(
             'elegido' => $aNorm === 'doppler' ? $a : $b,
             'descartado' => $aNorm === 'doble' ? $a : $b
         ];
+    }
+
+    /*
+     * Variante contextual observada:
+     *
+     *   "y un aumento" / "Yeyuno aumentado"
+     *
+     * No se registra como alias global porque "y un aumento"
+     * puede ser una frase válida fuera de contexto intestinal.
+     *
+     * Solo se resuelve cuando:
+     * - el otro motor dice explícitamente Yeyuno aumentado;
+     * - ambas ocurrencias están alineadas;
+     * - existe contexto GI suficiente en ambos motores.
+     */
+    $aJackYeyuno = preg_match(
+        '/^y\s+un\s+aumento[.,;:]*$/iu',
+        trim($a)
+    ) === 1;
+
+    $bJackYeyuno = preg_match(
+        '/^y\s+un\s+aumento[.,;:]*$/iu',
+        trim($b)
+    ) === 1;
+
+    $aYeyunoAumentado = preg_match(
+        '/^yeyuno\s+aumentad[oa]s?[.,;:]*$/iu',
+        trim($a)
+    ) === 1;
+
+    $bYeyunoAumentado = preg_match(
+        '/^yeyuno\s+aumentad[oa]s?[.,;:]*$/iu',
+        trim($b)
+    ) === 1;
+
+    if (
+        abs($indiceA - $indiceB) <= 2
+        && (
+            ($aJackYeyuno && $bYeyunoAumentado)
+            || ($bJackYeyuno && $aYeyunoAumentado)
+        )
+    ) {
+        $contextoAJack = stt_contexto_yeyuno_seguro(
+            $textoA,
+            $indiceA,
+            $aJackYeyuno ? 'ambigua' : 'fonetica'
+        );
+
+        $contextoBJack = stt_contexto_yeyuno_seguro(
+            $textoB,
+            $indiceB,
+            $bJackYeyuno ? 'ambigua' : 'fonetica'
+        );
+
+        if ($contextoAJack && $contextoBJack) {
+            return [
+                'accion' => 'resuelto',
+                'elegido' => $aYeyunoAumentado ? 'Yeyuno' : 'Yeyuno',
+                'descartado' => $aJackYeyuno ? $a : $b
+            ];
+        }
     }
 
     /*
@@ -2602,7 +2854,9 @@ function stt_resolver_coincidencias_comunes(
             . '|y\s+1'
             . '|g\s+y\s+1'
             . '|yei\s+1'
+            . '|gei\s*1'
             . '|jj\s+un'
+            . '|y\s+hilano'
             . '|y\s+hay\s+1'
             . '|hay\s+1'
             . '|y\s+hay\s+una'
@@ -3179,6 +3433,29 @@ function org_procesar(
                 'elegido' => $separadorMedida['elegido'],
                 'descartado' => $separadorMedida['descartado'],
                 'origen' => 'numero',
+            ], $contextoResolucion);
+
+            continue;
+        }
+
+        // Resolver Vaso/Bazo únicamente con contexto esplénico seguro.
+        $vasoBazo = stt_resolver_vaso_bazo_contextual(
+            $a,
+            $b,
+            $contextoResolucion['indice_a'],
+            $contextoResolucion['indice_b'],
+            $textoA,
+            $textoB
+        );
+
+        if (
+            $vasoBazo !== null
+            && ($vasoBazo['accion'] ?? '') === 'resuelto'
+        ) {
+            $resueltas[] = array_merge([
+                'elegido' => $vasoBazo['elegido'],
+                'descartado' => $vasoBazo['descartado'],
+                'origen' => 'organo',
             ], $contextoResolucion);
 
             continue;

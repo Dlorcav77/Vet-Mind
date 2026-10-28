@@ -262,6 +262,7 @@ function gpt_preparar_interpretacion_prompt(
             'atributo' => $d['atributo'] ?? null,
             'a' => $alternativas[0]['valor'] ?? '',
             'b' => $alternativas[1]['valor'] ?? '',
+            'motivo' => $d['motivo'] ?? 'cambio',
             'prioridad' => $d['prioridad'] ?? 'media',
         ];
 
@@ -562,6 +563,8 @@ No sustituyas automáticamente "reactivo focalizado" por conceptos nuevos como "
 
 No desplaces modificadores durante la redacción.
 
+Modificadores como "aproximadamente", "leve", "moderado", "marcado", "focal" o "difuso" pertenecen exclusivamente al dato, medida, lesión o estructura que modificaban en la evidencia. No los propagues al valor siguiente, no los traslades a otro órgano y no los agregues si la evidencia no los contiene.
+
 Por ejemplo, palabras como:
 "marcado",
 "leve",
@@ -670,6 +673,12 @@ Trabaja atributo por atributo.
 - No mezcles valores alternativos del mismo atributo.
 - Un hallazgo localizado no modifica automáticamente un atributo global del órgano.
 - Una lesión, estructura o masa localizada debe permanecer separada de los atributos globales salvo que la evidencia indique expresamente lo contrario.
+
+- En riñón, no dupliques expresiones clínicamente equivalentes del mismo atributo.
+  Por ejemplo, "imagen pélvica normal", "pelvis renal normal" y "pelvis conservada" pueden representar el mismo estado de la pelvis renal cuando el contexto demuestra que describen el mismo hallazgo.
+  En ese caso redacta UNA sola formulación clínica.
+  Si una de las expresiones aporta una medida válida de la pelvis, conserva esa medida dentro de la formulación consolidada.
+  No elimines datos distintos: esta consolidación solo aplica cuando las frases realmente describen el mismo atributo renal.
 - Si se describe una lesión focal, elimina cualquier frase de la plantilla que afirme ausencia de lesiones focales en ese mismo órgano.
 
 === CONSERVACIÓN DE ATRIBUTOS DE LA PLANTILLA ===
@@ -864,7 +873,12 @@ Si las alternativas A/B apuntan a órganos o conceptos distintos, NO existe evid
 Una alternativa aislada tampoco autoriza asignar el fragmento a un órgano diferente por posición, secuencia o plantilla.
 
 Si NO existe una de esas evidencias, está prohibido asignarlo por posición secuencial, orden de plantilla, medida típica o atributos compatibles.
-En ese caso conserva la incertidumbre y no traslades el fragmento a un órgano específico.
+
+En ese caso no traslades el fragmento a un órgano específico.
+
+Tampoco conviertas esa incertidumbre técnica en frases clínicas como "anatomía no determinada", "localización no precisada", "estructura no determinada" o equivalentes.
+
+Si el fragmento contiene información clínica segura que deba conservarse, escribe únicamente esa información clínica y agrega un flag si corresponde. La explicación de por qué no pudo asignarse anatómicamente pertenece exclusivamente a "Observaciones del Asistente".
 
 Si aparece un órgano extra con posición anatómica conocida, intégralo donde corresponda dentro del informe.
 
@@ -872,7 +886,17 @@ Mantén cada segmento gastrointestinal en su propio párrafo.
 
 Próstata y testículos deben integrarse cerca de la vejiga.
 Estructuras reproductivas femeninas deben mantenerse agrupadas en su orden anatómico.
-Íleon y ciego solo deben aparecer si fueron mencionados explícitamente en la evidencia; si no fueron dictados, elimina sus párrafos de plantilla.
+Una mención anatómica NO equivale automáticamente a evaluación clínica del órgano.
+
+Un órgano mencionado únicamente como referencia, comparación, límite o localización de otra estructura NO autoriza crear ni conservar su párrafo normal de plantilla.
+
+Ejemplo:
+"estructura que abarca desde íleon hasta colon ascendente"
+usa Íleon y Colon únicamente como referencias anatómicas; por sí sola NO demuestra que Íleon ni Colon hayan sido evaluados.
+
+Para crear o conservar la sección propia de Íleon, Ciego u otro órgano opcional debe existir evidencia de que ese órgano fue realmente evaluado como sujeto clínico, no solo mencionado dentro de la descripción de otra estructura.
+
+Íleon y ciego solo deben aparecer como secciones propias cuando hayan sido evaluados explícitamente; si no existe esa evidencia, elimina sus párrafos de plantilla.
 Otros hallazgos sin sección anatómica definida pueden ir en HALLAZGOS ADICIONALES.
 
 === HÍGADO Y BORDES ===
@@ -938,6 +962,22 @@ Esto aplica especialmente a discrepancias como:
 - lesión presente vs lesión ausente;
 - cualquier oposición que pueda cambiar de manera importante la interpretación o conducta clínica.
 
+Pero una contradicción fundamental existe SOLO cuando ambas alternativas son expresiones clínicas interpretables y realmente opuestas.
+
+Si una discrepancia estructurada tiene atributo "polaridad_clinica", una alternativa puede aparecer vacía y la otra contener solamente "no" debido al alineamiento entre transcripciones. En ese caso NO interpretes el vacío como ausencia de evidencia: utiliza obligatoriamente el contexto A/B adjunto para reconstruir las dos afirmaciones completas y determinar la contradicción real.
+
+Una alternativa manifiestamente corrupta, incompleta, sin significado clínico recuperable o que no formula una afirmación clínica válida NO debe tratarse automáticamente como la alternativa opuesta.
+
+Si una fuente contiene una afirmación clínica clara y contextualizada y la otra contiene solamente texto corrupto o no interpretable, conserva la afirmación clínica clara cuando no exista evidencia clínica real que la contradiga.
+
+Ejemplo:
+- una fuente: "uréter no visible";
+- otra fuente: fragmento STT corrupto que no afirma que el uréter sea visible.
+
+En ese caso NO escribas "visibilidad del uréter por confirmar" ni conviertas el caso en visible vs no visible. Conserva "No se visualiza uréter" si el contexto anatómico es inequívoco.
+
+En cambio, si una fuente dice inequívocamente "uréter visible" y la otra "uréter no visible", sí existe una contradicción fundamental y deben aplicarse las reglas de contradicción.
+
 Ejemplo:
 
 Motor A:
@@ -959,14 +999,13 @@ Cuando exista una contradicción fundamental:
 
 2. si existe, conserva únicamente ese núcleo neutral y agrega el flag;
 
-3. si no existe una afirmación clínica segura, utiliza una formulación mínima y explícitamente NO afirmativa que identifique qué dato requiere confirmación.
+3. si no existe una afirmación clínica segura, NO escribas una frase de incertidumbre técnica dentro del cuerpo del informe.
 
-Ejemplo seguro:
-"Presencia de masas abdominales por confirmar<sup class="flag" data-flag="N" data-tipo="incongruencia">(N)</sup>"
+Conserva únicamente, si existe, el término, valor o núcleo clínico mínimo que sí esté sustentado y coloca el flag inmediatamente después.
 
-Esta formulación NO afirma presencia ni ausencia.
+Si no existe ningún dato clínico seguro que pueda escribirse, NO inventes una frase clínica para sostener la duda. Explica el conflicto únicamente en "Observaciones del Asistente".
 
-La Observación del Asistente debe explicar las dos alternativas reales.
+La Observación del Asistente debe explicar las alternativas reales cuando corresponda.
 
 No ocultes una contradicción fundamental seleccionando silenciosamente:
 - la alternativa positiva;
@@ -981,9 +1020,26 @@ Para dudas que NO cambian presencia/ausencia ni polaridad fundamental:
 - coloca el flag inmediatamente después del término, valor o frase mínima afectada;
 - explica la causa de la duda únicamente en "Observaciones del Asistente".
 
-No incluyas razonamientos extensos sobre la transcripción dentro del cuerpo.
+REGLA DURA DE SEPARACIÓN ENTRE INFORME Y RAZONAMIENTO:
 
-La formulación neutral "por confirmar" queda reservada para contradicciones clínicas fundamentales donde afirmar cualquiera de las alternativas sería inseguro.
+El cuerpo del informe contiene SOLO información clínica.
+
+Está PROHIBIDO escribir dentro del cuerpo frases que describan el estado interno de interpretación, incertidumbre técnica o razonamiento del sistema, incluyendo formulaciones como:
+
+- "por confirmar";
+- "anatomía no determinada";
+- "localización anatómica no determinada";
+- "localización no precisada";
+- "estructura de anatomía no determinada";
+- "medida no resuelta";
+- "dato no resuelto";
+- "visibilidad por confirmar";
+- "no fue posible determinar";
+- referencias a Motor A, Motor B, STT, PHP, discrepancias, alternativas o al proceso de interpretación.
+
+Estas explicaciones pertenecen exclusivamente a "Observaciones del Asistente" y deben estar vinculadas al flag correspondiente cuando exista uno.
+
+Un flag marca el punto clínico afectado; la explicación del problema nunca debe convertirse en parte de la prosa clínica.
 
 No uses flags simplemente porque la transcripción original esté mal escrita si su significado puede recuperarse inequívocamente.
 

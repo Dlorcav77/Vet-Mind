@@ -190,6 +190,131 @@ function interpretacion_procesar_php(string $textoRecibido, ?array $origen = nul
     }
 
         /*
+     * Una ocurrencia resuelta por STT no puede seguir pendiente.
+     *
+     * Filtramos por identidad LOCAL de la discrepancia:
+     * - indice_a;
+     * - indice_b;
+     * - alternativa original de Motor A;
+     * - alternativa original de Motor B.
+     *
+     * No se filtra por texto global, porque una misma palabra puede
+     * aparecer legítimamente en varias posiciones del dictado.
+     */
+    if (
+        $origen !== null
+        && !empty($origen['resueltas'])
+        && !empty($origen['discrepancias'])
+    ) {
+        $clavesResueltas = [];
+
+        foreach ($origen['resueltas'] as $resuelta) {
+            if (!is_array($resuelta)) {
+                continue;
+            }
+
+            $indiceAResuelto = (
+                array_key_exists('indice_a', $resuelta)
+                && $resuelta['indice_a'] !== null
+            )
+                ? (int)$resuelta['indice_a']
+                : null;
+
+            $indiceBResuelto = (
+                array_key_exists('indice_b', $resuelta)
+                && $resuelta['indice_b'] !== null
+            )
+                ? (int)$resuelta['indice_b']
+                : null;
+
+            $normalizarClaveLocal = static function (
+                string $valor
+            ): string {
+                return mb_strtolower(
+                    trim(
+                        $valor,
+                        " \\t\\n\\r\\0\\x0B.,;:"
+                    ),
+                    'UTF-8'
+                );
+            };
+
+            $motorAResuelto = $normalizarClaveLocal(
+                (string)($resuelta['motor_a'] ?? '')
+            );
+
+            $motorBResuelto = $normalizarClaveLocal(
+                (string)($resuelta['motor_b'] ?? '')
+            );
+
+            if (
+                $indiceAResuelto === null
+                && $indiceBResuelto === null
+            ) {
+                continue;
+            }
+
+            $clave = json_encode(
+                [
+                    $indiceAResuelto,
+                    $indiceBResuelto,
+                    $motorAResuelto,
+                    $motorBResuelto,
+                ],
+                JSON_UNESCAPED_UNICODE
+                | JSON_UNESCAPED_SLASHES
+            );
+
+            $clavesResueltas[$clave] = true;
+        }
+
+        $origen['discrepancias'] = array_values(
+            array_filter(
+                $origen['discrepancias'],
+                static function (mixed $discrepancia) use (
+                    $clavesResueltas,
+                    $normalizarClaveLocal
+                ): bool {
+                    if (!is_array($discrepancia)) {
+                        return true;
+                    }
+
+                    $indiceA = (
+                        array_key_exists('indice_a', $discrepancia)
+                        && $discrepancia['indice_a'] !== null
+                    )
+                        ? (int)$discrepancia['indice_a']
+                        : null;
+
+                    $indiceB = (
+                        array_key_exists('indice_b', $discrepancia)
+                        && $discrepancia['indice_b'] !== null
+                    )
+                        ? (int)$discrepancia['indice_b']
+                        : null;
+
+                    $clave = json_encode(
+                        [
+                            $indiceA,
+                            $indiceB,
+                            $normalizarClaveLocal(
+                                (string)($discrepancia['a'] ?? '')
+                            ),
+                            $normalizarClaveLocal(
+                                (string)($discrepancia['b'] ?? '')
+                            ),
+                        ],
+                        JSON_UNESCAPED_UNICODE
+                        | JSON_UNESCAPED_SLASHES
+                    );
+
+                    return !isset($clavesResueltas[$clave]);
+                }
+            )
+        );
+    }
+
+    /*
      * Detectar discrepancias pendientes donde Motor B contiene
      * inequívocamente un órgano reconocido, mientras Motor A no.
      *
@@ -519,6 +644,8 @@ function interpretacion_procesar_php(string $textoRecibido, ?array $origen = nul
                         'respecto',
                         'hacia',
                         'sobre',
+                        'desde',
+                        'hasta',
                     ],
                     true
                 )
@@ -644,6 +771,8 @@ function interpretacion_procesar_php(string $textoRecibido, ?array $origen = nul
             . 'imagen\s+p[eé]lvica\b'
             . '|ur[eé]ter\b'
             . '|se\s+observan?\b'
+            . '|segmento\s+(?:m[aá]s\s+)?(?:hacia\s+)?(?:la\s+)?porci[oó]n\s+(?:proximal|distal)\b'
+            . '|(?:esta|dicha)\s+(?:lesi[oó]n|estructura|masa|n[oó]dulo)\b'
             . '|estratificaci[oó]n\b'
             . '|patr[oó]n\s+(?:mucoso|gaseoso|l[ií]quido|alimenticio)\b'
             . '|ecogenicidad\b'
@@ -731,6 +860,7 @@ function interpretacion_procesar_php(string $textoRecibido, ?array $origen = nul
         $hayContextoGastrointestinalFuerte = preg_match(
             '/(?:'
             . '\bmotilidad\b'
+            . '|\bsegmento\s+(?:m[aá]s\s+)?(?:hacia\s+)?(?:la\s+)?porci[oó]n\s+(?:proximal|distal)\b'
             . '|\bestratificaci[oó]n\b'
             . '|\bpatr[oó]n\s+(?:mucoso|gaseoso|l[ií]quido|alimenticio)\b'
             . '|\b(?:la\s+)?capa\s+(?:muscular|submucosa|mucosa)\b'
@@ -923,6 +1053,39 @@ function interpretacion_procesar_php(string $textoRecibido, ?array $origen = nul
             $fragmento
         ) ?? $fragmento;
 
+        /*
+         * Una mención anatómica usada únicamente como límite/localización
+         * tampoco constituye evaluación propia de esos órganos.
+         *
+         * Ejemplo:
+         *   "estructura que abarca desde íleon hasta colon ascendente"
+         *
+         * Íleon y Colon son referencias espaciales de la estructura;
+         * no deben crear secciones clínicas propias por esta frase.
+         */
+        $fragmentoParaContextosOrgano = preg_replace(
+            '/\b(?:'
+            . 'abarca'
+            . '|se\s+extiende'
+            . '|extendi[eé]ndose'
+            . '|localizad[oa]'
+            . '|ubicad[oa]'
+            . ')\b'
+            . '[^.!?;]{0,100}?'
+            . '\bdesde\s+'
+            . '(?:(?:el|la|los|las)\s+)?'
+            . '(?:' . $patronOrgano . ')'
+            . '(?:\s+(?:izquierd[oa]|derech[oa]))?'
+            . '[^.!?;]{0,60}?'
+            . '\bhasta\s+'
+            . '(?:(?:el|la|los|las)\s+)?'
+            . '(?:' . $patronOrgano . ')'
+            . '(?:\s+(?:izquierd[oa]|derech[oa]))?'
+            . '/iu',
+            '__VMREFRANGO__',
+            $fragmentoParaContextosOrgano
+        ) ?? $fragmentoParaContextosOrgano;
+
         // Si aparecen varios órganos DISTINTOS, no atribuir todo a uno solo.
         preg_match_all(
             '/(?<!\p{L})(?<organo>' . $patronOrgano . ')'
@@ -1013,6 +1176,10 @@ function interpretacion_procesar_php(string $textoRecibido, ?array $origen = nul
                 'tipo' => 'segmento_ambiguo',
                 'evidencia' => $fragmento
             ];
+
+            // Una frontera anatómica ambigua invalida la continuidad previa.
+            $organoActivo = null;
+            $lateralidadActiva = null;
         } elseif (
             $organo === null
             && $organoActivo !== null
@@ -2850,6 +3017,49 @@ function interpretacion_procesar_php(string $textoRecibido, ?array $origen = nul
     $usosTerminoA = [];
     $usosTerminoB = [];
 
+    /*
+     * Ventana textual compacta alrededor de una discrepancia.
+     *
+     * Se usa especialmente cuando LCS reduce una contradicción como:
+     *
+     *   "uréter visible"
+     *   "uréter no visible"
+     *
+     * a una diferencia aislada:
+     *
+     *   "" / "no"
+     *
+     * No realiza inferencia clínica ni usa orden de plantilla.
+     */
+    $extraerVentanaLocal = static function (
+        string $texto,
+        ?int $indice
+    ): string {
+        $tokens = preg_split(
+            '/\\s+/u',
+            trim($texto),
+            -1,
+            PREG_SPLIT_NO_EMPTY
+        );
+
+        if (!is_array($tokens) || $tokens === []) {
+            return '';
+        }
+
+        $centro = $indice ?? 0;
+        $centro = max(
+            0,
+            min($centro, count($tokens) - 1)
+        );
+
+        $inicio = max(0, $centro - 6);
+
+        return implode(
+            ' ',
+            array_slice($tokens, $inicio, 13)
+        );
+    };
+
     foreach (($origen['discrepancias'] ?? []) as $d) {
         $a = trim((string)($d['a'] ?? ''));
         $b = trim((string)($d['b'] ?? ''));
@@ -3043,6 +3253,56 @@ function interpretacion_procesar_php(string $textoRecibido, ?array $origen = nul
 
         $textoAlternativas = $a . ' ' . $b;
 
+        /*
+         * Contradicción de polaridad reducida por LCS.
+         *
+         * Ejemplos:
+         *
+         *   "uréter visible"
+         *   "uréter no visible"
+         *
+         *   "se observa masa"
+         *   "no se observa masa"
+         *
+         * cmp_comparar() conserva las palabras comunes y puede dejar
+         * únicamente "" / "no" como discrepancia.
+         *
+         * No elegimos ninguna alternativa. Conservamos contexto textual
+         * suficiente para que la capa de redacción vea ambas afirmaciones.
+         */
+        $esNegacionAislada = (
+            ($claveA === '' && $claveB === 'no')
+            || ($claveB === '' && $claveA === 'no')
+        );
+
+        $contextoPolaridadA = '';
+        $contextoPolaridadB = '';
+
+        if ($esNegacionAislada) {
+            $prioridad = 'alta';
+            $atributo = 'polaridad_clinica';
+
+            /*
+             * No conservar un órgano heredado únicamente desde un bloque
+             * anterior: la anatomía real queda visible en el contexto A/B.
+             */
+            $organo = null;
+            $lateralidad = null;
+
+            $indiceReferenciaA = $indiceA ?? $indiceB;
+            $indiceReferenciaB = $indiceB ?? $indiceA;
+
+            $contextoPolaridadA = $extraerVentanaLocal(
+                $textoA,
+                $indiceReferenciaA
+            );
+
+            $contextoPolaridadB = $extraerVentanaLocal(
+                $textoB,
+                $indiceReferenciaB
+            );
+        }
+
         $esRinon = $organo !== null
             && preg_match(
                 '/(?<!\p{L})ri(?:ñ|n)[oó]n(?!\p{L})/iu',
@@ -3175,10 +3435,17 @@ function interpretacion_procesar_php(string $textoRecibido, ?array $origen = nul
         ];
 
         if ($prioridad === 'alta') {
-            $discrepancia['evidencia_contexto'] = [
-                'motor_a' => $contextoA['contexto'] ?? '',
-                'motor_b' => $contextoB['contexto'] ?? ''
-            ];
+            if ($atributo === 'polaridad_clinica') {
+                $discrepancia['evidencia_contexto'] = [
+                    'motor_a' => $contextoPolaridadA,
+                    'motor_b' => $contextoPolaridadB
+                ];
+            } else {
+                $discrepancia['evidencia_contexto'] = [
+                    'motor_a' => $contextoA['contexto'] ?? '',
+                    'motor_b' => $contextoB['contexto'] ?? ''
+                ];
+            }
 
             if ($atributo === 'medida') {
                 $alertas[] = [
